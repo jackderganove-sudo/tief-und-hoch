@@ -324,7 +324,20 @@ function readPack(file: string, report: Report): Incoming[] {
     if (!lang) report.error(where, 'lang fehlt (in der Frage oder im Paket angeben)');
     if (!topic) report.error(where, 'topic fehlt (in der Frage oder im Paket angeben)');
     if (!lang || !topic) return;
-    const answers = [...raw.answers].sort((a, b) => b.baseScore - a.baseScore || a.text.localeCompare(b.text));
+    const answers = raw.answers
+      .map((a) => {
+        // Aliase, die nach Normalisierung dasselbe sind wie der Text oder ein früherer Alias
+        // ("Piña Colada" / "Pina Colada"), bringen nichts – stillschweigend weglassen.
+        const seen = new Set([compact(a.text)]);
+        const aliases = a.aliases.filter((alias) => {
+          const key = compact(alias);
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        return { ...a, aliases };
+      })
+      .sort((a, b) => b.baseScore - a.baseScore || a.text.localeCompare(b.text));
     const modes: Mode[] = raw.modes ? MODES.filter((m) => raw.modes!.includes(m)) : deriveModes(answers);
     if (modes.length === 0) {
       report.error(where, 'passt zu keinem Modus: weder klare Top-Antwort (≥ 80) noch genug seltene Antworten');
