@@ -1,0 +1,94 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'Fraunces Variable', ui-serif, Georgia, serif;
+  --font-sans: 'Outfit Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Höhle */
+  --color-cave-950: #07060b;
+  --color-cave-900: #0f0d17;
+  --color-cave-800: #1a1726;
+  --color-glow-crystal: #8be9fd;
+  --color-glow-violet: #b794f6;
+  --color-glow-shroom: #5eead4;
+  --color-glow-lava: #ff6a2b;
+
+  /* Himmel */
+  --color-sky-day: #9fd8ff;
+  --color-sky-mist: #e9f5ff;
+  --color-sky-dusk: #ff9a76;
+  --color-sky-night: #121a44;
+  --color-balloon: #ff7a59;
+  --color-cream: #fff7ec;
+
+  --animate-twinkle: twinkle 3.2s ease-in-out infinite;
+  --animate-pulse-glow: pulse-glow 3.6s ease-in-out infinite;
+  --animate-rise: rise 5s linear infinite;
+  --animate-drift: drift 40s linear infinite alternate;
+  --animate-bob: bob 4s ease-in-out infinite;
+  --animate-sway: sway 5s ease-in-out infinite;
+  --animate-flicker: flicker 0.18s ease-in-out infinite alternate;
+
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.25; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+  @keyframes pulse-glow {
+    0%, 100% { opacity: 0.75; }
+    50% { opacity: 1; }
+  }
+  @keyframes rise {
+    0% { transform: translateY(0) scale(1); opacity: 0; }
+    10% { opacity: 1; }
+    100% { transform: translateY(-40vmin) scale(0.4); opacity: 0; }
+  }
+  @keyframes drift {
+    from { transform: translateX(-6%); }
+    to { transform: translateX(6%); }
+  }
+  @keyframes bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-1.2vmin); }
+  }
+  @keyframes sway {
+    0%, 100% { transform: rotate(-2.5deg); }
+    50% { transform: rotate(2.5deg); }
+  }
+  @keyframes flicker {
+    from { transform: scaleY(0.85); opacity: 0.85; }
+    to { transform: scaleY(1.1); opacity: 1; }
+  }
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    margin: 0;
+    background: var(--color-cave-950);
+    color: var(--color-cream);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+  button {
+    cursor: pointer;
+  }
+  :focus-visible {
+    outline: 3px solid color-mix(in srgb, white 70%, transparent);
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
