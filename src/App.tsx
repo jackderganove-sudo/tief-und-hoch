@@ -11,8 +11,8 @@ import { GameScreen } from './screens/GameScreen';
 import { ResultScreen } from './screens/ResultScreen';
 import { PracticeScreen } from './screens/PracticeScreen';
 
-// Nur im Dev-Server geladen; im Produktions-Build fällt der Import komplett weg.
-const DebugPanel = import.meta.env.DEV ? lazy(() => import('./debug/DebugPanel')) : null;
+// Nur im Dev-Server oder mit VITE_ENABLE_DEBUG=true geladen; sonst fällt der Import komplett weg.
+const DebugPanel = import.meta.env.DEV || __DEBUG_BUILD__ ? lazy(() => import('./debug/DebugPanel')) : null;
 
 type Screen =
   | { name: 'home' }

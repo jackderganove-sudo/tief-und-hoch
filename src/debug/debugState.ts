@@ -1,12 +1,16 @@
 /**
- * Debug-Zustand (nur im Dev-Server, aktiv mit ?debug=1).
- * Im Produktions-Build ist import.meta.env.DEV = false → alles hier wird zu
- * Konstanten und der Rest wegoptimiert.
+ * Debug-Zustand, aktiv mit ?debug=1 – aber nur, wenn `debugAvailable` gilt.
  */
 const KEY = 'tuh:v1:debug:dayOffset';
 
+/**
+ * Debug-Code ist im Bundle, wenn der Dev-Server läuft oder der Build mit
+ * VITE_ENABLE_DEBUG=true gebaut wurde (Test-Deployment). Sonst wird er wegoptimiert.
+ */
+export const debugAvailable: boolean = import.meta.env.DEV || __DEBUG_BUILD__;
+
 export const debugEnabled: boolean =
-  import.meta.env.DEV && typeof location !== 'undefined' && new URLSearchParams(location.search).get('debug') === '1';
+  debugAvailable && typeof location !== 'undefined' && new URLSearchParams(location.search).get('debug') === '1';
 
 let offset = debugEnabled ? readOffset() : 0;
 const listeners = new Set<() => void>();
