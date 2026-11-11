@@ -1,0 +1,85 @@
+{
+  "app": {
+    "title": "Tief & Hoch",
+    "tagline": "7 questions a day. Two directions."
+  },
+  "modes": {
+    "rare": {
+      "name": "Descent",
+      "tagline": "The rarer your answer, the deeper you go",
+      "measure": "Depth"
+    },
+    "common": {
+      "name": "Ascent",
+      "tagline": "The more common your answer, the higher you rise",
+      "measure": "Height"
+    }
+  },
+  "home": {
+    "play": "Play",
+    "continue": "Continue",
+    "showResult": "See result",
+    "streak_one": "{{count}} day streak",
+    "streak_other": "{{count}} day streak",
+    "nextIn": "New questions in {{time}}",
+    "rules": "How to play",
+    "rulesText": "7 open questions, 25 seconds each, exactly one answer. It has to be a valid answer – otherwise 0 points. 1 point = 10 metres.",
+    "loading": "Loading …"
+  },
+  "game": {
+    "question": "Question {{n}} of {{total}}",
+    "placeholder": "Your answer …",
+    "submit": "Answer",
+    "didYouMean": "Did you mean: {{answer}}?",
+    "countedAs": "Counted as “{{answer}}”",
+    "invalid": "Not on the answer list",
+    "timeUp": "Time's up",
+    "empty": "No answer",
+    "next": "Next",
+    "finish": "See result",
+    "ready": "Ready?",
+    "start": "Let's go",
+    "topAnswer": "Most common: {{answer}}",
+    "rareAnswer": "Very rare: {{answer}}",
+    "points": "+{{points}}",
+    "back": "Back",
+    "noQuestions": "No questions available for today."
+  },
+  "tiers": {
+    "moss": "Moss",
+    "stone": "Stone",
+    "crystal": "Crystal",
+    "ember": "Ember",
+    "core": "Core",
+    "tooClever": "Too clever",
+    "meadow": "Meadow",
+    "treetops": "Treetops",
+    "clouds": "Clouds",
+    "sunset": "Sunset",
+    "stars": "Stars",
+    "invalid": "Miss"
+  },
+  "tierHints": {
+    "tooClever": "Sounds unusual – which is exactly why so many pick it."
+  },
+  "result": {
+    "title": "Your {{mode}}",
+    "points": "{{points}} of {{max}} points",
+    "share": "Share",
+    "copied": "Copied to clipboard",
+    "home": "Home",
+    "otherMode": "Try the {{mode}}",
+    "yourAnswer": "Your answer",
+    "stats": "Stats",
+    "played": "Played",
+    "best": "Best",
+    "average": "Average",
+    "streak": "Streak",
+    "maxStreak": "Max streak"
+  },
+  "lang": {
+    "label": "Language",
+    "de": "Deutsch",
+    "en": "English"
+  }
+}

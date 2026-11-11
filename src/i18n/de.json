@@ -1,0 +1,85 @@
+{
+  "app": {
+    "title": "Tief & Hoch",
+    "tagline": "Jeden Tag 7 Fragen. Zwei Richtungen."
+  },
+  "modes": {
+    "rare": {
+      "name": "Abstieg",
+      "tagline": "Je seltener deine Antwort, desto tiefer",
+      "measure": "Tiefe"
+    },
+    "common": {
+      "name": "Aufstieg",
+      "tagline": "Je häufiger deine Antwort, desto höher",
+      "measure": "Höhe"
+    }
+  },
+  "home": {
+    "play": "Spielen",
+    "continue": "Weiterspielen",
+    "showResult": "Ergebnis ansehen",
+    "streak_one": "{{count}} Tag in Folge",
+    "streak_other": "{{count}} Tage in Folge",
+    "nextIn": "Neue Fragen in {{time}}",
+    "rules": "So geht's",
+    "rulesText": "7 offene Fragen, je 25 Sekunden, genau eine Antwort. Die Antwort muss passen – sonst gibt es 0 Punkte. 1 Punkt = 10 Meter.",
+    "loading": "Lade …"
+  },
+  "game": {
+    "question": "Frage {{n}} von {{total}}",
+    "placeholder": "Deine Antwort …",
+    "submit": "Antworten",
+    "didYouMean": "Gemeint: {{answer}}?",
+    "countedAs": "Gewertet als „{{answer}}“",
+    "invalid": "Nicht in der Antwortliste",
+    "timeUp": "Zeit abgelaufen",
+    "empty": "Keine Antwort",
+    "next": "Weiter",
+    "finish": "Zum Ergebnis",
+    "ready": "Bereit?",
+    "start": "Los geht's",
+    "topAnswer": "Am häufigsten: {{answer}}",
+    "rareAnswer": "Sehr selten: {{answer}}",
+    "points": "+{{points}}",
+    "back": "Zurück",
+    "noQuestions": "Für heute sind keine Fragen hinterlegt."
+  },
+  "tiers": {
+    "moss": "Moos",
+    "stone": "Stein",
+    "crystal": "Kristall",
+    "ember": "Glut",
+    "core": "Kern",
+    "tooClever": "Zu schlau",
+    "meadow": "Wiese",
+    "treetops": "Baumwipfel",
+    "clouds": "Wolken",
+    "sunset": "Abendrot",
+    "stars": "Sterne",
+    "invalid": "Daneben"
+  },
+  "tierHints": {
+    "tooClever": "Klingt ausgefallen – aber genau darauf kommen viele."
+  },
+  "result": {
+    "title": "Dein {{mode}}",
+    "points": "{{points}} von {{max}} Punkten",
+    "share": "Teilen",
+    "copied": "In die Zwischenablage kopiert",
+    "home": "Zur Startseite",
+    "otherMode": "Zum {{mode}}",
+    "yourAnswer": "Deine Antwort",
+    "stats": "Statistik",
+    "played": "Gespielt",
+    "best": "Bestwert",
+    "average": "Schnitt",
+    "streak": "Serie",
+    "maxStreak": "Längste Serie"
+  },
+  "lang": {
+    "label": "Sprache",
+    "de": "Deutsch",
+    "en": "English"
+  }
+}
