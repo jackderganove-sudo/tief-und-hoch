@@ -1,0 +1,106 @@
+{
+  "lang": "en",
+  "mode": "rare",
+  "questions": [
+    {
+      "id": "en-rare-us-state",
+      "prompt": "Name a US state",
+      "answers": ["California=90", "Texas=75", "New York=70", "Florida=60", "Alaska=30", "Hawaii=30", "Washington=20", "Arizona=15", "Colorado=15", "Ohio=15", "Nevada=12", "Georgia=12", "Illinois=10", "Michigan=10", "Oregon=10", "Pennsylvania=10", "Utah=8", "Virginia=8", "Massachusetts=8", "New Jersey=8", "Louisiana=8", "Montana=6", "North Carolina=6", "Tennessee=6", "Kentucky=6", "Alabama=6", "Mississippi=6", "Kansas=6", "Iowa=6", "Minnesota=6", "Wyoming=6!", "South Carolina=5", "Nebraska=5", "Idaho=5", "Wisconsin=5", "Missouri=5", "Oklahoma=5", "Indiana=5", "Arkansas=4", "Maine=4", "Vermont=4", "Connecticut=4", "Maryland=4", "New Mexico=4", "New Hampshire=3", "Rhode Island=3", "West Virginia=3", "North Dakota=2", "South Dakota=2", "Delaware=2"]
+    },
+    {
+      "id": "en-rare-planet",
+      "prompt": "Name a planet or dwarf planet in our solar system",
+      "answers": ["Mars=90", "Jupiter=70", "Saturn=60", "Earth=50", "Venus=45", "Pluto=30!", "Mercury=25", "Uranus=20", "Neptune=18", "Ceres=3", "Eris=2", "Haumea=1", "Makemake=1"]
+    },
+    {
+      "id": "en-rare-zodiac",
+      "prompt": "Name a zodiac sign (Western or Chinese)",
+      "answers": ["Leo=70", "Scorpio=45", "Gemini=45", "Aries=40", "Taurus=40", "Virgo=30", "Cancer=30", "Aquarius=30", "Pisces=30", "Libra=25", "Sagittarius=25", "Capricorn=25", "Ophiuchus=8!", "Dragon=8", "Tiger=6", "Rat=5", "Dog=5", "Rabbit=4", "Snake=4", "Monkey=4", "Pig=4", "Ox=3", "Horse=3", "Goat|Sheep=3", "Rooster=3"]
+    },
+    {
+      "id": "en-rare-element",
+      "prompt": "Name a chemical element",
+      "answers": ["Oxygen=90", "Hydrogen=70", "Gold=60", "Iron=55", "Carbon=50", "Nitrogen=40", "Helium=40", "Silver=35", "Copper=30", "Uranium=25", "Sodium=20", "Aluminium|Aluminum=20", "Potassium=15", "Calcium=15", "Neon=15", "Lead=15", "Chlorine=15", "Mercury=15", "Zinc=12", "Magnesium=12", "Platinum=12", "Sulfur|Sulphur=12", "Lithium=12", "Titanium=10", "Plutonium=8", "Phosphorus=8", "Silicon=8", "Tin=8", "Nickel=8", "Argon=6", "Fluorine=6", "Xenon=6", "Iodine=5", "Krypton=5", "Tungsten=4", "Cobalt=4", "Chromium=4", "Arsenic=4", "Radon=3", "Manganese=3", "Boron=3", "Radium=3", "Beryllium=2", "Polonium=2", "Caesium|Cesium=2", "Gallium=2", "Germanium=2", "Selenium=2", "Barium=2", "Palladium=2", "Francium=1", "Strontium=1", "Vanadium=1", "Osmium=1", "Iridium=1", "Rhodium=1", "Tantalum=1", "Bismuth=1", "Antimony=1", "Thorium=1", "Neodymium=1", "Europium=1", "Einsteinium=1", "Oganesson=1!"]
+    },
+    {
+      "id": "en-rare-europe-country",
+      "prompt": "Name a country in Europe",
+      "answers": ["France=80", "Germany=75", "Italy=70", "Spain=65", "United Kingdom|UK|Britain|Great Britain=40", "England=20", "Scotland=12", "Wales=8", "Northern Ireland=4", "Ireland=30", "Portugal=25", "Greece=30", "Netherlands|Holland=30", "Switzerland=30", "Poland=25", "Sweden=25", "Norway=25", "Austria=20", "Belgium=20", "Denmark=20", "Finland=15", "Iceland=12", "Czechia|Czech Republic=12", "Hungary=12", "Croatia=12", "Ukraine=12", "Russia=10", "Romania=10", "Luxembourg=8", "Liechtenstein=10!", "Vatican City|Vatican|Holy See=12!", "Monaco=8", "Bulgaria=8", "Slovakia=6", "Slovenia=6", "Serbia=6", "Malta=6", "Albania=5", "Lithuania=5", "Latvia=5", "Estonia=5", "Bosnia and Herzegovina|Bosnia=4", "Montenegro=4", "Andorra=4", "San Marino=4", "Belarus=4", "Cyprus=4", "North Macedonia|Macedonia=3", "Kosovo=3", "Moldova=3"]
+    },
+    {
+      "id": "en-rare-shakespeare",
+      "prompt": "Name a play by Shakespeare",
+      "answers": ["Romeo and Juliet=90", "Hamlet=80", "Macbeth=60", "A Midsummer Night's Dream|Midsummer Night's Dream=35", "Othello=30", "King Lear=25", "Julius Caesar=25", "The Tempest|Tempest=20", "Much Ado About Nothing=15", "The Merchant of Venice|Merchant of Venice=15", "Twelfth Night=12", "The Taming of the Shrew|Taming of the Shrew=12", "As You Like It=8", "Richard III=8", "Antony and Cleopatra=6", "Henry V=6", "The Winter's Tale|Winter's Tale=4", "Henry IV=3", "Richard II=3", "Coriolanus=3", "Titus Andronicus=3", "All's Well That Ends Well=3", "The Comedy of Errors|Comedy of Errors=3", "The Merry Wives of Windsor|Merry Wives of Windsor=3", "Henry VI=2", "Henry VIII=2", "King John=2", "Measure for Measure=2", "Love's Labour's Lost=2", "The Two Gentlemen of Verona|Two Gentlemen of Verona=2", "Timon of Athens=1", "Cymbeline=1", "Pericles=1", "Troilus and Cressida=1", "The Two Noble Kinsmen|Two Noble Kinsmen=1!"]
+    },
+    {
+      "id": "en-rare-greek-letter",
+      "prompt": "Name a letter of the Greek alphabet",
+      "answers": ["Alpha=80", "Beta=50", "Omega=50", "Delta=40", "Gamma=35", "Pi=35", "Epsilon=15", "Lambda=15", "Omicron=15", "Sigma=15", "Kappa=10", "Theta=8", "Mu=8", "Phi=8", "Zeta=6", "Tau=6", "Psi=6", "Eta=4", "Iota=4", "Xi=4", "Upsilon=4", "Chi=4", "Nu=3", "Rho=3"]
+    },
+    {
+      "id": "en-rare-instrument",
+      "prompt": "Name a musical instrument",
+      "answers": ["Guitar=85", "Piano=80", "Drums=55", "Violin|Fiddle=50", "Flute=40", "Trumpet=35", "Saxophone|Sax=30", "Cello=20", "Harp=15", "Clarinet=15", "Trombone=12", "Bass|Bass guitar=12", "Ukulele=10", "Recorder=10", "Harmonica=10", "Organ=10", "Keyboard=8", "Tuba=8", "Triangle=8!", "Accordion=8", "Banjo=6", "Oboe=6", "French horn|Horn=6", "Double bass|Upright bass=6", "Xylophone=6", "Bagpipes=5", "Tambourine=5", "Bassoon=4", "Didgeridoo=4", "Synthesizer|Synth=4", "Mandolin=3", "Glockenspiel=3", "Timpani=3", "Bongos=3", "Cajon=3", "Sitar=2", "Zither=2", "Balalaika=2", "Pan flute|Panpipes=2", "Harpsichord=2", "Lute=2", "Marimba=2", "Castanets=2", "Melodica=2", "Cowbell=2", "Steel drum|Steelpan=1", "Theremin=1", "Dulcimer=1", "Kalimba=1", "Harmonium=1", "Bandoneon=1", "Hurdy-gurdy=1"]
+    },
+    {
+      "id": "en-rare-number-1-20",
+      "prompt": "Name a whole number from 1 to 20",
+      "answers": ["7|seven=60", "3|three=20", "1|one=15", "5|five=15", "8|eight=15", "10|ten=15", "13|thirteen=15", "4|four=12", "12|twelve=12", "2|two=10", "17|seventeen=10!", "6|six=8", "9|nine=8", "11|eleven=8", "15|fifteen=6", "20|twenty=6", "19|nineteen=5", "14|fourteen=3", "16|sixteen=3", "18|eighteen=3"]
+    },
+    {
+      "id": "en-rare-vegetable",
+      "prompt": "Name a vegetable",
+      "answers": ["Carrot|Carrots=80", "Broccoli=55", "Potato|Potatoes=40", "Cucumber=35", "Lettuce=30", "Tomato=30", "Pepper|Bell pepper=25", "Peas|Pea=25", "Spinach=20", "Onion=20", "Corn|Sweetcorn=20", "Cauliflower=15", "Cabbage=15", "Celery=12", "Green beans|Beans=12", "Zucchini|Courgette=12", "Eggplant|Aubergine=10", "Asparagus=10", "Brussels sprouts|Sprouts=10", "Kale=8", "Pumpkin=8", "Sweet potato=8", "Garlic=6", "Mushroom=6", "Radish=6", "Beetroot|Beet=6", "Leek=5", "Squash=5", "Artichoke=4", "Cabbage red|Red cabbage=3", "Turnip=4", "Parsnip=4", "Arugula|Rocket=3", "Okra=3", "Bok choy|Pak choi=3", "Swede|Rutabaga=2", "Fennel=2", "Chard|Swiss chard=2", "Rhubarb=3!", "Kohlrabi=2", "Celeriac=1", "Jerusalem artichoke=1", "Romanesco=1", "Salsify=1", "Endive|Chicory=1", "Watercress=1", "Daikon=1", "Jicama=1"]
+    },
+    {
+      "id": "en-rare-bone",
+      "prompt": "Name a bone in the human body",
+      "answers": ["Femur=50", "Skull|Cranium=40", "Rib|Ribs=40", "Spine|Backbone|Vertebra|Vertebrae=25", "Tibia=25", "Humerus=20!", "Fibula=15", "Pelvis=15", "Collarbone|Clavicle=15", "Jaw|Jawbone|Mandible=12", "Radius=10", "Ulna=10", "Kneecap|Patella=10", "Shoulder blade|Scapula=8", "Tailbone|Coccyx=8", "Sternum|Breastbone=6", "Stapes|Stirrup=4", "Phalanges|Phalanx=3", "Sacrum=2", "Metacarpal=2", "Metatarsal=2", "Heel bone|Calcaneus=2", "Cheekbone|Zygomatic=2", "Hyoid=1", "Talus=1", "Scaphoid=1", "Incus|Anvil=1", "Malleus|Hammer=1", "Maxilla=1", "Atlas=1", "Axis=1", "Ilium=1", "Ischium=1", "Pubis=1", "Sphenoid=1", "Ethmoid=1", "Lunate=1", "Trapezium=1", "Hamate=1", "Cuboid=1", "Navicular=1", "Vomer=1", "Occipital=1", "Temporal=1", "Parietal=1", "Frontal=1", "Lacrimal=1", "Palatine=1"]
+    },
+    {
+      "id": "en-rare-dog-breed",
+      "prompt": "Name a breed of dog",
+      "answers": ["Labrador|Labrador Retriever|Lab=80", "German Shepherd|Alsatian=60", "Golden Retriever=55", "Poodle=40", "Bulldog=35", "Beagle=30", "Chihuahua=30", "Pug=25", "Dachshund|Sausage dog=25", "Husky|Siberian Husky=25", "Rottweiler=20", "Border Collie|Collie=15", "Boxer=12", "Dalmatian=12", "Great Dane=12", "Corgi=12", "Pit Bull=10", "Doberman=10", "Shih Tzu=10", "Yorkshire Terrier|Yorkie=10", "French Bulldog|Frenchie=10", "Cocker Spaniel|Spaniel=8", "Jack Russell=8", "Greyhound=8", "Pomeranian=8", "Saint Bernard|St Bernard=8", "Labradoodle=5!", "Schnauzer=5", "Maltese=4", "Shiba Inu=4", "Bichon Frise=3", "Whippet=3", "Akita=3", "Bernese Mountain Dog=3", "Newfoundland=3", "Basset Hound=3", "Bloodhound=3", "Staffordshire Bull Terrier|Staffy=3", "Weimaraner=2", "Afghan Hound=2", "Samoyed=2", "Cockapoo=2", "Shar Pei=2", "Chow Chow=2", "Pekingese=2", "Mastiff=2", "Malamute=2", "Westie|West Highland Terrier=2", "Bull Terrier=2", "Irish Setter=2", "Cavalier King Charles Spaniel|Cavalier=2", "Vizsla=1", "Basenji=1", "Xoloitzcuintli=1", "Puli=1", "Komondor=1", "Borzoi=1", "Papillon=1", "Lhasa Apso=1", "Pointer=1"]
+    },
+    {
+      "id": "en-rare-olympic-sport",
+      "prompt": "Name a sport or event at the Summer Olympics",
+      "answers": ["Swimming=60", "Athletics|Track and field=45", "Gymnastics=40", "Basketball=25", "Football|Soccer=20", "Tennis=15", "Boxing=15", "Cycling=15", "Volleyball=12", "Rowing=10", "Fencing=10", "Diving=10", "Judo=8", "Equestrian|Horse riding=8", "Archery=8", "Table tennis|Ping pong=8", "Wrestling=6", "Sailing=6", "Weightlifting=6", "Badminton=6", "Triathlon=6", "Beach volleyball=6", "Canoeing|Kayaking=5", "Hockey|Field hockey=5", "Marathon=5", "Handball=5", "Breaking|Breakdancing=5!", "Shooting=4", "Skateboarding=4", "Sprint|100m=4", "Modern pentathlon=3", "Taekwondo=3", "Water polo=3", "Golf=3", "Surfing=3", "Sport climbing|Climbing=3", "Synchronised swimming|Artistic swimming=3", "High jump=3", "Long jump=3", "Rugby|Rugby sevens=2", "BMX=2", "Trampoline=2", "Javelin=2", "Shot put=2", "Pole vault=2", "Decathlon=2", "Rhythmic gymnastics=1", "Discus=1", "Hammer throw=1", "Hurdles=1"]
+    },
+    {
+      "id": "en-rare-herb-spice",
+      "prompt": "Name a herb or spice",
+      "answers": ["Pepper|Black pepper=55", "Salt=40", "Basil=35", "Cinnamon=35", "Oregano=25", "Paprika=25", "Parsley=20", "Rosemary=20", "Thyme=20", "Cumin=15", "Garlic=15", "Ginger=12", "Mint=12", "Chili|Chilli|Cayenne=12", "Turmeric=10", "Nutmeg=10", "Coriander|Cilantro=10", "Sage=8", "Dill=8", "Curry=8", "Chives=6", "Vanilla=6", "Saffron=6!", "Cloves=5", "Cardamom=5", "Bay leaf|Bay=5", "Allspice=4", "Tarragon=3", "Star anise=3", "Fennel seed|Fennel=3", "Marjoram=3", "Mustard seed|Mustard=3", "Anise|Aniseed=2", "Lemongrass=2", "Juniper=2", "Garam masala=2", "Lemon balm=1", "Lovage=1", "Chervil=1", "Fenugreek=1", "Asafoetida=1", "Sumac=1", "Za'atar=1", "Ras el hanout=1", "Caraway=1", "Savory=1"]
+    },
+    {
+      "id": "en-rare-us-president",
+      "prompt": "Name a US president",
+      "answers": ["Abraham Lincoln|Lincoln=80", "George Washington|Washington=70", "Barack Obama|Obama=50", "Donald Trump|Trump=45", "John F Kennedy|JFK|Kennedy=35", "Joe Biden|Biden=30", "Ronald Reagan|Reagan=20", "Bill Clinton|Clinton=20", "George W Bush|Bush|George Bush=20", "Thomas Jefferson|Jefferson=20", "Franklin D Roosevelt|FDR|Franklin Roosevelt|Roosevelt=15", "Richard Nixon|Nixon=15", "Theodore Roosevelt|Teddy Roosevelt=12", "Jimmy Carter|Carter=10", "Dwight Eisenhower|Eisenhower=8", "John Adams|Adams=8", "Harry Truman|Truman=6", "Andrew Jackson|Jackson=6", "James Madison|Madison=5", "Ulysses S Grant|Grant=5", "Gerald Ford|Ford=5", "James Monroe|Monroe=4", "Lyndon B Johnson|LBJ|Lyndon Johnson=4", "Woodrow Wilson|Wilson=4", "George H W Bush=3", "William Howard Taft|Taft=3", "Herbert Hoover|Hoover=3", "John Quincy Adams=2", "Calvin Coolidge|Coolidge=2", "William McKinley|McKinley=2", "Grover Cleveland|Cleveland=2", "James K Polk|Polk=2", "James Garfield|Garfield=2", "Millard Fillmore|Fillmore=1!", "Warren Harding|Harding=1", "Martin Van Buren|Van Buren=1", "William Henry Harrison=1", "Benjamin Harrison=1", "John Tyler|Tyler=1", "Zachary Taylor|Taylor=1", "Franklin Pierce|Pierce=1", "James Buchanan|Buchanan=1", "Rutherford B Hayes|Hayes=1", "Chester A Arthur|Chester Arthur=1", "Andrew Johnson=1"]
+    },
+    {
+      "id": "en-rare-bird",
+      "prompt": "Name a species of bird",
+      "answers": ["Eagle=45", "Robin=35", "Pigeon=35", "Sparrow=30", "Owl=30", "Crow=25", "Parrot=20", "Penguin=15!", "Blue jay|Jay=15", "Duck=15", "Chicken=12", "Seagull|Gull=12", "Hawk=12", "Flamingo=12", "Swan=10", "Cardinal=10", "Ostrich=10", "Hummingbird=10", "Woodpecker=8", "Peacock=8", "Falcon=8", "Raven=8", "Goose=6", "Magpie=6", "Pelican=6", "Toucan=5", "Turkey=5", "Stork=5", "Kiwi=4", "Vulture=4", "Heron=4", "Blackbird=4", "Starling=4", "Finch=4", "Canary=4", "Budgie|Budgerigar|Parakeet=4", "Emu=3", "Cockatoo=3", "Kingfisher=3", "Crane=3", "Wren=2", "Swallow=2", "Albatross=2", "Condor=2", "Puffin=3", "Nightingale=2", "Pheasant=2", "Lark=2", "Mockingbird=2", "Cuckoo=2", "Osprey=1", "Cormorant=1", "Hoopoe=1", "Lapwing=1", "Quail=1", "Kookaburra=1", "Dodo=1", "Goldfinch=1", "Chickadee=1", "Bullfinch=1", "Booby|Blue-footed booby=1"]
+    },
+    {
+      "id": "en-rare-colour",
+      "prompt": "Name a colour",
+      "answers": ["Red=80", "Blue=75", "Green=50", "Yellow=40", "Black=25", "Purple|Violet=20", "White=20", "Orange=15", "Pink=15", "Brown=10", "Grey|Gray=8", "Turquoise=8", "Gold=5", "Silver=4", "Beige=3", "Magenta=3", "Teal=3", "Cyan=2", "Maroon|Burgundy=2", "Ochre=2", "Olive=2", "Mint=2", "Indigo=2", "Lavender=2", "Navy|Navy blue=2", "Azure=1", "Crimson=1", "Scarlet=1", "Vermilion=1", "Ultramarine=1", "Mauve=1", "Taupe=1!", "Fuchsia=1", "Emerald=1", "Cobalt=1", "Apricot=1", "Khaki=1", "Charcoal=1", "Ivory=1", "Mustard=1", "Salmon=1", "Cream=1", "Chartreuse=1", "Periwinkle=1", "Puce=1", "Cerulean=1", "Lilac=1"]
+    },
+    {
+      "id": "en-rare-tool",
+      "prompt": "Name a tool",
+      "answers": ["Hammer=85", "Screwdriver=60", "Wrench|Spanner=35", "Saw=35", "Drill=30", "Pliers=30", "Tape measure=10", "Level|Spirit level=8", "Axe=8", "File=6", "Chisel=6", "Allen key|Hex key|Allen wrench=5!", "Shovel|Spade=5", "Plane=4", "Utility knife|Box cutter|Stanley knife=4", "Crowbar=4", "Mallet=3", "Paintbrush=3", "Soldering iron=3", "Angle grinder=3", "Pipe wrench=2", "Sandpaper=2", "Jigsaw=2", "Vise|Vice=2", "Putty knife|Scraper=2", "Wire cutters=2", "Hoe=2", "Rake=2", "Clamp=2", "Staple gun=2", "Trowel=2", "Awl=1", "Torque wrench=1", "Multimeter=1", "Hot glue gun|Glue gun=1", "Tweezers=1", "Hacksaw=1", "Wire stripper=1", "Socket wrench|Ratchet=2", "Stud finder=1", "Nail gun=1", "Sledgehammer=1"]
+    },
+    {
+      "id": "en-rare-uk-city",
+      "prompt": "Name a city in the United Kingdom",
+      "answers": ["London=90", "Manchester=50", "Liverpool=40", "Birmingham=35", "Edinburgh=30", "Glasgow=25", "Leeds=15", "Bristol=15", "Cardiff=12", "Oxford=12", "Cambridge=12", "Belfast=10", "Newcastle=10", "Sheffield=10", "Nottingham=8", "Brighton=8", "York=8", "Leicester=6", "Bath=6", "Southampton=5", "Portsmouth=5", "Aberdeen=5", "Dundee=4", "Coventry=4", "Bradford=4", "Plymouth=4", "Norwich=4", "Canterbury=4", "Swansea=4", "Inverness=3", "Exeter=3", "Stoke-on-Trent|Stoke=3", "Derby=3", "Hull=3", "Sunderland=3", "Wolverhampton=2", "Lancaster=2", "Chester=2", "Durham=2", "Winchester=2", "Salisbury=2", "Lincoln=2", "Gloucester=2", "Worcester=2", "Derry|Londonderry=2", "Milton Keynes=2", "Hereford=1", "Wells=1", "St Davids=1!", "Newport=1", "Armagh=1", "Stirling=1", "Perth=1", "Peterborough=1", "Ely=1", "Truro=1", "Ripon=1", "Carlisle=1", "Preston=1", "Wakefield=1", "Lichfield=1", "Bangor=1", "St Albans=1", "Chelmsford=1", "Salford=1", "Lisburn=1", "Dunfermline=1"]
+    },
+    {
+      "id": "en-rare-fairy-tale",
+      "prompt": "Name a classic fairy tale",
+      "answers": ["Cinderella=70", "Little Red Riding Hood|Red Riding Hood=60", "Snow White=55", "Hansel and Gretel=45", "Sleeping Beauty=40", "The Three Little Pigs|Three Little Pigs=40", "Rapunzel=35", "Jack and the Beanstalk=35", "Goldilocks|Goldilocks and the Three Bears=35", "The Little Mermaid|Little Mermaid=25", "Beauty and the Beast=25", "Rumpelstiltskin=15", "The Frog Prince|Frog Prince=15", "The Ugly Duckling|Ugly Duckling=15", "The Princess and the Pea=12", "Puss in Boots=10", "The Emperor's New Clothes|Emperor's New Clothes=10", "The Gingerbread Man|Gingerbread Man=10", "Thumbelina=6", "The Snow Queen|Snow Queen=5", "The Pied Piper of Hamelin|Pied Piper=5", "Aladdin=5!", "The Elves and the Shoemaker=4", "The Little Match Girl=4", "Three Billy Goats Gruff|Billy Goats Gruff=4", "Tom Thumb=3", "The Town Musicians of Bremen|Bremen Town Musicians=3", "The Golden Goose=2", "The Twelve Dancing Princesses=2", "Bluebeard=2", "The Steadfast Tin Soldier|Tin Soldier=2", "The Red Shoes=2", "Henny Penny|Chicken Little=2", "The Brave Little Tailor=2", "The Wolf and the Seven Young Kids=2", "The Wild Swans=1", "The Nightingale=1", "The Fisherman and His Wife=1", "Snow White and Rose Red=1", "Diamonds and Toads=1", "East of the Sun and West of the Moon=1", "The Goose Girl=1", "Donkeyskin=1", "The Juniper Tree=1", "Hans My Hedgehog=1", "Sweet Porridge|The Magic Porridge Pot=1"]
+    }
+  ]
+}
