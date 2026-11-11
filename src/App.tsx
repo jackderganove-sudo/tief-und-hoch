@@ -9,11 +9,15 @@ import { currentLang } from './i18n';
 import { HomeScreen } from './screens/HomeScreen';
 import { GameScreen } from './screens/GameScreen';
 import { ResultScreen } from './screens/ResultScreen';
+import { PracticeScreen } from './screens/PracticeScreen';
 
 // Nur im Dev-Server geladen; im Produktions-Build fällt der Import komplett weg.
 const DebugPanel = import.meta.env.DEV ? lazy(() => import('./debug/DebugPanel')) : null;
 
-type Screen ={ name: 'home' } | { name: 'game'; mode: Mode; dateKey: string } | { name: 'result'; mode: Mode; dateKey: string };
+type Screen =
+  | { name: 'home' }
+  | { name: 'practice' }
+  | { name: 'game'; mode: Mode; dateKey: string } | { name: 'result'; mode: Mode; dateKey: string };
 
 export default function App() {
   useTranslation(); // bei Sprachwechsel neu rendern
@@ -29,7 +33,8 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      {screen.name === 'home' && <HomeScreen key={`${today}-${refresh}`} dateKey={today} onPlay={open} />}
+      {screen.name === 'home' && <HomeScreen key={`${today}-${refresh}`} dateKey={today} onPlay={open} onPractice={() => setScreen({ name: 'practice' })} />}
+      {screen.name === 'practice' && <PracticeScreen lang={currentLang()} dateKey={today} onExit={() => setScreen({ name: 'home' })} />}
       {screen.name === 'game' && (
         <GameScreen
           key={`${screen.mode}-${screen.dateKey}`}

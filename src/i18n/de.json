@@ -81,5 +81,43 @@
     "label": "Sprache",
     "de": "Deutsch",
     "en": "English"
+  },
+  "topics": {
+    "legend": "Themen",
+    "all": "Alle Themen",
+    "food": "Essen & Trinken",
+    "animals": "Tiere",
+    "gaming": "Gaming",
+    "anime": "Anime & Manga",
+    "music": "Musik",
+    "general": "Allgemein­wissen",
+    "geography": "Geo­grafie",
+    "sports": "Sport",
+    "movies_tv": "Filme & Serien",
+    "brands": "Marken",
+    "everyday": "Alltag"
+  },
+  "practice": {
+    "name": "Übung",
+    "title": "Übungsmodus",
+    "intro": "Endlos spielen, so lange du magst. Zählt nicht für Serie und Tagesergebnis.",
+    "mode": "Modus",
+    "start": "Übung starten",
+    "available_one": "{{count}} Frage verfügbar",
+    "available_other": "{{count}} Fragen verfügbar",
+    "pickTopic": "Wähle mindestens ein Thema.",
+    "questionNo": "Frage {{n}}",
+    "average": "Ø {{points}} P.",
+    "end": "Beenden",
+    "summary": "Übung beendet",
+    "answered_one": "{{count}} Frage beantwortet",
+    "answered_other": "{{count}} Fragen beantwortet",
+    "avgPoints": "Ø Punkte",
+    "bestTier": "Beste Stufe",
+    "valid": "Gültig",
+    "projected": "Hochgerechnet auf 7 Fragen",
+    "again": "Nochmal",
+    "noQuestions": "Für diese Auswahl gibt es keine Fragen.",
+    "gaugeHint": "Der Höhenmesser zeigt deinen Schnitt, hochgerechnet auf 7 Fragen."
   }
 }

@@ -81,5 +81,43 @@
     "label": "Language",
     "de": "Deutsch",
     "en": "English"
+  },
+  "topics": {
+    "legend": "Topics",
+    "all": "All topics",
+    "food": "Food & Drink",
+    "animals": "Animals",
+    "gaming": "Gaming",
+    "anime": "Anime & Manga",
+    "music": "Music",
+    "general": "General knowledge",
+    "geography": "Geography",
+    "sports": "Sports",
+    "movies_tv": "Movies & TV",
+    "brands": "Brands",
+    "everyday": "Everyday life"
+  },
+  "practice": {
+    "name": "Practice",
+    "title": "Practice mode",
+    "intro": "Play endlessly, for as long as you like. Does not count towards your streak or daily result.",
+    "mode": "Mode",
+    "start": "Start practice",
+    "available_one": "{{count}} question available",
+    "available_other": "{{count}} questions available",
+    "pickTopic": "Pick at least one topic.",
+    "questionNo": "Question {{n}}",
+    "average": "avg {{points}} pts",
+    "end": "Finish",
+    "summary": "Practice finished",
+    "answered_one": "{{count}} question answered",
+    "answered_other": "{{count}} questions answered",
+    "avgPoints": "Avg points",
+    "bestTier": "Best tier",
+    "valid": "Valid",
+    "projected": "Projected over 7 questions",
+    "again": "Again",
+    "noQuestions": "There are no questions for this selection.",
+    "gaugeHint": "The gauge shows your average, projected over 7 questions."
   }
 }

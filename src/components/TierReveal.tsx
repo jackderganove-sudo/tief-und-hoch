@@ -10,14 +10,19 @@ export function TierReveal({
   result,
   question,
   mode,
-  isLast,
+  nextLabel,
   onNext,
+  secondaryLabel,
+  onSecondary,
 }: {
   result: AnswerResult;
   question: Question;
   mode: Mode;
-  isLast: boolean;
+  nextLabel: string;
   onNext: () => void;
+  /** Optionaler zweiter Knopf (Übungsmodus: "Beenden"). */
+  secondaryLabel?: string;
+  onSecondary?: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const fmt = new Intl.NumberFormat(localeFor(i18n.language === 'en' ? 'en' : 'de'));
@@ -86,8 +91,13 @@ export function TierReveal({
           rare ? 'bg-glow-crystal text-cave-950 hover:brightness-110' : 'bg-balloon text-white hover:brightness-105'
         }`}
       >
-        {isLast ? t('game.finish') : t('game.next')}
+        {nextLabel}
       </button>
+      {secondaryLabel && onSecondary && (
+        <button type="button" onClick={onSecondary} className="mt-3 w-full rounded-2xl px-6 py-2.5 text-sm font-semibold underline decoration-dotted underline-offset-4 opacity-80">
+          {secondaryLabel}
+        </button>
+      )}
     </motion.div>
   );
 }

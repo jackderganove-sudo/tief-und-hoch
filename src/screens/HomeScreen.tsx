@@ -11,7 +11,15 @@ import { useCountdown } from '../game/useBerlinDay';
 import { currentLang, localeFor } from '../i18n';
 
 /** Startseite: oben Himmel (Aufstieg), unten Höhle (Abstieg). */
-export function HomeScreen({ dateKey, onPlay }: { dateKey: string; onPlay: (mode: Mode) => void }) {
+export function HomeScreen({
+  dateKey,
+  onPlay,
+  onPractice,
+}: {
+  dateKey: string;
+  onPlay: (mode: Mode) => void;
+  onPractice: () => void;
+}) {
   const { t } = useTranslation();
   const countdown = useCountdown();
   const [showRules, setShowRules] = useState(false);
@@ -37,6 +45,14 @@ export function HomeScreen({ dateKey, onPlay }: { dateKey: string; onPlay: (mode
           {t('app.tagline')} · {t('home.nextIn', { time: countdown })}
         </p>
       </div>
+
+      <button
+        type="button"
+        onClick={onPractice}
+        className="absolute left-3 top-[max(0.75rem,env(safe-area-inset-top))] z-30 rounded-full bg-black/30 px-3.5 py-1.5 text-xs font-semibold text-white backdrop-blur transition hover:bg-black/45"
+      >
+        ∞ {t('practice.name')}
+      </button>
 
       <div className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-30 flex items-center gap-2">
         <button
@@ -71,6 +87,9 @@ export function HomeScreen({ dateKey, onPlay }: { dateKey: string; onPlay: (mode
               </p>
               <p className="mt-1">
                 ⛏️ <b>{t('modes.rare.name')}</b>: {t('modes.rare.tagline')}.
+              </p>
+              <p className="mt-1">
+                ∞ <b>{t('practice.name')}</b>: {t('practice.intro')}
               </p>
             </motion.div>
           </motion.div>

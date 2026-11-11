@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { MODES, type Mode } from '../domain/types';
+import { useEffect, useState } from 'react';
+import { MODES, TOPIC_EMOJI, type Mode, type Question } from '../domain/types';
+import { currentLang } from '../i18n';
 import { totalPoints } from '../domain/scoring';
 import { services } from '../services';
 import { getDayOffset, setDayOffset } from './debugState';
@@ -30,6 +31,20 @@ export default function DebugPanel({ dateKey, onChange }: { dateKey: string; onC
     }
   };
   const offset = getDayOffset();
+
+  // Heutige Tagesfragen (in der aktuellen Sprache) mit Thema – zum Prüfen der Themen-Mischung.
+  const lang = currentLang();
+  const [daily, setDaily] = useState<Record<Mode, Question[]> | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setDaily(null);
+    void Promise.all(MODES.map((m) => services.questions.getDailyQuestions(dateKey, lang, m))).then(([rare, common]) => {
+      if (!cancelled) setDaily({ rare, common });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [dateKey, lang]);
 
   const shift = (delta: number | null) => {
     setDayOffset(delta === null ? 0 : offset + delta);
@@ -66,7 +81,7 @@ export default function DebugPanel({ dateKey, onChange }: { dateKey: string; onC
   }
 
   return (
-    <div className="fixed bottom-3 left-3 z-[100] w-64 rounded-xl bg-black/85 p-3 font-mono text-xs text-white shadow-2xl ring-1 ring-lime-400/40 backdrop-blur">
+    <div className="fixed bottom-3 left-3 z-[100] max-h-[calc(100dvh-1.5rem)] w-72 overflow-y-auto rounded-xl bg-black/85 p-3 font-mono text-xs text-white shadow-2xl ring-1 ring-lime-400/40 backdrop-blur">
       <div className="flex items-center justify-between">
         <span className="font-bold text-lime-300">DEBUG</span>
         <button type="button" onClick={() => setOpen(false)} className="px-1 text-white/60 hover:text-white" aria-label="Debug-Panel einklappen">
@@ -98,6 +113,26 @@ export default function DebugPanel({ dateKey, onChange }: { dateKey: string; onC
           </li>
         ))}
       </ul>
+
+      {MODES.map((m) => (
+        <details key={m} className="mt-2">
+          <summary className="cursor-pointer text-white/60 hover:text-white">
+            Fragen {m === 'rare' ? 'Abstieg' : 'Aufstieg'} ({lang}) · {daily ? new Set(daily[m].map((q) => q.topic)).size : '…'} Themen
+          </summary>
+          <ol className="mt-1 max-h-40 space-y-1 overflow-y-auto pr-1">
+            {daily?.[m].map((q, i) => (
+              <li key={q.id} className="leading-tight">
+                <span className="text-lime-300">
+                  {i + 1}. {TOPIC_EMOJI[q.topic]} {q.topic}
+                </span>{' '}
+                <span className="text-white/50">{q.id}</span>
+                <br />
+                <span className="text-white/85">{q.prompt}</span>
+              </li>
+            ))}
+          </ol>
+        </details>
+      ))}
 
       <p className="mt-3 text-white/60">Tagesfortschritt zurücksetzen:</p>
       <div className="mt-1 flex flex-wrap gap-1.5">
