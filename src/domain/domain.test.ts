@@ -3,20 +3,18 @@ import { compact, normalize } from './normalize';
 import { allowedTypos, levenshtein } from './levenshtein';
 import { matchAnswer } from './matchAnswer';
 import { MAX_POINTS, scoreAnswer, tierFor } from './scoring';
-import {
-  addDays,
-  berlinDateKey,
-  msUntilNextBerlinDay,
-  selectDailyQuestions,
-} from './daily';
+import { addDays, berlinDateKey, msUntilNextBerlinDay, selectDailyQuestions, selectDailySets } from './daily';
+import { deriveModes, distributionIssues, qualifiesFor } from './quality';
+import { TOPICS } from './types';
 import { buildShareText } from './share';
-import type { Question } from './types';
+import type { Mode, Question } from './types';
 
 const pasta: Question = {
-  id: 'de-common-pasta',
+  id: 'de-food-001',
   lang: 'de',
-  mode: 'common',
+  topic: 'food',
   prompt: 'Nenne ein Nudelgericht',
+  modes: ['rare', 'common'],
   answers: [
     { text: 'Spaghetti Bolognese', aliases: ['Spag Bol', 'Bolognese'], baseScore: 100 },
     { text: 'Lasagne', aliases: ['Lasagna'], baseScore: 70 },
@@ -103,22 +101,79 @@ describe('daily', () => {
     const ms = msUntilNextBerlinDay(new Date('2026-11-10T22:00:00Z'));
     expect(Math.abs(ms - 3_600_000)).toBeLessThanOrEqual(1000);
   });
-  it('selects 7 distinct questions deterministically and rotates without repeats', () => {
-    const pool: Question[] = Array.from({ length: 20 }, (_, i) => ({
+  const pool: Question[] = TOPICS.flatMap((topic) =>
+    Array.from({ length: 12 }, (_, i) => ({
       ...pasta,
-      id: `q${String(i).padStart(2, '0')}`,
-    }));
+      id: `de-${topic}-${String(i + 1).padStart(3, '0')}`,
+      topic,
+      // jede dritte Frage nur Rare, jede vierte nur Common
+      modes: i % 3 === 0 ? (['rare'] as Mode[]) : i % 4 === 0 ? (['common'] as Mode[]) : (['rare', 'common'] as Mode[]),
+    })),
+  );
+
+  it('selects 7 distinct questions deterministically, independent of pool order', () => {
     const a = selectDailyQuestions(pool, '2026-11-11', 'de', 'rare');
     const b = selectDailyQuestions([...pool].reverse(), '2026-11-11', 'de', 'rare');
     expect(a.map((q) => q.id)).toEqual(b.map((q) => q.id));
     expect(new Set(a.map((q) => q.id)).size).toBe(7);
-    const other = selectDailyQuestions(pool, '2026-11-11', 'de', 'common');
-    expect(other.map((q) => q.id)).not.toEqual(a.map((q) => q.id));
-    // Zwei aufeinanderfolgende Tage innerhalb einer Runde überschneiden sich nicht.
-    const days = ['2026-11-12', '2026-11-13', '2026-11-14'].map((d) =>
-      selectDailyQuestions(pool, d, 'de', 'rare').map((q) => q.id),
-    );
-    for (const d of days) expect(new Set(d).size).toBe(7);
+  });
+
+  it('only uses questions that allow the mode and mixes topics', () => {
+    for (let d = 0; d < 40; d++) {
+      const date = addDays('2026-11-01', d);
+      const sets = selectDailySets(pool, date, 'de');
+      for (const mode of ['rare', 'common'] as const) {
+        expect(sets[mode]).toHaveLength(7);
+        expect(sets[mode].every((q) => q.modes.includes(mode))).toBe(true);
+        // 11 Themen im Pool → jede Tagesfrage aus einem anderen Thema
+        expect(new Set(sets[mode].map((q) => q.topic)).size).toBe(7);
+      }
+      // Kein Verrat: dieselbe Frage nie am selben Tag in beiden Modi
+      const rareIds = new Set(sets.rare.map((q) => q.id));
+      expect(sets.common.some((q) => rareIds.has(q.id))).toBe(false);
+    }
+  });
+
+  it('uses different seeds for rare and common', () => {
+    const both = pool.map((q) => ({ ...q, modes: ['rare', 'common'] as Mode[] }));
+    const rare = selectDailyQuestions(both, '2026-11-11', 'de', 'rare').map((q) => q.id);
+    const common = selectDailyQuestions(both, '2026-11-11', 'de', 'common').map((q) => q.id);
+    expect(rare).not.toEqual(common);
+  });
+
+  it('rarely repeats a question before the pool is used up', () => {
+    const rarePool = pool.filter((q) => q.modes.includes('rare'));
+    const days = Math.floor(rarePool.length / 7);
+    // Start an einer Rundengrenze: Tag d mit (d * 7) % n === 0
+    const start = addDays('1970-01-01', rarePool.length * 300);
+    const seen = new Set<string>();
+    let repeats = 0;
+    for (let d = 0; d < days; d++) {
+      for (const q of selectDailyQuestions(pool, addDays(start, d), 'de', 'rare')) {
+        if (seen.has(q.id)) repeats++;
+        seen.add(q.id);
+      }
+    }
+    // Wiederholungen entstehen nur durch Themen-Ersatz am Rundenende.
+    expect(repeats).toBeLessThanOrEqual(4);
+    expect(seen.size).toBeGreaterThanOrEqual(days * 7 - 4);
+  });
+});
+
+describe('quality rules', () => {
+  const scores = (list: number[]) => list.map((baseScore) => ({ baseScore }));
+  it('derives modes from the score distribution', () => {
+    const longTail = [100, 60, 40, 20, 10, 8, 6, 5, 4, 3, 2, 2, 1, 1];
+    expect(deriveModes(scores(longTail))).toEqual(['rare', 'common']);
+    expect(deriveModes(scores([70, 40, 20, 10, 8, 6, 5, 4, 3, 2, 2, 1, 1]))).toEqual(['rare']);
+    expect(deriveModes(scores([100, 70, 50, 30, 20, 15, 12]))).toEqual(['common']);
+    expect(qualifiesFor('common', scores([90, 90, 85, 80, 70, 60, 10]))).toBe(false);
+  });
+  it('flags implausible distributions', () => {
+    expect(distributionIssues(scores([100, 50, 30, 10, 5, 2, 1, 1]))).toEqual([]);
+    expect(distributionIssues(scores([30, 20, 10, 5, 1]))).toHaveLength(1);
+    expect(distributionIssues(scores([90, 80, 70, 60, 5, 1]))).toHaveLength(1);
+    expect(distributionIssues(scores([90, 50, 40, 30, 25, 20]))).toHaveLength(1);
   });
 });
 

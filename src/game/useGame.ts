@@ -41,11 +41,32 @@ export function useGame(mode: Mode, dateKey: string, lang: Lang) {
     (async () => {
       const existing = services.progress.getDay(mode, dateKey);
       const questions = existing
-        ? await services.questions.getQuestionsByIds(existing.questionIds, existing.lang, mode)
+        ? await services.questions.getQuestionsByIds(existing.questionIds, existing.lang)
         : await services.questions.getDailyQuestions(dateKey, lang, mode);
       if (cancelled) return;
 
-      if (questions.length === 0) {
+      // Gespeicherter Stand verweist auf Fragen, die es nicht mehr gibt (Datenstand geändert):
+      // Ein laufendes Spiel beginnt neu, ein beendetes bleibt als Ergebnis stehen.
+      if (existing && !existing.finished && questions.length !== existing.questionIds.length) {
+        services.progress.clearDay(mode, dateKey);
+        const fresh = await services.questions.getDailyQuestions(dateKey, lang, mode);
+        if (cancelled) return;
+        if (fresh.length === 0) {
+          setState((s) => ({ ...s, status: 'empty' }));
+          return;
+        }
+        setState({
+          status: 'intro',
+          questions: fresh,
+          record: { dateKey, mode, lang, questionIds: fresh.map((q) => q.id), results: [], questionStartedAt: null, finished: false },
+          index: 0,
+          lastResult: null,
+          deadline: null,
+        });
+        return;
+      }
+
+      if (questions.length === 0 && !existing?.finished) {
         setState((s) => ({ ...s, status: 'empty' }));
         return;
       }
@@ -105,9 +126,9 @@ export function useGame(mode: Mode, dateKey: string, lang: Lang) {
     submitting.current = true;
 
     const question = s.questions[s.record.results.length];
-    const result = await services.scores.evaluate(question, timedOut && !input.trim() ? '' : input, { timedOut });
+    const result = await services.scores.evaluate(question, input, mode, { timedOut });
     const results = [...s.record.results, result];
-    const finished = results.length >= s.questions.length;
+    const finished = results.length >= s.record.questionIds.length;
     const record: DayRecord = { ...s.record, results, questionStartedAt: null, finished };
 
     services.progress.saveDay(record);

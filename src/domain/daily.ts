@@ -61,9 +61,8 @@ export function mulberry32(seed: number): () => number {
   };
 }
 
-function seededShuffle<T>(items: readonly T[], seed: number): T[] {
+function shuffle<T>(items: readonly T[], rand: () => number): T[] {
   const out = [...items];
-  const rand = mulberry32(seed);
   for (let i = out.length - 1; i > 0; i--) {
     const j = Math.floor(rand() * (i + 1));
     [out[i], out[j]] = [out[j], out[i]];
@@ -72,12 +71,54 @@ function seededShuffle<T>(items: readonly T[], seed: number): T[] {
 }
 
 /**
- * Wählt die Tagesfragen deterministisch aus dem Pool.
+ * Mischt die Fragen so, dass sich Themen abwechseln: Ein Thema kommt erst
+ * wieder dran, wenn `spread - 1` andere Fragen dazwischen lagen (solange noch
+ * genug Themen übrig sind). Innerhalb dieser Regel wird gewichtet gezogen –
+ * große Themen sind über die ganze Runde verteilt statt am Anfang gehäuft.
+ */
+export function shuffleSpreadByTopic(questions: readonly Question[], rand: () => number, spread: number): Question[] {
+  const byTopic = new Map<string, Question[]>();
+  for (const q of shuffle(questions, rand)) {
+    const list = byTopic.get(q.topic);
+    if (list) list.push(q);
+    else byTopic.set(q.topic, [q]);
+  }
+  const out: Question[] = [];
+  const recent: string[] = [];
+  while (out.length < questions.length) {
+    const open = [...byTopic.entries()].filter(([, list]) => list.length > 0);
+    const fresh = open.filter(([topic]) => !recent.includes(topic));
+    const candidates = fresh.length ? fresh : open;
+    let pick = rand() * candidates.reduce((sum, [, list]) => sum + list.length, 0);
+    let chosen = candidates[candidates.length - 1];
+    for (const c of candidates) {
+      pick -= c[1].length;
+      if (pick < 0) {
+        chosen = c;
+        break;
+      }
+    }
+    out.push(chosen[1].pop()!);
+    recent.push(chosen[0]);
+    if (recent.length >= spread) recent.shift();
+  }
+  return out;
+}
+
+/**
+ * Wählt die Tagesfragen eines Modus deterministisch aus dem Pool.
  *
- * Der Pool wird (nach ID sortiert) in "Runden" gemischt: Runde r ist eine
- * eigene Permutation mit Seed aus (Sprache, Modus, r). Tag n nimmt die
- * Positionen n·7 … n·7+6 dieser endlosen Folge. So kommt jede Frage erst
- * wieder dran, wenn alle anderen einmal dran waren.
+ * Nur Fragen, deren `modes` den Modus enthält. Der Pool wird (nach ID
+ * sortiert) in "Runden" gemischt: Runde r ist eine eigene, nach Themen
+ * gestreute Permutation mit Seed aus (Sprache, Modus, r) – Rare und Common
+ * haben also verschiedene Seeds. Tag n nimmt die Positionen n·7 … n·7+6 dieser
+ * endlosen Folge. So kommt eine Frage in der Regel erst wieder dran, wenn alle
+ * anderen einmal dran waren, und ein Tag mischt verschiedene Themen (bei
+ * mindestens 7 Themen im Pool hat jede Tagesfrage ein anderes Thema).
+ *
+ * `excludeIds`: Fragen, die an diesem Tag nicht vorkommen dürfen (die des
+ * anderen Modus – sonst würde dessen Auflösung die Antworten verraten).
+ * Ersatz kommt von einer halben Runde entfernt.
  *
  * Hinweis: Wenn neue Fragen dazukommen, ändert sich die Auswahl künftiger
  * (und vergangener) Tage – alle Spieler mit gleichem Datenstand sehen aber
@@ -89,34 +130,53 @@ export function selectDailyQuestions(
   lang: Lang,
   mode: Mode,
   count = QUESTIONS_PER_DAY,
+  excludeIds: ReadonlySet<string> = new Set(),
 ): Question[] {
-  const sorted = [...pool].sort((a, b) => a.id.localeCompare(b.id));
+  const sorted = pool.filter((q) => q.modes.includes(mode)).sort((a, b) => a.id.localeCompare(b.id));
   const n = sorted.length;
   if (n === 0) return [];
-  const want = Math.min(count, n);
 
   const rounds = new Map<number, Question[]>();
-  const round = (r: number) => {
+  const at = (pos: number) => {
+    const r = Math.floor(pos / n);
     let perm = rounds.get(r);
     if (!perm) {
-      perm = seededShuffle(sorted, hashString(`${lang}:${mode}:round:${r}`));
+      perm = shuffleSpreadByTopic(sorted, mulberry32(hashString(`${lang}:${mode}:round:${r}`)), count);
       rounds.set(r, perm);
     }
-    return perm;
+    return perm[((pos % n) + n) % n];
   };
 
   const picked: Question[] = [];
-  const seen = new Set<string>();
-  // Index kann für weit zurückliegende Daten negativ werden → in den positiven Bereich falten.
-  let pos = dayNumber(dateKey) * count;
-  while (picked.length < want) {
-    const r = Math.floor(pos / n);
-    const q = round(r)[((pos % n) + n) % n];
-    if (!seen.has(q.id)) {
-      seen.add(q.id);
-      picked.push(q);
+  const seen = new Set<string>(excludeIds);
+  const topics = new Set<string>();
+  const start = dayNumber(dateKey) * count;
+  const half = Math.floor(n / 2);
+  for (let i = 0; i < count; i++) {
+    // Reguläre Position. Ist die Frage gesperrt oder das Thema heute schon dran,
+    // kommt Ersatz von einer halben Runde entfernt – erst mit neuem Thema, sonst irgendeine freie.
+    const regular = at(start + i);
+    let q: Question | undefined;
+    for (const needNewTopic of [true, false]) {
+      const fits = (c: Question) => !seen.has(c.id) && !(needNewTopic && topics.has(c.topic));
+      if (fits(regular)) q = regular;
+      for (let j = 0; !q && j < n; j++) {
+        const c = at(start + i + half + j);
+        if (fits(c)) q = c;
+      }
+      if (q) break;
     }
-    pos++;
+    if (!q) break; // Pool erschöpft
+    seen.add(q.id);
+    topics.add(q.topic);
+    picked.push(q);
   }
   return picked;
+}
+
+/** Beide Tagessätze; Common enthält keine Frage, die heute schon in Rare vorkommt. */
+export function selectDailySets(pool: readonly Question[], dateKey: string, lang: Lang): Record<Mode, Question[]> {
+  const rare = selectDailyQuestions(pool, dateKey, lang, 'rare');
+  const common = selectDailyQuestions(pool, dateKey, lang, 'common', QUESTIONS_PER_DAY, new Set(rare.map((q) => q.id)));
+  return { rare, common };
 }

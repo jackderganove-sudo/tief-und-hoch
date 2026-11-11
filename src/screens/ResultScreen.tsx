@@ -32,7 +32,7 @@ export function ResultScreen({
   const otherDone = services.progress.getDay(other, dateKey)?.finished ?? false;
 
   useEffect(() => {
-    if (record) void services.questions.getQuestionsByIds(record.questionIds, record.lang, mode).then(setQuestions);
+    if (record) void services.questions.getQuestionsByIds(record.questionIds, record.lang).then(setQuestions);
   }, [record, mode]);
 
   if (!record) {

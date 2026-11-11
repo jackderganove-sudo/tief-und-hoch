@@ -21,7 +21,7 @@ export interface AnswerSubmission {
  * Die Oberfläche merkt davon nichts – sie ruft nur `evaluate` und `submit`.
  */
 export interface ScoreService {
-  evaluate(question: Question, input: string, opts?: { timedOut?: boolean }): Promise<AnswerResult>;
+  evaluate(question: Question, input: string, mode: Mode, opts?: { timedOut?: boolean }): Promise<AnswerResult>;
   submit(submission: AnswerSubmission): Promise<void>;
 }
 
@@ -30,11 +30,11 @@ export class LocalScoreService implements ScoreService {
     return answer.baseScore;
   }
 
-  async evaluate(question: Question, input: string, opts: { timedOut?: boolean } = {}) {
+  async evaluate(question: Question, input: string, mode: Mode, opts: { timedOut?: boolean } = {}) {
     const match = matchAnswer(question, input);
     const frequency = match ? await this.frequencyOf(question, match.answer) : null;
     return scoreAnswer({
-      mode: question.mode,
+      mode,
       questionId: question.id,
       input,
       match,

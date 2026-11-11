@@ -4,6 +4,43 @@ export type Mode = 'rare' | 'common';
 export const LANGS: readonly Lang[] = ['de', 'en'];
 export const MODES: readonly Mode[] = ['rare', 'common'];
 
+/** Themen-IDs – in beiden Sprachen identisch, Anzeigenamen kommen aus i18n. */
+export const TOPICS = [
+  'food',
+  'animals',
+  'gaming',
+  'anime',
+  'music',
+  'general',
+  'geography',
+  'sports',
+  'movies_tv',
+  'brands',
+  'everyday',
+] as const;
+export type TopicId = (typeof TOPICS)[number];
+
+/** Themenauswahl für Übungs- und (später) Freunde-Modus. */
+export type TopicSelection = 'all' | TopicId[];
+
+export function topicSelected(selection: TopicSelection, topic: TopicId): boolean {
+  return selection === 'all' || selection.includes(topic);
+}
+
+export const TOPIC_EMOJI: Record<TopicId, string> = {
+  food: '🍝',
+  animals: '🐾',
+  gaming: '🎮',
+  anime: '🌸',
+  music: '🎵',
+  general: '🧠',
+  geography: '🌍',
+  sports: '⚽',
+  movies_tv: '🎬',
+  brands: '🏷️',
+  everyday: '🏠',
+};
+
 export interface Answer {
   text: string;
   aliases: string[];
@@ -14,10 +51,13 @@ export interface Answer {
 }
 
 export interface Question {
+  /** z. B. "de-food-001" */
   id: string;
   lang: Lang;
-  mode: Mode;
+  topic: TopicId;
   prompt: string;
+  /** In welchen Modi die Frage vorkommen darf. */
+  modes: Mode[];
   answers: Answer[];
 }
 
