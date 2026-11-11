@@ -10,6 +10,19 @@ Tägliches Wort-/Trivia-Spiel mit zwei Modi:
 Jeden Tag 7 Fragen pro Modus, 25 Sekunden pro Frage, eine Antwort. 1 Punkt = 10 m.
 Tageswechsel um Mitternacht Europe/Berlin.
 
+## Live-Testversion
+
+**<https://jackderganove-sudo.github.io/tief-und-hoch/>**
+
+Jeder Push auf `main` baut und veröffentlicht die App über GitHub Actions
+(`.github/workflows/deploy.yml`): `npm ci` → Tests → Fragen-Validierung → Build → GitHub Pages.
+Schlägt ein Test oder die Validierung fehl, wird nicht veröffentlicht.
+
+- Der Pages-Build setzt `VITE_BASE=/tief-und-hoch/`; lokal bleibt die Basis `/`.
+- Solange im Workflow `VITE_ENABLE_DEBUG: 'true'` steht, ist das Debug-Panel auch live über
+  [`?debug=1`](https://jackderganove-sudo.github.io/tief-und-hoch/?debug=1) erreichbar.
+  Zum Abschalten die Zeile im Workflow entfernen.
+
 ## Lokal starten
 
 Voraussetzung: Node.js ≥ 20.
@@ -34,7 +47,7 @@ Weitere Befehle:
 | `npm run import-questions -- <paket.json>` | Fragen-Paket importieren |
 | `npm run validate-questions` | Alle gespeicherten Fragen prüfen |
 
-### Debug-Modus (nur Dev-Server)
+### Debug-Modus
 
 <http://localhost:5173/?debug=1> öffnen. Unten links erscheint ein Panel:
 
@@ -46,7 +59,8 @@ Weitere Befehle:
 - **Fragen Abstieg / Aufstieg** klappt die Tagesfragen des angezeigten Tages mit Thema
   und ID auf (zum Prüfen der Themen-Mischung).
 
-Im Produktions-Build (`npm run build`) ist der Debug-Code nicht enthalten, auch nicht mit `?debug=1`.
+In einem normalen Build (`npm run build`) ist der Debug-Code nicht enthalten, auch nicht mit `?debug=1`.
+Nur ein Build mit `VITE_ENABLE_DEBUG=true` (die Live-Testversion) nimmt ihn mit auf.
 
 ## Fragen: Format, Themen, Import
 
