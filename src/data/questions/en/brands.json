@@ -1709,7 +1709,7 @@
       {"text":"Fritos","aliases":[],"baseScore":25},
       {"text":"Tostitos","aliases":[],"baseScore":20},
       {"text":"Sun Chips","aliases":[],"baseScore":12},
-      {"text":"Takis","aliases":[],"baseScore":12},
+      {"text":"Takis","aliases":[],"baseScore":12,"tooClever":true},
       {"text":"Kettle","aliases":["Kettle Chips","Kettle Brand"],"baseScore":10},
       {"text":"Cheez-It","aliases":["Cheez-Its"],"baseScore":8},
       {"text":"Goldfish","aliases":[],"baseScore":8},

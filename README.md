@@ -43,72 +43,88 @@ Weitere Befehle:
 - **Tagesfortschritt zurücksetzen** löscht den Spielstand des angezeigten Tages
   (Abstieg, Aufstieg oder beide), damit man ihn erneut spielen kann.
 - **Statistik & Serien löschen** setzt Gespielt/Bestwert/Serie zurück.
+- **Fragen Abstieg / Aufstieg** klappt die Tagesfragen des angezeigten Tages mit Thema
+  und ID auf (zum Prüfen der Themen-Mischung).
 
 Im Produktions-Build (`npm run build`) ist der Debug-Code nicht enthalten, auch nicht mit `?debug=1`.
 
-## Neue Fragen hinzufügen
+## Fragen: Format, Themen, Import
 
-1. Paket als JSON anlegen, z. B. `packs/meine-fragen.json`:
+Bestand: **600 Fragen** (300 Deutsch, 300 Englisch), je Sprache getrennt erstellt,
+in 11 Themen: `food`, `animals`, `gaming`, `anime`, `music`, `general`, `geography`,
+`sports`, `movies_tv`, `brands`, `everyday`. Die IDs sind in beiden Sprachen gleich,
+die Anzeigenamen stehen in `src/i18n/de.json` / `en.json` unter `topics`.
 
-   ```json
-   {
-     "lang": "de",
-     "mode": "rare",
-     "questions": [
-       {
-         "id": "de-rare-kontinent",
-         "prompt": "Nenne einen Kontinent",
-         "answers": [
-           "Europa=90",
-           "Afrika=70",
-           "Nordamerika|Amerika=50",
-           { "text": "Antarktis", "aliases": ["Antarktika"], "baseScore": 8, "tooClever": true },
-           "Australien|Ozeanien=30"
-         ]
-       }
-     ]
-   }
-   ```
+Eine Datei pro Thema und Sprache: `src/data/questions/<lang>/<topic>.json`.
 
-   - Antworten als Objekt `{ text, aliases[], baseScore, tooClever? }` oder in Kurzform
-     `"Text|Alias|Alias=Score"`; ein `!` am Ende markiert `tooClever` (`"Saarland=12!"`).
-   - `baseScore` = geschätzte Häufigkeit 0–100 (100 = die Antwort, die jeder sagt).
-   - `id` ist optional; ohne ID wird eine aus Sprache, Modus und Prompt erzeugt.
-   - `lang`/`mode` können auch pro Frage stehen.
+```json
+{
+  "id": "de-food-001",
+  "lang": "de",
+  "topic": "food",
+  "prompt": "Nenne ein Nudelgericht",
+  "modes": ["rare", "common"],
+  "answers": [{ "text": "Lasagne", "aliases": ["Lasagna"], "baseScore": 70, "tooClever": true }]
+}
+```
 
+### Neues Paket einfügen
+
+1. Paket als JSON anlegen (Vorlage: `packs/example-pack.json`). Antworten als Objekt
+   oder in Kurzform `"Text|Alias|Alias=Score"`, ein `!` am Ende markiert `tooClever`.
+   `id` und `modes` dürfen fehlen: die ID wird fortlaufend vergeben (`de-food-029`),
+   die Modi werden aus der Verteilung abgeleitet.
 2. Erst probeweise, dann echt importieren:
 
    ```bash
-   npm run import-questions -- packs/meine-fragen.json --dry-run
-   npm run import-questions -- packs/meine-fragen.json
+   npm run import-questions -- packs/mein-paket.json --dry-run
+   npm run import-questions -- packs/mein-paket.json
    ```
 
-   Das Skript prüft das Paket (Pflichtfelder, Wertebereiche, doppelte Schreibweisen,
-   ob „Kern“/„Sterne“ erreichbar sind), sortiert die Antworten und schreibt nach
-   `src/data/questions/<lang>/<mode>.json`. Bestehende IDs werden übersprungen,
-   mit `--replace` überschrieben. `--verbose` zeigt zusätzlich sehr ähnliche
-   Schreibweisen, die bei Tippfehlern verwechselt werden könnten.
+   Bestehende Fragen (gleiche ID oder gleicher Prompt) werden übersprungen, mit
+   `--replace` überschrieben. Bei Fehlern wird nichts geschrieben.
+3. `npm run validate-questions` prüft den ganzen Bestand und zeigt die Übersicht
+   Fragen pro Thema / Sprache / Modus.
 
-Hinweis: Die Tagesauswahl hängt vom Fragen-Pool ab. Wer neue Fragen hinzufügt,
-verändert die Auswahl künftiger Tage – alle Spieler mit demselben Stand sehen aber
-weiterhin dieselben Fragen.
+### Was die Validierung prüft (zod + eigene Regeln)
+
+- Schema, bekannte Sprache/Thema/Modus, ID passt zu Sprache und Thema, IDs und Prompts eindeutig
+- mindestens 20 Antworten, keine doppelte Schreibweise (Text oder Alias) in einer Frage
+- plausible Verteilung: eine Antwort ≥ 40, höchstens 25 % der Antworten ≥ 60, mindestens 25 % ≤ 15
+- `common` nur mit klarer Top-Antwort (eine ≥ 80, höchstens 5 Antworten ≥ 60)
+- `rare` nur mit genug seltenen Antworten (mind. 8 mit ≤ 10, davon 3 mit ≤ 3)
+- `tooClever`: höchstens 3, Hinweis wenn bei einer Rare-Frage keine markiert ist
+- pro Sprache mindestens 7 Fragen je Modus, Hinweis bei weniger als 5 je Thema und Modus
+- `--verbose` listet sehr ähnliche Schreibweisen, die bei Tippfehlern verwechselt werden könnten
+
+Die `baseScore`-Werte sind Schätzungen. Hinweis: Wer Fragen hinzufügt, verändert die
+Tagesauswahl künftiger Tage; alle Spieler mit demselben Stand sehen weiter dieselben Fragen.
+
+## Übungsmodus
+
+Startseite → „∞ Übung“: Abstieg oder Aufstieg wählen, Themen per Checkbox („Alle Themen“
+ist Standard), dann endlos spielen. Nichts davon wird gespeichert, es zählt nicht für
+Serie oder Tagesergebnis. Die heutigen Tagesfragen kommen in der Übung nicht vor;
+Fragen künftiger Tage können aber vorkommen. Die Themenauswahl (`TopicPicker`,
+`TopicSelection`, `QuestionRepository.getQuestions`) ist eigenständig gebaut und für den
+Freunde-Modus wiederverwendbar.
 
 ## Aufbau
 
 ```
 src/
   domain/      reine Logik ohne React (getestet)
-               normalize · levenshtein · matchAnswer · scoring · daily · share
+               normalize · levenshtein · matchAnswer · scoring · daily · share · quality
   data/        Fragen als JSON (vom Import-Skript erzeugt)
   services/    Interfaces + lokale Implementierungen
                QuestionRepository · ScoreService · ProgressRepository
                index.ts = die eine Stelle, an der die Implementierungen gewählt werden
-  game/        useGame (Ablauf, Speichern, Fortsetzen), Tages-/Countdown-Hooks
-  components/  Szenen (Höhle, Himmel), Timer, Höhenmesser, Stufen-Einblendung
-  screens/     Start, Spiel, Ergebnis
+  game/        useGame (Tagesspiel), usePractice (Übung), Tages-/Countdown-Hooks
+  components/  Szenen (Höhle, Himmel), Timer, Höhenmesser, Stufen-Einblendung, TopicPicker
+  screens/     Start, Spiel, Ergebnis, Übung
   i18n/        de.json, en.json (react-i18next)
 scripts/       import-questions.ts
-packs/         Beispiel-Pakete (Quelle der 80 Testfragen)
+packs/         example-pack.json (Vorlage für eigene Pakete)
 ```
 
 **Antwortprüfung:** Eingabe und Antworten werden normalisiert (Kleinschreibung,
@@ -117,9 +133,12 @@ packs/         Beispiel-Pakete (Quelle der 80 Testfragen)
 Wortlänge (≤3: 0, ≤5: 1, ≤9: 2, sonst 3). Knappe Treffer werden beim Tippen als
 „Gemeint: …?“ angezeigt und als diese Antwort gewertet.
 
-**Tagesauswahl:** Der Pool wird nach ID sortiert und pro „Runde“ mit einem Seed aus
-Sprache, Modus und Rundennummer gemischt. Tag *n* nimmt die nächsten 7 Positionen.
-So kommt jede Frage erst wieder, wenn alle anderen dran waren.
+**Tagesauswahl:** Pro Modus nur Fragen, deren `modes` den Modus enthält. Der Pool wird
+nach ID sortiert und pro „Runde“ mit einem Seed aus Sprache, Modus und Rundennummer
+gemischt (Rare und Common haben also verschiedene Seeds), dabei nach Themen gestreut.
+Tag *n* nimmt die nächsten 7 Positionen; jede Tagesfrage hat ein anderes Thema, und
+keine Frage kommt am selben Tag in beiden Modi vor. Eine Frage kommt in der Regel erst
+wieder, wenn alle anderen dran waren.
 
 **Spielstand:** `localStorage` (`tuh:v1:…`): Tages-Spielstand pro Modus, Statistik,
 Serie. Der Timer rechnet mit einem gespeicherten Startzeitpunkt, deshalb läuft er auch

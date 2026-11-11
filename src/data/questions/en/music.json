@@ -1001,7 +1001,7 @@
       {"text":"Annie","aliases":[],"baseScore":12},
       {"text":"Oliver!","aliases":[],"baseScore":10},
       {"text":"Hairspray","aliases":[],"baseScore":8},
-      {"text":"Six","aliases":[],"baseScore":8},
+      {"text":"Six","aliases":[],"baseScore":8,"tooClever":true},
       {"text":"Dear Evan Hansen","aliases":[],"baseScore":6},
       {"text":"Joseph and the Amazing Technicolor Dreamcoat","aliases":["Joseph"],"baseScore":6},
       {"text":"Mary Poppins","aliases":[],"baseScore":6},

@@ -61,8 +61,8 @@ export function TopicPicker({
           return (
             <label key={topic} className={chip(checked, disabled)}>
               <input type="checkbox" className={box} checked={checked} disabled={disabled} onChange={() => toggle(topic)} />
-              <span aria-hidden>{TOPIC_EMOJI[topic]}</span>
-              <span className="min-w-0 flex-1 hyphens-auto break-words">{t(`topics.${topic}`)}</span>
+              <span aria-hidden className="max-[400px]:hidden">{TOPIC_EMOJI[topic]}</span>
+              <span className="min-w-0 flex-1 hyphens-manual [overflow-wrap:anywhere]">{t(`topics.${topic}`)}</span>
               {counts && <span className="text-xs tabular-nums opacity-60">{counts[topic] ?? 0}</span>}
             </label>
           );

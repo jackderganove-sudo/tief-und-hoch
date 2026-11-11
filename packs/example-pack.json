@@ -1,0 +1,17 @@
+{
+  "lang": "de",
+  "topic": "geography",
+  "questions": [
+    {
+      "prompt": "Nenne eine Stadt in Spanien",
+      "answers": [
+        "Madrid=100", "Barcelona=95", "Sevilla=45", "Valencia=40", "Málaga|Malaga=30", "Palma|Palma de Mallorca=25!",
+        "Bilbao=15", "Granada=15", "Saragossa|Zaragoza=8", "Alicante=8", "Córdoba|Cordoba=6", "Marbella=6",
+        "San Sebastián|San Sebastian|Donostia=4", "Toledo=4", "Pamplona=4", "Santiago de Compostela=3",
+        "Cádiz|Cadiz=2", "Salamanca=2", "Benidorm=3", "Murcia=2", "Valladolid=1", "Girona=2", "Vigo=1",
+        "Gijón|Gijon=1", "A Coruña|La Coruña|La Coruna=1", "Almería|Almeria=1", "Tarragona=1", "Santander=1",
+        "Las Palmas|Las Palmas de Gran Canaria=1", "Santa Cruz de Tenerife=1", "Oviedo=1", "Burgos=1"
+      ]
+    }
+  ]
+}
