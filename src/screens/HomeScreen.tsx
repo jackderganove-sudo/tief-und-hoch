@@ -146,8 +146,8 @@ function BalloonIcon() {
 function PickIcon() {
   return (
     <svg viewBox="0 0 60 60" className="mt-4 w-12 drop-shadow-[0_0_10px_rgba(139,233,253,0.6)]" aria-hidden>
-      <path d="M8 22 Q30 2 52 22 Q30 12 8 22 Z" fill="#8be9fd" />
-      <rect x="27" y="14" width="6" height="42" rx="3" fill="#c9a77a" transform="rotate(0 30 30)" />
+      <path d="M14 52 L40 18" stroke="#c9a77a" strokeWidth="5" strokeLinecap="round" />
+      <path d="M21 4 Q48 4 58 31 Q43 15 21 4 Z" fill="#8be9fd" stroke="#e0fbff" strokeWidth="1" strokeLinejoin="round" />
     </svg>
   );
 }

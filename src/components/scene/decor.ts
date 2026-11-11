@@ -68,8 +68,11 @@ export function skyDecor(): DecorItem[] {
     ...scatter(rand, 'star', 25, ZONE * 1.7, ZONE * 2.1, [0.2, 0.5]),
     ...scatter(rand, 'cloud', 8, ZONE * 1.8, ZONE * 2.6, [18, 34]),
     ...scatter(rand, 'cloud', 14, ZONE * 2.6, ZONE * 4.1, [20, 42]),
-    ...scatter(rand, 'bird', 7, ZONE * 3.9, ZONE * 4.6, [2, 3.5]),
-    ...scatter(rand, 'tree', 16, ZONE * 4.55, ZONE * 5.25, [14, 26]),
+    ...scatter(rand, 'cloud', 5, ZONE * 4.1, ZONE * 4.7, [16, 26]),
+    ...scatter(rand, 'bird', 9, ZONE * 4.6, ZONE * 5.4, [2, 3.5]),
+    // Wald am Boden: Stämme stehen auf der Grasnarbe (~92,5 %), Kronen ragen hoch.
+    ...scatter(rand, 'tree', 9, 92.9, 93.4, [30, 52]),
+    ...scatter(rand, 'tree', 12, 93.6, 94.6, [22, 36]),
     ...scatter(rand, 'flower', 30, ZONE * 5.6, 98.5, [0.8, 1.6]),
   ];
 }

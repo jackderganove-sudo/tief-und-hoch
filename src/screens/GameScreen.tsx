@@ -49,7 +49,7 @@ export function GameScreen({
     <div className={`relative h-dvh w-full overflow-hidden ${theme}`}>
       {rare ? <CaveScene progress={progress} /> : <SkyScene progress={progress} />}
 
-      <div className="absolute bottom-[8%] right-1 top-[18%] z-10">
+      <div className="pointer-events-none absolute bottom-[8%] right-1 top-[18%] z-30">
         <DepthGauge mode={mode} meters={meters} locale={localeFor(lang)} />
       </div>
 

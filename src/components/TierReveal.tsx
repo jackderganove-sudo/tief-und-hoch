@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { TIERS, pointsToMeters } from '../domain/scoring';
 import type { AnswerResult, Mode, Question } from '../domain/types';
 import { TIER_COLOR } from './tierStyle';
+import { localeFor } from '../i18n';
 
 /** Große Stufen-Einblendung nach jeder Antwort. */
 export function TierReveal({
@@ -18,7 +19,8 @@ export function TierReveal({
   isLast: boolean;
   onNext: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const fmt = new Intl.NumberFormat(localeFor(i18n.language === 'en' ? 'en' : 'de'));
   const tier = TIERS[result.tier];
   const color = TIER_COLOR[result.tier];
   const rare = mode === 'rare';
@@ -67,7 +69,7 @@ export function TierReveal({
         {t('game.points', { points: result.points })}
         <span className="ml-2 text-base opacity-70">
           ({rare && meters > 0 ? '−' : '+'}
-          {meters} m)
+          {fmt.format(meters)} m)
         </span>
       </p>
       {result.tier === 'tooClever' && <p className="mt-2 text-sm opacity-80">{t('tierHints.tooClever')}</p>}
