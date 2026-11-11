@@ -34,8 +34,17 @@ Weitere Befehle:
 | `npm run import-questions -- <paket.json>` | Fragen-Paket importieren |
 | `npm run validate-questions` | Alle gespeicherten Fragen prüfen |
 
-Zum Zurücksetzen des eigenen Spielstands im Browser: DevTools → Application →
-Local Storage → Einträge mit `tuh:v1:` löschen.
+### Debug-Modus (nur Dev-Server)
+
+<http://localhost:5173/?debug=1> öffnen. Unten links erscheint ein Panel:
+
+- **◀ Tag / Heute / Tag ▶** verschiebt den Spieltag (andere Tagesfragen, Serien testen).
+  Die Verschiebung bleibt über Reloads erhalten, solange `?debug=1` in der URL steht.
+- **Tagesfortschritt zurücksetzen** löscht den Spielstand des angezeigten Tages
+  (Abstieg, Aufstieg oder beide), damit man ihn erneut spielen kann.
+- **Statistik & Serien löschen** setzt Gespielt/Bestwert/Serie zurück.
+
+Im Produktions-Build (`npm run build`) ist der Debug-Code nicht enthalten, auch nicht mit `?debug=1`.
 
 ## Neue Fragen hinzufügen
 

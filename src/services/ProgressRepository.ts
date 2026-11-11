@@ -46,6 +46,10 @@ export interface ProgressRepository {
   /** Streak, wie er heute angezeigt wird (0, wenn gestern nicht gespielt wurde). */
   getStreak(mode: Mode, today: string): number;
   recordFinished(record: DayRecord): ModeStats;
+  /** Spielstand eines Tages löschen (Debug-Modus). */
+  clearDay(mode: Mode, dateKey: string): void;
+  /** Statistik und Serie eines Modus löschen (Debug-Modus). */
+  clearStats(mode: Mode): void;
 }
 
 const PREFIX = 'tuh:v1';
@@ -73,6 +77,22 @@ export class LocalProgressRepository implements ProgressRepository {
 
   getDay(mode: Mode, dateKey: string) {
     return this.read<DayRecord>(`${PREFIX}:day:${mode}:${dateKey}`);
+  }
+
+  clearDay(mode: Mode, dateKey: string) {
+    try {
+      this.storage?.removeItem(`${PREFIX}:day:${mode}:${dateKey}`);
+    } catch {
+      /* ignorieren */
+    }
+  }
+
+  clearStats(mode: Mode) {
+    try {
+      this.storage?.removeItem(`${PREFIX}:stats:${mode}`);
+    } catch {
+      /* ignorieren */
+    }
   }
 
   saveDay(record: DayRecord) {

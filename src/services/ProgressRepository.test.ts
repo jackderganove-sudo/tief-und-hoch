@@ -38,6 +38,18 @@ describe('LocalProgressRepository', () => {
     expect(s2).toMatchObject({ currentStreak: 1, maxStreak: 2 });
   });
 
+  it('clears a single day and the stats on request', () => {
+    const repo = new LocalProgressRepository(new MemoryStorage());
+    repo.saveDay(day('2026-11-10', [10]));
+    repo.saveDay(day('2026-11-11', [10]));
+    repo.recordFinished(day('2026-11-11', [10]));
+    repo.clearDay('rare', '2026-11-11');
+    expect(repo.getDay('rare', '2026-11-11')).toBeNull();
+    expect(repo.getDay('rare', '2026-11-10')).not.toBeNull();
+    repo.clearStats('rare');
+    expect(repo.getStats('rare').played).toBe(0);
+  });
+
   it('prunes old day records', () => {
     const storage = new MemoryStorage();
     const repo = new LocalProgressRepository(storage);

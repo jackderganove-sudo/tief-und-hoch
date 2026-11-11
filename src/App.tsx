@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { MotionConfig } from 'framer-motion';
+import { debugEnabled } from './debug/debugState';
 import { useTranslation } from 'react-i18next';
 import type { Mode } from './domain/types';
 import { services } from './services';
@@ -9,12 +10,17 @@ import { HomeScreen } from './screens/HomeScreen';
 import { GameScreen } from './screens/GameScreen';
 import { ResultScreen } from './screens/ResultScreen';
 
-type Screen = { name: 'home' } | { name: 'game'; mode: Mode; dateKey: string } | { name: 'result'; mode: Mode; dateKey: string };
+// Nur im Dev-Server geladen; im Produktions-Build fällt der Import komplett weg.
+const DebugPanel = import.meta.env.DEV ? lazy(() => import('./debug/DebugPanel')) : null;
+
+type Screen ={ name: 'home' } | { name: 'game'; mode: Mode; dateKey: string } | { name: 'result'; mode: Mode; dateKey: string };
 
 export default function App() {
   useTranslation(); // bei Sprachwechsel neu rendern
   const today = useBerlinDay();
   const [screen, setScreen] = useState<Screen>({ name: 'home' });
+  // Erhöht sich bei Debug-Aktionen, damit die Startseite Stände neu einliest.
+  const [refresh, setRefresh] = useState(0);
 
   const open = (mode: Mode) => {
     const day = services.progress.getDay(mode, today);
@@ -23,7 +29,7 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      {screen.name === 'home' && <HomeScreen dateKey={today} onPlay={open} />}
+      {screen.name === 'home' && <HomeScreen key={`${today}-${refresh}`} dateKey={today} onPlay={open} />}
       {screen.name === 'game' && (
         <GameScreen
           key={`${screen.mode}-${screen.dateKey}`}
@@ -42,6 +48,17 @@ export default function App() {
           onHome={() => setScreen({ name: 'home' })}
           onOtherMode={() => open(screen.mode === 'rare' ? 'common' : 'rare')}
         />
+      )}
+      {DebugPanel && debugEnabled && (
+        <Suspense fallback={null}>
+          <DebugPanel
+            dateKey={today}
+            onChange={() => {
+              setScreen({ name: 'home' });
+              setRefresh((r) => r + 1);
+            }}
+          />
+        </Suspense>
       )}
     </MotionConfig>
   );
