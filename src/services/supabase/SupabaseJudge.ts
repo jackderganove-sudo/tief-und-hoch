@@ -11,6 +11,7 @@ interface JudgeResponse {
   list_answer: string | null;
   canonical_text: string | null;
   estimated_base_score: number | null;
+  approved?: boolean;
 }
 
 /** Ruft die Edge Function "judge-answer" auf. Fehler und Zeitüberschreitung → status "error". */
@@ -30,7 +31,7 @@ export class SupabaseJudge implements AnswerJudge {
       if (!res.ok) return { status: 'error' };
       const r = (await res.json()) as JudgeResponse;
       if (!['valid', 'invalid', 'error', 'limited'].includes(r.status)) return { status: 'error' };
-      return { status: r.status, listAnswer: r.list_answer, canonicalText: r.canonical_text, estimatedBaseScore: r.estimated_base_score };
+      return { status: r.status, approved: r.approved === true, listAnswer: r.list_answer, canonicalText: r.canonical_text, estimatedBaseScore: r.estimated_base_score };
     } catch {
       return { status: 'error' };
     } finally {

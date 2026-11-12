@@ -7,6 +7,7 @@ import { localeFor } from '../i18n';
 import { modeTheme } from './PlayShell';
 import { Panel, PxButton, TierIcon } from './px';
 import { AiBadge } from './AiBadge';
+import { isApprovedResult } from '../domain/approved';
 
 /** Stufen-Einblendung nach jeder Antwort – kompakt, damit die Fahrt darunter sichtbar bleibt. */
 export function TierReveal({
@@ -40,7 +41,7 @@ export function TierReveal({
   const ai = result.source === 'ai';
 
   // KI-Badge direkt hinter der gewerteten (bzw. abgelehnten) Antwort; Erklärung nur als Tooltip
-  const badge = ai && !result.unchecked ? <AiBadge mode={mode} /> : null;
+  const badge = ai && !result.unchecked && !isApprovedResult(question, result) ? <AiBadge mode={mode} /> : null;
 
   let detail: React.ReactNode;
   if (result.matched) detail = <>{t('game.countedAs', { answer: result.matched })}{badge}</>;

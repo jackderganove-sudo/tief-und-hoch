@@ -27,6 +27,22 @@ export interface JudgeResponse {
   estimated_base_score: number | null;
   reason: string | null;
   cached: boolean;
+  /** Von mir im Admin-Bereich freigegeben → zählt wie eine Listen-Antwort (kein KI-Badge). */
+  approved?: boolean;
+}
+
+export interface ApprovedRow {
+  text: string;
+  aliases: string[];
+  base_score: number;
+  merged_into: string | null;
+}
+
+/** Passt die Eingabe (normalisiert) zu einer freigegebenen Antwort? */
+export function findApproved(rows: ApprovedRow[], text: string): ApprovedRow | null {
+  const key = compact(text);
+  if (!key) return null;
+  return rows.find((r) => compact(r.text) === key || r.aliases.some((a) => compact(a) === key)) ?? null;
 }
 
 /** Höchstlänge einer Spielerantwort (das Eingabefeld erlaubt 60 Zeichen). */

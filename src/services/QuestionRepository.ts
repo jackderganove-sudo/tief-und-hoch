@@ -1,4 +1,5 @@
 import { selectDailySets } from '../domain/daily';
+import { mergeApproved, type ApprovedAnswer } from '../domain/approved';
 import { TOPICS, topicSelected } from '../domain/types';
 import type { Lang, Mode, Question, TopicId, TopicSelection } from '../domain/types';
 
@@ -67,5 +68,34 @@ export class LocalQuestionRepository implements QuestionRepository {
     const counts = Object.fromEntries(TOPICS.map((t) => [t, 0])) as Record<TopicId, number>;
     for (const q of await this.pool(lang)) if (q.modes.includes(mode)) counts[q.topic]++;
     return counts;
+  }
+}
+
+/**
+ * Arbeitet freigegebene Antworten in alle gelieferten Fragen ein. Die
+ * Tagesauswahl selbst bleibt unverändert (sie hängt nur an den Fragen-IDs).
+ */
+export class ApprovedQuestionRepository implements QuestionRepository {
+  constructor(
+    private readonly inner: QuestionRepository,
+    private readonly approved: () => Promise<ApprovedAnswer[]>,
+  ) {}
+
+  private async merge(questions: Question[]): Promise<Question[]> {
+    const rows = await this.approved();
+    return rows.length ? questions.map((q) => mergeApproved(q, rows)) : questions;
+  }
+
+  async getDailyQuestions(dateKey: string, lang: Lang, mode: Mode) {
+    return this.merge(await this.inner.getDailyQuestions(dateKey, lang, mode));
+  }
+  async getQuestionsByIds(ids: string[], lang: Lang) {
+    return this.merge(await this.inner.getQuestionsByIds(ids, lang));
+  }
+  async getQuestions(filter: QuestionFilter) {
+    return this.merge(await this.inner.getQuestions(filter));
+  }
+  getTopicCounts(lang: Lang, mode: Mode) {
+    return this.inner.getTopicCounts(lang, mode);
   }
 }

@@ -156,7 +156,7 @@ cp .env.example .env.local                 # URL + anon key eintragen
 npx supabase db push                       # Migrationen anwenden
 npm run function-data                      # Fragen-Bundle der Funktion (nach Fragen-Änderungen)
 npx supabase functions deploy judge-answer
-npm run review-ai-answers -- --export=packs/ai-review.json   # KI-Antworten sichten/übernehmen
+npm run review-ai-answers                  # KI-Antworten sichten (über die CLI-Anmeldung)
 node scripts/smoke-judge.mjs de-food-001 Mangold Gemüse     # Live-Test der Funktion
 ```
 
@@ -169,6 +169,28 @@ läuft `gemini-3.5-flash-lite` parallel mit; 3.8 Flash gewinnt, wenn es bis 4,7 
 `ai_verdicts.model` zeigt, welches Modell geurteilt hat.
 Optionale Function-Secrets: `GEMINI_MODEL`, `GEMINI_THINKING` (`low`), `GEMINI_FALLBACK_MODEL`
 (leer = kein Ersatz), `GEMINI_FALLBACK_THINKING` (`minimal`), `AI_USER_DAILY_LIMIT` (30), `AI_GLOBAL_DAILY_LIMIT` (1000).
+
+## Admin-Bereich (KI-Antworten prüfen)
+
+Versteckte Route **/admin** (nicht verlinkt), Login mit GitHub. Zugriff hat nur, wer in der
+Tabelle `admins` steht – durchgesetzt per RLS in der Datenbank, nicht nur im Frontend.
+Es gibt keinen geheimen Schlüssel im Frontend; Aktionen laufen über die SQL-Funktionen
+`approve_verdict`, `reject_verdicts`, `reset_verdicts` (SECURITY INVOKER + `is_admin()`).
+
+- **Freigeben:** Schreibweise, Aliase und baseScore anpassbar → `approved_answers`. Die App lädt
+  diese beim Start (gecacht, offline der letzte Stand) und behandelt sie wie Listen-Antworten:
+  normale Wertung, kein KI-Badge – sofort für alle, ohne Deployment.
+- **Variante:** einer Listen-Antwort zuordnen (wird deren Alias).
+- **Ablehnen:** Urteil wird ungültig, auch im Cache der Edge Function. Ein Revisionszähler
+  (`app_meta`) lässt Geräte ihren lokalen KI-Cache verwerfen.
+- Filter (Status, KI-Urteil, Sprache, Thema), Mehrfachauswahl, Tasten **↑/↓ A R X**.
+- Bereits vergebene Punkte alter Runden ändern sich nicht.
+
+```bash
+npm run review-ai-answers -- --apply-approved --dry-run   # zeigt, was übernommen würde
+npm run review-ai-answers -- --apply-approved             # Freigaben → Fragen-JSONs, in der DB "exportiert"
+npm run test:rls                                          # RLS-Tests gegen das Projekt (mit Rollback)
+```
 
 ## Übungsmodus
 

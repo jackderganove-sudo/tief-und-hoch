@@ -1,5 +1,6 @@
 import type { AnswerSubmission } from '../ScoreService';
 import { LocalScoreService } from '../ScoreService';
+import { normalize } from '../../domain/normalize';
 import { SUPABASE_URL, ensureSession, supabase } from './client';
 
 /**
@@ -27,6 +28,7 @@ export class SupabaseScoreService extends LocalScoreService {
         mode,
         day: dateKey,
         raw_answer: result.input.slice(0, 100),
+        normalized_answer: normalize(result.input).slice(0, 100),
         matched_answer: result.matched?.slice(0, 100) ?? null,
         source: result.source ?? 'list',
         score: result.points,

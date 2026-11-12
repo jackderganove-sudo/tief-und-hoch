@@ -14,6 +14,7 @@ import {
   MAX_ANSWER_LENGTH,
   cacheKey,
   extractText,
+  findApproved,
   findListAnswer,
   geminiRequestBody,
   parseModelOutput,
@@ -198,7 +199,27 @@ Deno.serve(async (req) => {
     return json(verdict({ status: 'valid', list_answer: listed, canonical_text: listed }));
   }
 
-  // Cache
+  // Von mir freigegeben (auch Schreibweisen/Aliase) → wie eine Listen-Antwort
+  const { data: approvedRows } = await admin
+    .from('approved_answers')
+    .select('text, aliases, base_score, merged_into')
+    .eq('question_id', questionId);
+  const approved = findApproved(approvedRows ?? [], answer);
+  if (approved) {
+    log(user.id, questionId, 'list');
+    const merged = findListAnswer(question, approved.merged_into);
+    return json(
+      verdict({
+        status: 'valid',
+        approved: true,
+        list_answer: merged,
+        canonical_text: merged ?? approved.text,
+        estimated_base_score: approved.base_score,
+      }),
+    );
+  }
+
+  // Cache (abgelehnte Urteile stehen hier mit valid = false)
   const { data: hit } = await admin
     .from('ai_verdicts')
     .select('valid, list_answer, canonical_text, estimated_base_score, reason')
@@ -240,6 +261,7 @@ Deno.serve(async (req) => {
           question_id: questionId,
           normalized_answer: key,
           valid: result.status === 'valid',
+          ai_valid: result.status === 'valid',
           canonical_text: result.canonical_text,
           list_answer: result.list_answer,
           estimated_base_score: result.estimated_base_score,

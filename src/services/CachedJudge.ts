@@ -19,6 +19,15 @@ interface Store {
  * Limit-Antworten werden nicht gemerkt, damit sie später erneut geprüft werden.
  */
 export class CachedJudge implements AnswerJudge {
+  /** Lokalen Cache verwerfen (z. B. nachdem ich Urteile geprüft habe). */
+  static clear(storage: Pick<Storage, 'removeItem'> | null = typeof localStorage === 'undefined' ? null : localStorage) {
+    try {
+      storage?.removeItem(KEY);
+    } catch {
+      /* egal */
+    }
+  }
+
   constructor(
     private readonly inner: AnswerJudge,
     private readonly build: string,

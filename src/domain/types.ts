@@ -48,6 +48,8 @@ export interface Answer {
   baseScore: number;
   /** Wirkt ausgefallen, wird aber genau deshalb oft gewählt (RARE: Sonderstufe). */
   tooClever?: boolean;
+  /** Im Admin-Bereich freigegeben (noch nicht ins Repo exportiert). */
+  approved?: boolean;
 }
 
 export interface Question {
@@ -59,6 +61,8 @@ export interface Question {
   /** In welchen Modi die Frage vorkommen darf. */
   modes: Mode[];
   answers: Answer[];
+  /** Normalisierte Schreibweisen freigegebener Antworten – für sie gibt es kein KI-Badge mehr. */
+  approvedKeys?: string[];
 }
 
 export type TierId =

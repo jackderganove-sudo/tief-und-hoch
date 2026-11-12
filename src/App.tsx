@@ -16,6 +16,9 @@ const DebugPanel = import.meta.env.DEV || __DEBUG_BUILD__ ? lazy(() => import('.
 // Welt-Vorschau für Screenshots (nur Dev-Server): /?world=rare&m=3000
 const WorldPreview = import.meta.env.DEV ? lazy(() => import('./pixel/WorldPreview')) : null;
 const previewWorld = import.meta.env.DEV && new URLSearchParams(location.search).has('world');
+// Admin-Bereich: versteckte Route /admin, eigener Chunk (Spieler laden ihn nie)
+const AdminApp = lazy(() => import('./admin/AdminApp'));
+const adminRoute = /\/admin\/?$/.test(location.pathname);
 
 type Screen =
   | { name: 'home' }
@@ -33,6 +36,14 @@ export default function App() {
     const day = services.progress.getDay(mode, today);
     setScreen(day?.finished ? { name: 'result', mode, dateKey: today } : { name: 'game', mode, dateKey: today });
   };
+
+  if (adminRoute) {
+    return (
+      <Suspense fallback={null}>
+        <AdminApp />
+      </Suspense>
+    );
+  }
 
   if (WorldPreview && previewWorld) {
     return (

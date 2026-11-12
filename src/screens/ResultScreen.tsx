@@ -10,6 +10,7 @@ import { TIER_COLOR } from '../components/tierStyle';
 import { modeTheme } from '../components/PlayShell';
 import { Panel, PxButton, TierIcon } from '../components/px';
 import { AiBadge } from '../components/AiBadge';
+import { isApprovedResult } from '../domain/approved';
 import { localeFor } from '../i18n';
 import { useCountdown } from '../game/useBerlinDay';
 
@@ -122,7 +123,7 @@ export function ResultScreen({
                       </p>
                       <p className="flex items-center text-lg">
                         <span className="truncate">{r.matched ?? (r.input.trim() ? `„${r.input}“` : '—')}</span>
-                        {r.source === 'ai' && !r.unchecked && (
+                        {r.source === 'ai' && !r.unchecked && !isApprovedResult(q, r) && (
                           <AiBadge mode={mode} />
                         )}
                       </p>

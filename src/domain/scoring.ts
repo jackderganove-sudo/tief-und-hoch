@@ -88,6 +88,8 @@ export function scoreAnswer(params: {
 /** Urteil der KI-Prüfung, wie es das Spiel von der Edge Function bekommt. */
 export interface AiVerdict {
   status: 'valid' | 'invalid' | 'error' | 'limited';
+  /** Von mir freigegeben → normale Wertung wie eine Listen-Antwort, kein KI-Badge. */
+  approved?: boolean;
   /** Antwort aus der Liste, wenn die Eingabe eine Variante davon ist. */
   listAnswer?: string | null;
   canonicalText?: string | null;
@@ -120,9 +122,15 @@ export function scoreAiVerdict(params: {
   if (verdict.status !== 'valid') return invalid;
 
   const listed = verdict.listAnswer ? question.answers.find((a) => a.text === verdict.listAnswer) : undefined;
+  const source = verdict.approved ? ('list' as const) : ('ai' as const);
   if (listed) {
     const tier = tierFor(mode, listed.baseScore, listed.tooClever);
-    return { ...base, matched: listed.text, frequency: listed.baseScore, tier, points: TIERS[tier].points };
+    return { ...base, source, matched: listed.text, frequency: listed.baseScore, tier, points: TIERS[tier].points };
+  }
+  if (verdict.approved) {
+    const freq = Math.max(0, Math.min(100, Math.round(verdict.estimatedBaseScore ?? 0)));
+    const tier = tierFor(mode, freq);
+    return { ...base, source, matched: (verdict.canonicalText ?? '').trim() || input.trim(), frequency: freq, tier, points: TIERS[tier].points };
   }
 
   const matched = (verdict.canonicalText ?? '').trim() || input.trim();
