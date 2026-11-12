@@ -103,8 +103,12 @@ export async function handleAuthCallback(db: SupabaseClient | null = supabase, h
   };
   if (errorCode) {
     clean();
-    if (errorCode === 'identity_already_exists' && intent?.step === 'link') {
-      // Diese Google-/GitHub-Identität gehört schon zu einem Konto → dort anmelden, Gerät wird zusammengeführt
+    const description = params.get('error_description') ?? '';
+    const belongsToAccount =
+      /identity_already_exists|email_exists|user_already_exists/.test(errorCode) || /already (been )?(registered|linked|exists)/i.test(description);
+    if (belongsToAccount && intent?.step === 'link') {
+      // Identität oder ihre E-Mail gehört schon zu einem Konto (z. B. Discord mit derselben E-Mail wie
+      // das GitHub-Konto) → dort anmelden; Supabase hängt die Identität an, das Gerät wird zusammengeführt
       writeIntent({ provider: intent.provider, step: 'switch', at: Date.now() });
       await db.auth.signInWithOAuth({ provider: intent.provider, options: { redirectTo: returnUrl() } });
       return { kind: 'redirecting' };

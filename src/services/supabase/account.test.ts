@@ -52,6 +52,17 @@ describe('Login: anonymes Konto upgraden statt neu anlegen', () => {
     expect(await handleAuthCallback(after, 'https://playhighsandlows.github.io/')).toEqual({ kind: 'switched' });
   });
 
+  it('Discord-E-Mail gehört schon zu einem Konto (email_exists) → ebenfalls dort anmelden statt Fehler', async () => {
+    const { db: before } = fakeDb({ id: 'anon-4', is_anonymous: true });
+    await signInWith('discord', before);
+    const { db: mid, auth } = fakeDb({ id: 'anon-4', is_anonymous: true });
+    const res = await handleAuthCallback(mid, 'https://x/?error=server_error&error_code=email_exists&error_description=A+user+with+this+email+address+has+already+been+registered');
+    expect(res).toEqual({ kind: 'redirecting' });
+    expect(auth.signInWithOAuth).toHaveBeenCalledWith(expect.objectContaining({ provider: 'discord' }));
+    const { db: after } = fakeDb({ id: 'existing-account', is_anonymous: false });
+    expect(await handleAuthCallback(after, 'https://x/')).toEqual({ kind: 'switched' });
+  });
+
   it('ohne anonyme Sitzung → normale Anmeldung', async () => {
     const { db, auth } = fakeDb(null);
     await signInWith('google', db);
