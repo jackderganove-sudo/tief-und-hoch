@@ -1,11 +1,13 @@
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { TIERS, pointsToMeters } from '../domain/scoring';
+import { pointsToMeters } from '../domain/scoring';
 import type { AnswerResult, Mode, Question } from '../domain/types';
 import { TIER_COLOR } from './tierStyle';
 import { localeFor } from '../i18n';
+import { modeTheme } from './PlayShell';
+import { Panel, PxButton, TierIcon } from './px';
 
-/** Große Stufen-Einblendung nach jeder Antwort. */
+/** Stufen-Einblendung nach jeder Antwort – kompakt, damit die Fahrt darunter sichtbar bleibt. */
 export function TierReveal({
   result,
   question,
@@ -26,7 +28,7 @@ export function TierReveal({
 }) {
   const { t, i18n } = useTranslation();
   const fmt = new Intl.NumberFormat(localeFor(i18n.language === 'en' ? 'en' : 'de'));
-  const tier = TIERS[result.tier];
+  const theme = modeTheme(mode);
   const color = TIER_COLOR[result.tier];
   const rare = mode === 'rare';
   const meters = pointsToMeters(result.points);
@@ -41,63 +43,40 @@ export function TierReveal({
   else detail = `„${result.input}“ – ${t('game.invalid')}`;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 24, scale: 0.94 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -16 }}
-      transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-      className={`rounded-3xl p-6 text-center shadow-2xl backdrop-blur-md ${
-        rare ? 'bg-cave-900/75 ring-1 ring-white/10' : 'bg-white/75 text-[#1d2a52] ring-1 ring-white/60'
-      }`}
-      style={{ boxShadow: `0 0 60px -12px ${color}` }}
-      aria-live="polite"
-    >
-      <motion.div
-        initial={{ scale: 0.3, rotate: -12 }}
-        animate={{ scale: 1, rotate: 0 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 12, delay: 0.1 }}
-        className="text-6xl leading-none"
-        aria-hidden
-      >
-        {tier.emoji}
-      </motion.div>
-      <motion.h2
-        initial={{ opacity: 0, letterSpacing: '0.3em' }}
-        animate={{ opacity: 1, letterSpacing: '0.02em' }}
-        transition={{ duration: 0.5, delay: 0.15 }}
-        className="mt-3 font-display text-5xl font-bold"
-        style={{ color, textShadow: rare ? `0 0 24px ${color}` : undefined }}
-      >
-        {t(`tiers.${result.tier}`)}
-      </motion.h2>
-      <p className="mt-1 font-display text-2xl tabular-nums opacity-90">
-        {t('game.points', { points: result.points })}
-        <span className="ml-2 text-base opacity-70">
-          ({rare && meters > 0 ? '−' : '+'}
-          {fmt.format(meters)} m)
-        </span>
-      </p>
-      {result.tier === 'tooClever' && <p className="mt-2 text-sm opacity-80">{t('tierHints.tooClever')}</p>}
-      <p className="mt-4 text-base">{detail}</p>
-      <div className="mt-2 space-y-0.5 text-sm opacity-70">
-        <p>{t('game.topAnswer', { answer: top.text })}</p>
-        {rare && rarest && rarest.text !== result.matched && <p>{t('game.rareAnswer', { answer: rarest.text })}</p>}
-      </div>
-      <button
-        type="button"
-        onClick={onNext}
-        autoFocus
-        className={`mt-6 w-full rounded-2xl px-6 py-3.5 text-lg font-semibold transition active:scale-[0.98] ${
-          rare ? 'bg-glow-crystal text-cave-950 hover:brightness-110' : 'bg-balloon text-white hover:brightness-105'
-        }`}
-      >
-        {nextLabel}
-      </button>
-      {secondaryLabel && onSecondary && (
-        <button type="button" onClick={onSecondary} className="mt-3 w-full rounded-2xl px-6 py-2.5 text-sm font-semibold underline decoration-dotted underline-offset-4 opacity-80">
-          {secondaryLabel}
-        </button>
-      )}
+    <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.22 }} aria-live="polite">
+      <Panel tone={theme.panel} className="px-1 text-center">
+        <div className="flex items-center justify-center gap-3">
+          <motion.span initial={{ y: -10 }} animate={{ y: [-10, 0, -4, 0] }} transition={{ duration: 0.5, times: [0, 0.5, 0.75, 1] }}>
+            <TierIcon tier={result.tier} scale={3} />
+          </motion.span>
+          <div className="text-left">
+            <h2 className="text-4xl font-bold leading-none" style={{ color, textShadow: rare ? '2px 2px 0 #0e0a16' : '2px 2px 0 rgba(58,36,22,0.25)' }}>
+              {t(`tiers.${result.tier}`)}
+            </h2>
+            <p className="mt-1 text-xl font-bold tabular-nums">
+              {t('game.points', { points: result.points })}{' '}
+              <span className="text-base font-normal opacity-75">
+                ({rare && meters > 0 ? '−' : '+'}
+                {fmt.format(meters)} m)
+              </span>
+            </p>
+          </div>
+        </div>
+        {result.tier === 'tooClever' && <p className="mt-2 text-sm opacity-85">{t('tierHints.tooClever')}</p>}
+        <p className="mt-3 text-lg leading-tight">{detail}</p>
+        <div className="mt-1 text-sm leading-snug opacity-75">
+          <p>{t('game.topAnswer', { answer: top.text })}</p>
+          {rare && rarest && rarest.text !== result.matched && <p>{t('game.rareAnswer', { answer: rarest.text })}</p>}
+        </div>
+        <PxButton tone={theme.rare ? 'gold' : theme.primary} onClick={onNext} autoFocus className="mt-4 w-full text-xl">
+          {nextLabel}
+        </PxButton>
+        {secondaryLabel && onSecondary && (
+          <button type="button" onClick={onSecondary} className="mt-2 w-full py-1 text-base underline decoration-dotted underline-offset-4 opacity-85">
+            {secondaryLabel}
+          </button>
+        )}
+      </Panel>
     </motion.div>
   );
 }

@@ -3,8 +3,8 @@ import { SECONDS_PER_QUESTION } from '../domain/scoring';
 import type { Mode } from '../domain/types';
 
 /**
- * Schrumpfender Zeitbalken. Rechnet mit einer festen Deadline (nicht mit
- * Intervallen) – dadurch stimmt die Zeit auch nach Tab-Wechsel oder Reload.
+ * Schrumpfender Zeitbalken in Pixel-Segmenten. Rechnet mit einer festen
+ * Deadline – stimmt auch nach Tab-Wechsel oder Reload.
  */
 export function TimerBar({ deadline, mode, onExpire }: { deadline: number; mode: Mode; onExpire: () => void }) {
   const bar = useRef<HTMLDivElement>(null);
@@ -19,9 +19,10 @@ export function TimerBar({ deadline, mode, onExpire }: { deadline: number; mode:
     let raf = 0;
     const tick = () => {
       const left = Math.max(0, deadline - Date.now());
-      const frac = left / total;
+      // in 50 Stufen – der Balken springt pixelweise statt weich zu gleiten
+      const frac = Math.ceil((left / total) * 50) / 50;
       if (bar.current) {
-        bar.current.style.transform = `scaleX(${frac})`;
+        bar.current.style.width = `${frac * 100}%`;
         bar.current.dataset.low = left < 5000 ? 'true' : 'false';
       }
       if (label.current) label.current.textContent = String(Math.ceil(left / 1000));
@@ -38,18 +39,17 @@ export function TimerBar({ deadline, mode, onExpire }: { deadline: number; mode:
     return () => cancelAnimationFrame(raf);
   }, [deadline]);
 
-  const track = mode === 'rare' ? 'bg-white/10' : 'bg-white/45';
   const fill =
     mode === 'rare'
-      ? 'bg-gradient-to-r from-glow-crystal to-glow-violet data-[low=true]:from-glow-lava data-[low=true]:to-[#ff2d55]'
-      : 'bg-gradient-to-r from-[#ffb36b] to-balloon data-[low=true]:from-[#ff5f6d] data-[low=true]:to-[#d6249f]';
+      ? 'bg-[#3fc6c0] shadow-[inset_0_3px_0_#a8f5ea,inset_0_-3px_0_#1f6f76] data-[low=true]:bg-[#e2541e] data-[low=true]:shadow-[inset_0_3px_0_#ffb347,inset_0_-3px_0_#7a2416]'
+      : 'bg-[#f2b53a] shadow-[inset_0_3px_0_#ffe08a,inset_0_-3px_0_#a8661c] data-[low=true]:bg-[#e2541e] data-[low=true]:shadow-[inset_0_3px_0_#ffb347,inset_0_-3px_0_#7a2416]';
 
   return (
-    <div className="flex items-center gap-3" role="timer" aria-live="off">
-      <div className={`relative h-2.5 flex-1 overflow-hidden rounded-full ${track}`}>
-        <div ref={bar} className={`absolute inset-0 origin-left rounded-full transition-colors duration-500 ${fill}`} />
+    <div className="flex items-center gap-2" role="timer" aria-live="off">
+      <div className="px-field px-field-dark h-7 flex-1">
+        <div ref={bar} className={`h-full ${fill}`} />
       </div>
-      <span ref={label} className="w-7 text-right font-display text-lg tabular-nums" />
+      <span ref={label} className="w-7 text-right text-xl font-bold tabular-nums" />
     </div>
   );
 }

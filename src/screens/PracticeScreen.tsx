@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { QUESTIONS_PER_DAY, TIERS, pointsToMeters, totalPoints } from '../domain/scoring';
+import { QUESTIONS_PER_DAY, pointsToMeters, totalPoints } from '../domain/scoring';
 import { MODES, TOPICS, type AnswerResult, type Lang, type Mode, type TopicId, type TopicSelection } from '../domain/types';
 import { usePractice } from '../game/usePractice';
 import { services } from '../services';
@@ -9,6 +9,7 @@ import { PlayShell, modeTheme } from '../components/PlayShell';
 import { QuestionCard } from '../components/QuestionCard';
 import { TierReveal } from '../components/TierReveal';
 import { TopicPicker } from '../components/TopicPicker';
+import { Panel, PxButton, TierIcon } from '../components/px';
 import { PixelWorld } from '../pixel/PixelWorld';
 import { localeFor } from '../i18n';
 
@@ -104,67 +105,55 @@ function PracticeSetup({
   const available = counts ? selected.reduce((s, topic) => s + counts[topic], 0) : 0;
 
   return (
-    <div className={`relative min-h-dvh w-full ${theme.text}`}>
+    <div className="relative min-h-dvh w-full">
       <div className="fixed inset-0">
         <PixelWorld view={setup.mode} meters={setup.mode === 'rare' ? 2600 : 1800} />
       </div>
-      <div className="relative z-10 mx-auto max-w-xl px-4 pb-8 pt-[max(1rem,env(safe-area-inset-top))]">
-        <button type="button" onClick={onExit} className={`rounded-full px-3 py-1.5 text-sm font-medium backdrop-blur ${theme.ghost}`}>
+      <div className="relative z-10 mx-auto max-w-xl px-3 pb-8 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <PxButton tone={theme.secondary} small onClick={onExit} aria-label={t('game.back')} className="text-base">
           ← {t('game.back')}
-        </button>
-        <motion.section
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className={`mt-4 rounded-3xl p-5 backdrop-blur-md ${theme.card}`}
-        >
-          <h1 className="font-display text-4xl font-bold">∞ {t('practice.title')}</h1>
-          <p className="mt-2 text-sm opacity-80">{t('practice.intro')}</p>
+        </PxButton>
+        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="mt-3">
+          <Panel tone={theme.panel} className="px-1">
+            <h1 className="text-4xl font-bold leading-none">∞ {t('practice.title')}</h1>
+            <p className="mt-2 text-base leading-snug opacity-85">{t('practice.intro')}</p>
 
-          <h2 className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] opacity-70">{t('practice.mode')}</h2>
-          <div role="radiogroup" aria-label={t('practice.mode')} className="mt-2 grid grid-cols-2 gap-2">
-            {MODES.map((mode) => {
-              const active = setup.mode === mode;
-              return (
-                <button
-                  key={mode}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => onChange({ ...setup, mode })}
-                  className={`rounded-2xl px-3 py-3 text-left ring-2 transition ${
-                    active ? (mode === 'rare' ? 'bg-cave-950 text-cream ring-glow-crystal' : 'bg-white text-[#1d2a52] ring-balloon') : `ring-transparent ${theme.ghost}`
-                  }`}
-                >
-                  <span className="font-display text-xl font-bold">
-                    {mode === 'rare' ? '⛏️' : '🎈'} {t(`modes.${mode}.name`)}
-                  </span>
-                  <span className="mt-0.5 block text-xs opacity-75">{t(`modes.${mode}.tagline`)}</span>
-                </button>
-              );
-            })}
-          </div>
+            <h2 className="mt-4 font-tiny text-xs uppercase opacity-75">{t('practice.mode')}</h2>
+            <div role="radiogroup" aria-label={t('practice.mode')} className="mt-1 grid grid-cols-2 gap-2">
+              {MODES.map((mode) => {
+                const active = setup.mode === mode;
+                return (
+                  <PxButton
+                    key={mode}
+                    role="radio"
+                    aria-checked={active}
+                    tone={active ? 'gold' : theme.secondary}
+                    onClick={() => onChange({ ...setup, mode })}
+                    className="text-left text-lg"
+                  >
+                    {mode === 'rare' ? '▼' : '▲'} {t(`modes.${mode}.name`)}
+                  </PxButton>
+                );
+              })}
+            </div>
 
-          <h2 className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] opacity-70">{t('topics.legend')}</h2>
-          <div className="mt-2">
-            <TopicPicker
-              value={setup.topics}
-              onChange={(topics) => onChange({ ...setup, topics })}
-              counts={counts ?? undefined}
-              tone={theme.rare ? 'dark' : 'light'}
-            />
-          </div>
+            <h2 className="mt-4 font-tiny text-xs uppercase opacity-75">{t('topics.legend')}</h2>
+            <div className="mt-1">
+              <TopicPicker
+                value={setup.topics}
+                onChange={(topics) => onChange({ ...setup, topics })}
+                counts={counts ?? undefined}
+                tone={theme.rare ? 'dark' : 'light'}
+              />
+            </div>
 
-          <p className="mt-4 text-sm opacity-75" aria-live="polite">
-            {!counts ? t('home.loading') : selected.length === 0 ? t('practice.pickTopic') : t('practice.available', { count: available })}
-          </p>
-          <button
-            type="button"
-            onClick={onStart}
-            disabled={available === 0}
-            className={`mt-3 w-full rounded-2xl px-6 py-3.5 text-lg font-semibold transition active:scale-[0.98] disabled:opacity-40 ${theme.primary}`}
-          >
-            {t('practice.start')}
-          </button>
+            <p className="mt-3 text-base" aria-live="polite">
+              {!counts ? t('home.loading') : selected.length === 0 ? t('practice.pickTopic') : t('practice.available', { count: available })}
+            </p>
+            <PxButton tone={theme.rare ? 'gold' : theme.primary} onClick={onStart} disabled={available === 0} className="mt-2 w-full text-xl">
+              {t('practice.start')}
+            </PxButton>
+          </Panel>
         </motion.section>
       </div>
     </div>
@@ -215,8 +204,10 @@ function PracticeSession({
         )}
 
         {game.status === 'empty' && (
-          <motion.div key="empty" className={`rounded-3xl p-6 text-center backdrop-blur-md ${theme.card}`}>
-            {t('practice.noQuestions')}
+          <motion.div key="empty">
+            <Panel tone={theme.panel} className="text-center">
+              {t('practice.noQuestions')}
+            </Panel>
           </motion.div>
         )}
 
@@ -238,40 +229,37 @@ function PracticeSession({
         )}
 
         {game.status === 'summary' && (
-          <motion.section
-            key="summary"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className={`rounded-3xl p-6 text-center backdrop-blur-md ${theme.card}`}
-          >
-            <p className="text-sm uppercase tracking-[0.2em] opacity-70">{t('practice.summary')}</p>
-            <p className="mt-2 font-display text-5xl font-bold tabular-nums" style={{ color: theme.rare ? '#8be9fd' : '#ff7a59' }}>
-              {t('practice.average', { points: Math.round(avg) })}
-            </p>
-            <p className="mt-1 opacity-80">{t('practice.answered', { count: n })}</p>
-            <dl className="mt-5 grid grid-cols-2 gap-3">
-              <div>
-                <dd className="font-display text-2xl font-bold tabular-nums">
-                  {game.results.filter((r) => r.matched).length}/{n}
-                </dd>
-                <dt className="text-xs opacity-70">{t('practice.valid')}</dt>
+          <motion.section key="summary" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+            <Panel tone={theme.panel} className="px-1 text-center">
+              <p className="font-tiny text-xs uppercase opacity-75">{t('practice.summary')}</p>
+              <p className="mt-2 text-5xl font-bold tabular-nums" style={{ color: theme.accent }}>
+                {t('practice.average', { points: Math.round(avg) })}
+              </p>
+              <p className="mt-1 text-lg">{t('practice.answered', { count: n })}</p>
+              <dl className="mt-4 grid grid-cols-2 gap-3">
+                <div>
+                  <dd className="text-2xl font-bold tabular-nums">
+                    {game.results.filter((r) => r.matched).length}/{n}
+                  </dd>
+                  <dt className="text-sm opacity-75">{t('practice.valid')}</dt>
+                </div>
+                <div>
+                  <dd className="text-2xl font-bold tabular-nums">
+                    {theme.rare && meters > 0 ? '−' : ''}
+                    {new Intl.NumberFormat(localeFor(lang)).format(meters)} m
+                  </dd>
+                  <dt className="text-sm opacity-75">{t('practice.projected')}</dt>
+                </div>
+              </dl>
+              <div className="mt-4 flex gap-2">
+                <PxButton tone={theme.secondary} onClick={onExit} className="flex-1 text-lg">
+                  {t('result.home')}
+                </PxButton>
+                <PxButton tone={theme.rare ? 'gold' : theme.primary} onClick={onAgain} autoFocus className="flex-1 text-lg">
+                  {t('practice.again')}
+                </PxButton>
               </div>
-              <div>
-                <dd className="font-display text-2xl font-bold tabular-nums">
-                  {theme.rare && meters > 0 ? '−' : ''}
-                  {new Intl.NumberFormat(localeFor(lang)).format(meters)} m
-                </dd>
-                <dt className="text-xs opacity-70">{t('practice.projected')}</dt>
-              </div>
-            </dl>
-            <div className="mt-6 flex gap-3">
-              <button type="button" onClick={onExit} className={`flex-1 rounded-2xl px-4 py-3 font-semibold ${theme.ghost}`}>
-                {t('result.home')}
-              </button>
-              <button type="button" onClick={onAgain} autoFocus className={`flex-1 rounded-2xl px-4 py-3 font-semibold ${theme.primary}`}>
-                {t('practice.again')}
-              </button>
-            </div>
+            </Panel>
           </motion.section>
         )}
       </AnimatePresence>
@@ -279,14 +267,15 @@ function PracticeSession({
   );
 }
 
-/** Die letzten Ergebnisse als Emoji-Reihe. */
+/** Die letzten Ergebnisse als Icon-Reihe. */
 function EmojiStrip({ results }: { results: AnswerResult[] }) {
   const { t } = useTranslation();
-  const last = results.slice(-12);
+  const last = results.slice(-10);
   return (
-    <p className="h-6 text-center text-lg tracking-wide" aria-label={last.map((r) => t(`tiers.${r.tier}`)).join(', ')}>
-      {results.length > last.length && <span className="opacity-50">… </span>}
-      {last.map((r) => TIERS[r.tier].emoji).join('')}
+    <p className="flex h-8 items-center justify-center gap-1" aria-label={last.map((r) => t(`tiers.${r.tier}`)).join(', ')}>
+      {last.map((r, i) => (
+        <TierIcon key={results.length - last.length + i} tier={r.tier} scale={2} />
+      ))}
     </p>
   );
 }

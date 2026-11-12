@@ -496,3 +496,63 @@ export function lightMask(radius: number): Sprite {
   ctx.putImageData(img, 0, 0);
   return c;
 }
+
+// ---------------------------------------------------------------- Stufen-Icons (16×16)
+
+const ICONS: Record<string, [string[], Record<string, string>]> = {
+  moss: [
+    ['................', '................', '................', '................', '.......g........', '...g...gg..g....', '...gg.gGg.gg....', '....gGgGggG..g..', '..g.gGGGgGg.gg..', '..ggGGGgGGGgG...', '...GGgGGGgGGG...', '.dGGGGGGGGGGGd..', '.dddGGGGGGGddd..', '..dddddddddddd..', '................', '................'],
+    { g: '#b8e86a', G: '#5d9f3a', d: '#3e6b2a' },
+  ],
+  stone: [
+    ['................', '................', '................', '................', '.....kkkkk......', '....kwllllkk....', '...kwllllllmk...', '..kwlllllllmmk..', '..kllllmlllmmk..', '.klllllmmllmmmk.', '.kllmlllllmmmmk.', '.kmmmmmmmmmmmmk.', '..kkkkkkkkkkkk..', '................', '................', '................'],
+    { k: '#2a2438', w: '#c8bfd2', l: '#9a8fa8', m: '#6d6478' },
+  ],
+  ember: [
+    ['................', '.......o........', '......oo........', '......ooo.......', '.....ooyoo..o...', '....oooyyoo.oo..', '...oooyyyoooo...', '..oooyyyyyooo...', '..ooyyywyyyoo...', '..ooyyywwyyoo...', '..oyyywwwwyyo...', '...oyywwwwyo....', '....oyywwyo.....', '.....oooooo.....', '................', '................'],
+    { o: '#e2541e', y: '#ffb347', w: '#fff1b0' },
+  ],
+  core: [
+    ['................', '................', '.....rrrrrr.....', '...rrooooooorr..', '..rooyyyyyyoor..', '..roywwwwwwyor..', '.royywwwwwwyyor.', '.roywwwwwwwwyor.', '.roywwwwwwwwyor.', '.royywwwwwwyyor.', '..roywwwwwwyor..', '..rooyyyyyyoor..', '...rrooooooorr..', '.....rrrrrr.....', '................', '................'],
+    { r: '#7a2416', o: '#e2541e', y: '#ffb347', w: '#fff1b0' },
+  ],
+  tooClever: [
+    ['................', '................', '................', '................', '................', 'k..............k', '.kkkkk....kkkkk.', '.kwwwkkkkkkwwwk.', '.kwbbk....kwbbk.', '.kbbbk....kbbbk.', '.kkkkk....kkkkk.', '................', '................', '................', '................', '................'],
+    { k: '#2a2438', w: '#e6f6ff', b: '#9fd8ff' },
+  ],
+  invalid: [
+    ['................', '................', '..kk........kk..', '..kxk......kxk..', '...kxk....kxk...', '....kxk..kxk....', '.....kxkkxk.....', '......kxxk......', '......kxxk......', '.....kxkkxk.....', '....kxk..kxk....', '...kxk....kxk...', '..kxk......kxk..', '..kk........kk..', '................', '................'],
+    { k: '#2a2438', x: '#8a8f98' },
+  ],
+  meadow: [
+    ['................', '................', '......pp........', '.....pyyp.......', '......pp...w....', '......g...wyw...', '...g..g....w....', '...gg.g..g.g....', '....gggg.gg.g...', '..g.gggggggg....', '..gggggggggggg..', '.dggggggggggggd.', '.dddddddddddddd.', '................', '................', '................'],
+    { p: '#ff8fab', y: '#ffd166', w: '#ffffff', g: '#7ec850', d: '#4e9a3a' },
+  ],
+  treetops: [
+    ['................', '......gggg......', '....ggGGGggg....', '...gGGGGGGGgg...', '..gGGGlGGGGGgg..', '..gGGllGGGGGGg..', '.gGGGGGGGGlGGGg.', '.gGGGGGGGllGGGg.', '.dGGGGGGGGGGGGd.', '..ddGGGGGGGGdd..', '....ddddbddd....', '.......bb.......', '.......bb.......', '......bbbb......', '................', '................'],
+    { g: '#7ec850', G: '#4e9a3a', l: '#b8e86a', d: '#2f6b2a', b: '#8a5a2e' },
+  ],
+  clouds: [
+    ['................', '................', '................', '................', '.......www......', '.....wwwwwww....', '...wwwwwwwwwww..', '..wwwwwwwwwwww..', '.wwwwwwwwwwwwww.', '.wllllllllllllw.', '.blllllllllllbb.', '..bbbbbbbbbbbb..', '................', '................', '................', '................'],
+    { w: '#ffffff', l: '#dff1ff', b: '#b7dcf7' },
+  ],
+  sunset: [
+    ['kkkkkkkkkkkkkkkk', 'kppppppppppppppk', 'kppppppppppppppk', 'kpppppyyyyppqppk', 'kppppyyyyyyqqppk', 'kpppyyyyyyyyqppk', 'kroooooooooooork', 'krrrrrrrrrrrrrrk', 'krooooooooooorrk', 'krrrrrrrrrrrrrrk', 'krrroooooooorrrk', 'kmmmmmmmmmmmmmmk', 'kmmmmmmmmmmmmmmk', 'kmmwwmmmmmmwwmmk', 'kmmmmmmmmmmmmmmk', 'kkkkkkkkkkkkkkkk'],
+    { k: '#3a2030', p: '#e2567c', q: '#f79a7a', y: '#fff3b0', o: '#ffae4a', r: '#ff7f50', m: '#6c3c8c', w: '#c79bd8' },
+  ],
+  stars: [
+    ['................', '.......y........', '.......y........', '......yyy.......', '......ywy.......', '.yyyyywwwyyyyy..', '..yyywwwwwyyy...', '...yyywwwyyy....', '....yywwwyy.....', '....yyyyyyy.....', '...yyy...yyy....', '...yy.....yy....', '..y.........y...', '................', '................', '................'],
+    { y: '#ffd76a', w: '#fff6c2' },
+  ],
+};
+
+/** 16×16-Icon einer Stufe ("crystal" nutzt den Kristall-Sprite). */
+export function tierIconSprite(tier: string): Sprite {
+  if (tier === 'crystal') {
+    const [c, ctx] = canvas(16, 16);
+    ctx.drawImage(crystalSprite(0, false), 1, 2);
+    return c;
+  }
+  const def = ICONS[tier] ?? ICONS.invalid;
+  return fromRows(def[0], def[1]);
+}

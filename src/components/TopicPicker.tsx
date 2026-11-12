@@ -32,26 +32,26 @@ export function TopicPicker({
   };
 
   const dark = tone === 'dark';
+  const field = dark ? 'px-field px-field-dark' : 'px-field px-field-light';
   const chip = (checked: boolean, disabled = false) =>
-    `flex min-h-11 cursor-pointer items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[13px] leading-tight font-medium ring-1 transition select-none ` +
-    `has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 ` +
-    (disabled
-      ? 'cursor-not-allowed opacity-35 ring-current/10'
-      : checked
-        ? dark
-          ? 'bg-glow-crystal/20 ring-glow-crystal/70'
-          : 'bg-balloon/15 ring-balloon/70'
-        : dark
-          ? 'bg-white/5 ring-white/15 hover:bg-white/10'
-          : 'bg-white/50 ring-black/10 hover:bg-white/80');
-  const box = `h-4 w-4 shrink-0 ${dark ? 'accent-[#8be9fd]' : 'accent-[#ff7a59]'}`;
+    `${field} flex min-h-11 cursor-pointer items-center gap-1.5 px-1 text-[15px] leading-tight select-none ` +
+    `has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[#ffd76a] ` +
+    (disabled ? 'cursor-not-allowed opacity-35' : checked ? (dark ? 'bg-[#1f6f76]/60' : 'bg-[#f2b53a]/45') : '');
+
+  /** Pixel-Checkbox: echtes <input> (für Tastatur/Screenreader), unsichtbar über dem gezeichneten Kästchen. */
+  const box = (checked: boolean, disabled: boolean, onToggle: () => void) => (
+    <span className="relative grid size-5 shrink-0 place-items-center border-2 border-[#1b1424] bg-[#fff7e3]">
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={onToggle} className="absolute inset-0 m-0 cursor-pointer opacity-0" />
+      {checked && <span className="size-2.5 bg-[#3a2416] shadow-[inset_-2px_-2px_0_#1b1424]" aria-hidden />}
+    </span>
+  );
 
   return (
     <fieldset>
       <legend className="sr-only">{t('topics.legend')}</legend>
       <label className={chip(value === 'all')}>
-        <input type="checkbox" className={box} checked={value === 'all'} onChange={() => onChange(value === 'all' ? [] : 'all')} />
-        <span className="flex-1 font-semibold">{t('topics.all')}</span>
+        {box(value === 'all', false, () => onChange(value === 'all' ? [] : 'all'))}
+        <span className="flex-1 font-bold">{t('topics.all')}</span>
         {counts && <span className="tabular-nums opacity-60">{available.reduce((s, x) => s + (counts[x] ?? 0), 0)}</span>}
       </label>
       <div className="mt-2 grid grid-cols-2 gap-2">
@@ -60,8 +60,10 @@ export function TopicPicker({
           const checked = !disabled && topicSelected(value, topic);
           return (
             <label key={topic} className={chip(checked, disabled)}>
-              <input type="checkbox" className={box} checked={checked} disabled={disabled} onChange={() => toggle(topic)} />
-              <span aria-hidden className="max-[400px]:hidden">{TOPIC_EMOJI[topic]}</span>
+              {box(checked, disabled, () => toggle(topic))}
+              <span aria-hidden className="max-[400px]:hidden">
+                {TOPIC_EMOJI[topic]}
+              </span>
               <span className="min-w-0 flex-1 hyphens-manual [overflow-wrap:anywhere]">{t(`topics.${topic}`)}</span>
               {counts && <span className="text-xs tabular-nums opacity-60">{counts[topic] ?? 0}</span>}
             </label>

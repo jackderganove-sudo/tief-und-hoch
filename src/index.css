@@ -1,8 +1,9 @@
 @import 'tailwindcss';
 
 @theme {
-  --font-display: 'Fraunces Variable', ui-serif, Georgia, serif;
-  --font-sans: 'Outfit Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Pixelify Sans', ui-monospace, monospace;
+  --font-sans: 'Pixelify Sans', ui-monospace, monospace;
+  --font-tiny: 'Silkscreen', ui-monospace, monospace;
 
   /* Höhle */
   --color-cave-950: #07060b;
@@ -68,6 +69,98 @@
   }
 }
 
+/* ---------------------------------------------------------------- Pixel-Oberfläche
+   9-Slice-Rahmen aus src/assets/pixel/frames (eigene Grafiken). --px = Größe eines
+   Rahmen-Pixels; immer ganzzahlig, damit nichts verschwimmt. */
+:root {
+  --px: 3px;
+}
+@media (min-width: 900px) {
+  :root {
+    --px: 4px;
+  }
+}
+.px-wood,
+.px-stone {
+  border-style: solid;
+  border-width: calc(var(--px) * 6);
+  border-image-slice: 6 fill;
+  border-image-width: calc(var(--px) * 6);
+  border-image-repeat: stretch;
+  image-rendering: pixelated;
+}
+.px-wood {
+  border-image-source: url('./assets/pixel/frames/wood.png');
+  color: #3a2416;
+}
+.px-stone {
+  border-image-source: url('./assets/pixel/frames/stone.png');
+  color: #f3e2bb;
+}
+.px-field {
+  border-style: solid;
+  border-width: calc(var(--px) * 3);
+  border-image-slice: 3 fill;
+  border-image-width: calc(var(--px) * 3);
+  image-rendering: pixelated;
+  outline: none;
+}
+.px-field-light {
+  border-image-source: url('./assets/pixel/frames/field-light.png');
+  color: #3a2416;
+}
+.px-field-dark {
+  border-image-source: url('./assets/pixel/frames/field-dark.png');
+  color: #f3e2bb;
+}
+.px-field:focus-visible {
+  outline: calc(var(--px) * 1) solid #ffd76a;
+  outline-offset: 0;
+}
+.px-btn {
+  border-style: solid;
+  border-width: calc(var(--px) * 4) calc(var(--px) * 4) calc(var(--px) * 6);
+  border-image-slice: 4 4 6 4 fill;
+  border-image-width: calc(var(--px) * 4) calc(var(--px) * 4) calc(var(--px) * 6);
+  image-rendering: pixelated;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+}
+.px-btn-label {
+  display: inline-block;
+  padding: 0 calc(var(--px) * 2);
+}
+.px-btn:active:not(:disabled) .px-btn-label {
+  transform: translateY(calc(var(--px) * 2));
+}
+.px-btn:disabled {
+  filter: grayscale(0.7) brightness(0.85);
+  cursor: default;
+}
+.px-btn-sm {
+  --px: 2px;
+}
+.px-btn-gold { border-image-source: url('./assets/pixel/frames/btn-gold.png'); color: #3a2416; }
+.px-btn-gold:active:not(:disabled) { border-image-source: url('./assets/pixel/frames/btn-gold-down.png'); }
+.px-btn-teal { border-image-source: url('./assets/pixel/frames/btn-teal.png'); color: #0e2a2c; }
+.px-btn-teal:active:not(:disabled) { border-image-source: url('./assets/pixel/frames/btn-teal-down.png'); }
+.px-btn-coral { border-image-source: url('./assets/pixel/frames/btn-coral.png'); color: #fff4e0; }
+.px-btn-coral:active:not(:disabled) { border-image-source: url('./assets/pixel/frames/btn-coral-down.png'); }
+.px-btn-wood { border-image-source: url('./assets/pixel/frames/btn-wood.png'); color: #2a1810; }
+.px-btn-wood:active:not(:disabled) { border-image-source: url('./assets/pixel/frames/btn-wood-down.png'); }
+.px-btn-stone { border-image-source: url('./assets/pixel/frames/btn-stone.png'); color: #f3e2bb; }
+.px-btn-stone:active:not(:disabled) { border-image-source: url('./assets/pixel/frames/btn-stone-down.png'); }
+
+/* Pixel-Text mit hartem 1-Pixel-Schatten (keine weichen Schatten) */
+.px-shadow {
+  text-shadow: 2px 2px 0 #1b1424;
+}
+.px-shadow-light {
+  text-shadow: 2px 2px 0 rgba(255, 255, 255, 0.6);
+}
+
 @layer base {
   html,
   body,
@@ -79,6 +172,7 @@
     background: var(--color-cave-950);
     color: var(--color-cream);
     font-family: var(--font-sans);
+    font-size: 17px;
     -webkit-font-smoothing: antialiased;
     -webkit-tap-highlight-color: transparent;
     overscroll-behavior: none;

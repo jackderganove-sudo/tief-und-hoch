@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { MAX_POINTS, TIERS, pointsToMeters, totalPoints } from '../domain/scoring';
+import { MAX_POINTS, pointsToMeters, totalPoints } from '../domain/scoring';
 import { buildShareText } from '../domain/share';
 import type { Mode, Question } from '../domain/types';
 import { services, type DayRecord } from '../services';
 import { PixelWorld } from '../pixel/PixelWorld';
 import { TIER_COLOR } from '../components/tierStyle';
+import { modeTheme } from '../components/PlayShell';
+import { Panel, PxButton, TierIcon } from '../components/px';
 import { localeFor } from '../i18n';
 import { useCountdown } from '../game/useBerlinDay';
 
@@ -37,9 +39,9 @@ export function ResultScreen({
   if (!record) {
     return (
       <div className="grid h-dvh place-items-center">
-        <button type="button" onClick={onHome} className="rounded-full bg-white/10 px-4 py-2">
+        <PxButton tone="wood" onClick={onHome}>
           {t('result.home')}
-        </button>
+        </PxButton>
       </div>
     );
   }
@@ -75,7 +77,7 @@ export function ResultScreen({
     window.setTimeout(() => setToast(null), 2500);
   };
 
-  const panel = rare ? 'bg-cave-900/80 ring-1 ring-white/10 text-cream' : 'bg-white/80 ring-1 ring-white/70 text-[#1d2a52]';
+  const theme = modeTheme(mode);
 
   return (
     <div className="relative min-h-dvh w-full">
@@ -83,106 +85,82 @@ export function ResultScreen({
         <PixelWorld view={mode} meters={meters} />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-xl px-4 pb-10 pt-[max(1.25rem,env(safe-area-inset-top))]">
-        <motion.section
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          className={`rounded-3xl p-6 text-center shadow-2xl backdrop-blur-md ${panel}`}
-        >
-          <p className="text-sm uppercase tracking-[0.2em] opacity-70">{t('result.title', { mode: t(`modes.${mode}.name`) })}</p>
-          <motion.p
-            initial={{ scale: 0.6, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 200, damping: 14, delay: 0.15 }}
-            className="mt-2 font-display text-6xl font-bold tabular-nums"
-            style={{ color: rare ? '#8be9fd' : '#ff7a59', textShadow: rare ? '0 0 30px rgba(139,233,253,0.5)' : undefined }}
-          >
-            {rare && meters > 0 ? '−' : ''}
-            {fmt.format(meters)} m
-          </motion.p>
-          <p className="mt-1 opacity-80">{t('result.points', { points, max: MAX_POINTS })}</p>
-          <p className="mt-4 text-3xl tracking-wider" aria-label={record.results.map((r) => t(`tiers.${r.tier}`)).join(', ')}>
-            {record.results.map((r) => TIERS[r.tier].emoji).join('')}
-          </p>
-          <button
-            type="button"
-            onClick={share}
-            className={`mt-6 w-full rounded-2xl px-6 py-3.5 text-lg font-semibold transition active:scale-[0.98] ${
-              rare ? 'bg-glow-crystal text-cave-950' : 'bg-balloon text-white'
-            }`}
-          >
-            {t('result.share')} ↗
-          </button>
-          {toast && <p className="mt-3 whitespace-pre-line text-sm opacity-90">{toast}</p>}
-          <p className="mt-4 text-sm opacity-70">{t('home.nextIn', { time: countdown })}</p>
+      <div className="relative z-10 mx-auto max-w-xl px-3 pb-10 pt-[max(0.75rem,env(safe-area-inset-top))]">
+        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+          <Panel tone={theme.panel} className="px-1 text-center">
+            <p className="font-tiny text-xs uppercase opacity-75">{t('result.title', { mode: t(`modes.${mode}.name`) })}</p>
+            <p className="mt-2 text-6xl font-bold leading-none tabular-nums" style={{ color: theme.accent, textShadow: rare ? '3px 3px 0 #0e0a16' : '3px 3px 0 rgba(58,36,22,0.25)' }}>
+              {rare && meters > 0 ? '−' : ''}
+              {fmt.format(meters)} m
+            </p>
+            <p className="mt-2 text-lg">{t('result.points', { points, max: MAX_POINTS })}</p>
+            <p className="mt-3 flex justify-center gap-1" aria-label={record.results.map((r) => t(`tiers.${r.tier}`)).join(', ')}>
+              {record.results.map((r, i) => (
+                <TierIcon key={i} tier={r.tier} scale={2} />
+              ))}
+            </p>
+            <PxButton tone={rare ? 'gold' : theme.primary} onClick={share} className="mt-4 w-full text-xl">
+              {t('result.share')} ↗
+            </PxButton>
+            {toast && <p className="mt-2 whitespace-pre-line text-sm">{toast}</p>}
+            <p className="mt-3 text-sm opacity-80">{t('home.nextIn', { time: countdown })}</p>
+          </Panel>
         </motion.section>
 
-        <motion.section
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className={`mt-4 rounded-3xl p-4 backdrop-blur-md ${panel}`}
-        >
-          <ol className="divide-y divide-current/10">
-            {record.results.map((r, i) => {
-              const q = questions.find((x) => x.id === r.questionId);
-              return (
-                <li key={r.questionId} className="flex items-center gap-3 py-2.5">
-                  <span className="text-xl" aria-hidden>
-                    {TIERS[r.tier].emoji}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm opacity-70">
-                      {i + 1}. {q?.prompt ?? '…'}
-                    </p>
-                    <p className="truncate font-medium">{r.matched ?? (r.input.trim() ? `„${r.input}“` : '—')}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold" style={{ color: TIER_COLOR[r.tier] }}>
-                      {t(`tiers.${r.tier}`)}
-                    </p>
-                    <p className="text-sm tabular-nums opacity-70">{r.points}</p>
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
+        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mt-3">
+          <Panel tone={theme.panel} className="px-1">
+            <ol>
+              {record.results.map((r, i) => {
+                const q = questions.find((x) => x.id === r.questionId);
+                return (
+                  <li key={r.questionId} className={`flex items-center gap-2 py-2 ${i ? 'border-t-2 border-dashed border-current/20' : ''}`}>
+                    <TierIcon tier={r.tier} scale={2} className="shrink-0" />
+                    <div className="min-w-0 flex-1 leading-tight">
+                      <p className="truncate text-sm opacity-75">
+                        {i + 1}. {q?.prompt ?? '…'}
+                      </p>
+                      <p className="truncate text-lg">{r.matched ?? (r.input.trim() ? `„${r.input}“` : '—')}</p>
+                    </div>
+                    <div className="text-right leading-tight">
+                      <p className="text-base font-bold" style={{ color: TIER_COLOR[r.tier], textShadow: rare ? '1px 1px 0 #0e0a16' : undefined }}>
+                        {t(`tiers.${r.tier}`)}
+                      </p>
+                      <p className="text-sm tabular-nums opacity-75">{r.points}</p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </Panel>
         </motion.section>
 
-        <motion.section
-          initial={{ opacity: 0, y: 24 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className={`mt-4 rounded-3xl p-4 backdrop-blur-md ${panel}`}
-        >
-          <h2 className="mb-3 font-display text-lg font-semibold">{t('result.stats')}</h2>
-          <dl className="grid grid-cols-4 gap-2 text-center">
-            {[
-              [t('result.played'), stats.played],
-              [t('result.average'), avg],
-              [t('result.best'), stats.best],
-              [t('result.streak'), streak],
-            ].map(([label, value]) => (
-              <div key={label}>
-                <dd className="font-display text-2xl font-bold tabular-nums">{value}</dd>
-                <dt className="text-xs opacity-70">{label}</dt>
-              </div>
-            ))}
-          </dl>
+        <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-3">
+          <Panel tone={theme.panel} className="px-1">
+            <h2 className="text-xl font-bold">{t('result.stats')}</h2>
+            <dl className="mt-2 grid grid-cols-4 gap-2 text-center">
+              {[
+                [t('result.played'), stats.played],
+                [t('result.average'), avg],
+                [t('result.best'), stats.best],
+                [t('result.streak'), streak],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dd className="text-2xl font-bold tabular-nums">{value}</dd>
+                  <dt className="text-xs opacity-75">{label}</dt>
+                </div>
+              ))}
+            </dl>
+          </Panel>
         </motion.section>
 
-        <div className="mt-5 flex gap-3">
-          <button type="button" onClick={onHome} className={`flex-1 rounded-2xl px-4 py-3 font-semibold backdrop-blur ${rare ? 'bg-white/10' : 'bg-white/60'}`}>
+        <div className="mt-3 flex gap-2">
+          <PxButton tone={theme.secondary} onClick={onHome} className="flex-1 text-lg">
             {t('result.home')}
-          </button>
+          </PxButton>
           {!otherDone && (
-            <button
-              type="button"
-              onClick={onOtherMode}
-              className={`flex-1 rounded-2xl px-4 py-3 font-semibold ${rare ? 'bg-balloon text-white' : 'bg-cave-900 text-glow-crystal'}`}
-            >
-              {t('result.otherMode', { mode: t(`modes.${other}.name`) })} {rare ? '🎈' : '⛏️'}
-            </button>
+            <PxButton tone={rare ? 'coral' : 'teal'} onClick={onOtherMode} className="flex-1 text-lg">
+              {t('result.otherMode', { mode: t(`modes.${other}.name`) })} {rare ? '▲' : '▼'}
+            </PxButton>
           )}
         </div>
       </div>

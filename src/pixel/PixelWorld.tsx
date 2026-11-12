@@ -12,6 +12,9 @@ export interface WorldFx {
   points: number;
 }
 
+/** Startseite: Schacht im linken, Ballon im rechten Drittel – auch auf breiten Bildschirmen. */
+const homeCamX = (W: number) => BALLOON_X / 2 + Math.max(0, (W - 200) * 0.12);
+
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
 /**
@@ -111,11 +114,11 @@ export function PixelWorld({ view, meters = 0, fx = null }: { view: WorldView; m
 
       const px = shown * PPM;
       const state: ViewState = {
-        camX: view === 'home' ? BALLOON_X / 2 : view === 'rare' ? 0 : BALLOON_X,
+        camX: view === 'home' ? homeCamX(W) : view === 'rare' ? 0 : BALLOON_X,
         camY: view === 'rare' ? px : view === 'common' ? -px : 0,
-        anchorY: Math.round(H * (view === 'home' ? 0.5 : view === 'rare' ? 0.62 : 0.84)),
+        anchorY: Math.round(H * (view === 'home' ? 0.55 : view === 'rare' ? 0.7 : 0.86)),
         time: now / 1000,
-        depth: view === 'rare' ? shown : 0,
+        depth: view === 'rare' ? shown : view === 'home' ? 70 : 0,
         altitude: view === 'common' ? shown : 0,
         explorerMood: view === 'rare' ? mood : 'idle',
         balloonMood: view === 'common' ? mood : 'idle',
