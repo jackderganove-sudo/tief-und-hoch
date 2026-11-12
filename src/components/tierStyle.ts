@@ -1,17 +1,24 @@
 import type { TierId } from '../domain/types';
 
-/** Leuchtfarbe pro Stufe (Text, Glow, Ränder). */
+/** Medaillen-Farben: auf dunklem Stein und hellem Holz lesbar. */
+const BRONZE = '#c46f2e';
+const SILVER = '#8d97a8';
+const GOLD = '#d9a21c';
+const PLATINUM = '#4a8aa0';
+const DIAMOND = '#25b4e8';
+
+/** Farbe pro Stufe (Text, Ränder) – gleiche Punkte = gleiche Medaille in beiden Modi. */
 export const TIER_COLOR: Record<TierId, string> = {
-  moss: '#86c46b',
-  stone: '#b8bfcc',
-  crystal: '#8be9fd',
-  ember: '#ffa94d',
-  core: '#ff5a2b',
+  moss: BRONZE,
+  stone: SILVER,
+  crystal: GOLD,
+  ember: PLATINUM,
+  core: DIAMOND,
+  meadow: BRONZE,
+  treetops: SILVER,
+  clouds: GOLD,
+  sunset: PLATINUM,
+  stars: DIAMOND,
   tooClever: '#f6d365',
-  meadow: '#5aa843',
-  treetops: '#2f8a4a',
-  clouds: '#5b8fd9',
-  sunset: '#f0703f',
-  stars: '#6d4cd6',
   invalid: '#8a8f98',
 };

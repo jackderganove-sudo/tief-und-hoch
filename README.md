@@ -3,9 +3,12 @@
 Tägliches Wort-/Trivia-Spiel mit zwei Modi:
 
 - **Abstieg (RARE):** Je seltener die Antwort, desto tiefer geht es in die Höhle.
-  Moos 10 · Stein 30 · Kristall 60 · Glut 85 · Kern 100 · Sonderstufe „Zu schlau“ 15
+  Bronze 10 · Silber 30 · Gold 60 · Platin 85 · Diamant 100 · Sonderstufe „Zu schlau“ 15
 - **Aufstieg (COMMON):** Je häufiger die Antwort, desto höher steigt der Ballon.
-  Wiese 10 · Baumwipfel 30 · Wolken 60 · Abendrot 85 · Sterne 100
+  Bronze 10 · Silber 30 · Gold 60 · Platin 85 · Diamant 100
+
+Die Stufen sind Medaillen, keine Orte – die Welt (Höhlenzonen, Himmelsschichten) ergibt sich
+allein aus den Metern.
 
 Jeden Tag 7 Fragen pro Modus, 25 Sekunden pro Frage, eine Antwort. 1 Punkt = 10 m.
 Tageswechsel um Mitternacht Europe/Berlin.
@@ -146,8 +149,8 @@ Frontend kennt nur Supabase-URL und anon key, der Gemini-Key liegt als Supabase-
   Edge Function: Cache `ai_verdicts` → Limit (30 KI-Prüfungen pro Spieler in 24 h,
   1000 insgesamt) → Gemini (≈ 4,7 s, im Spiel max. 6 s mit Lade-Animation) → Urteil cachen.
   Fehler/Timeout/Limit: ungültig, aber „Konnte nicht geprüft werden“.
-- **Wertung:** Abstieg nach geschätzter Häufigkeit, höchstens „Glut“ (85) – der Kern
-  bleibt Listen-Antworten vorbehalten. Aufstieg: nicht in der Liste = „Wiese“ (10).
+- **Wertung:** Abstieg nach geschätzter Häufigkeit, höchstens Platin (85) – Diamant
+  bleibt Listen-Antworten vorbehalten. Aufstieg: nicht in der Liste = Bronze (10).
   Erkennt die KI eine Variante einer Listen-Antwort, zählt die Listen-Antwort.
 - **Speichern:** jede Tagesantwort landet in `submissions` (Übung nicht).
 - **Datenbank:** `supabase/migrations/` (RLS überall, Rechte explizit vergeben).

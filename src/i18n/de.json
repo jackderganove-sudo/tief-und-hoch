@@ -52,17 +52,17 @@
     "aiBadgeHint": "Diese Antwort stand nicht in der Liste und wurde von einer KI geprüft."
   },
   "tiers": {
-    "moss": "Moos",
-    "stone": "Stein",
-    "crystal": "Kristall",
-    "ember": "Glut",
-    "core": "Kern",
+    "moss": "Bronze",
+    "stone": "Silber",
+    "crystal": "Gold",
+    "ember": "Platin",
+    "core": "Diamant",
     "tooClever": "Zu schlau",
-    "meadow": "Wiese",
-    "treetops": "Baumwipfel",
-    "clouds": "Wolken",
-    "sunset": "Abendrot",
-    "stars": "Sterne",
+    "meadow": "Bronze",
+    "treetops": "Silber",
+    "clouds": "Gold",
+    "sunset": "Platin",
+    "stars": "Diamant",
     "invalid": "Daneben"
   },
   "tierHints": {

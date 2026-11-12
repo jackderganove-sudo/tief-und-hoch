@@ -547,12 +547,79 @@ const ICONS: Record<string, [string[], Record<string, string>]> = {
 };
 
 /** 16×16-Icon einer Stufe ("crystal" nutzt den Kristall-Sprite). */
-export function tierIconSprite(tier: string): Sprite {
-  if (tier === 'crystal') {
-    const [c, ctx] = canvas(16, 16);
-    ctx.drawImage(crystalSprite(0, false), 1, 2);
-    return c;
+/** Medaille je Stufe – gleiche Punkte = gleiche Medaille in beiden Modi. */
+const MEDAL_OF: Record<string, 'bronze' | 'silver' | 'gold' | 'platinum' | 'diamond'> = {
+  moss: 'bronze',
+  meadow: 'bronze',
+  stone: 'silver',
+  treetops: 'silver',
+  crystal: 'gold',
+  clouds: 'gold',
+  ember: 'platinum',
+  sunset: 'platinum',
+  core: 'diamond',
+  stars: 'diamond',
+};
+
+const MEDAL_COLORS = {
+  bronze: { l: '#f0b27a', m: '#c4783c', d: '#8a4f24', ribbon: ['#c23b34', '#8e2a2a'] },
+  silver: { l: '#ffffff', m: '#c3c9d4', d: '#7d8698', ribbon: ['#3d83b3', '#2a5f86'] },
+  gold: { l: '#fff3a0', m: '#f2c23a', d: '#b8851c', ribbon: ['#c23b34', '#8e2a2a'] },
+  platinum: { l: '#ffffff', m: '#bfe6f0', d: '#6fa3b3', ribbon: ['#6d4cd6', '#4a2f9a'] },
+};
+
+/** 16×16-Pixel-Medaille mit Band (Bronze–Platin) bzw. geschliffener Diamant. */
+function medalSprite(kind: keyof typeof MEDAL_COLORS | 'diamond'): Sprite {
+  if (kind === 'diamond') {
+    return fromRows(
+      [
+        '................',
+        '................',
+        '....kkkkkkkk....',
+        '...kwlwlllclk...',
+        '..kwwllwlllcck..',
+        '.kkkkkkkkkkkkkk.',
+        '.klwwlllllcccdk.',
+        '..klwlllllccdk..',
+        '...klwlllccdk...',
+        '....klwllcdk....',
+        '.....klwlcdk....',
+        '......klcdk.....',
+        '.......kdk......',
+        '........k.......',
+        '................',
+        '................',
+      ].map((r) => r.padEnd(16, '.').slice(0, 16)),
+      { k: '#1e3a5f', w: '#ffffff', l: '#bff4ff', c: '#5fd3f5', d: '#2a8fc4' },
+    );
   }
+  const c = MEDAL_COLORS[kind];
+  return fromRows(
+    [
+      '...rrR....Rrr...',
+      '....rrR..Rrr....',
+      '.....rrRRrr.....',
+      '......rRRr......',
+      '.....kkkkkk.....',
+      '...kkllllmmkk...',
+      '..kllmmmmmmddk..',
+      '..klmmmlmmmmdk..',
+      '.klmmmllmmmmmdk.',
+      '.klmmmmlmmmmmdk.',
+      '.klmmmmlmmmmmdk.',
+      '.kmmmmlllmmmmdk.',
+      '..kmmmmmmmmmdk..',
+      '..kdmmmmmmmddk..',
+      '...kkddddddkk...',
+      '.....kkkkkk.....',
+    ],
+    { k: '#2a2030', l: c.l, m: c.m, d: c.d, r: c.ribbon[0], R: c.ribbon[1] },
+  );
+}
+
+export function tierIconSprite(tier: string): Sprite {
+  const medal = MEDAL_OF[tier];
+  if (medal) return medalSprite(medal);
   const def = ICONS[tier] ?? ICONS.invalid;
   return fromRows(def[0], def[1]);
 }

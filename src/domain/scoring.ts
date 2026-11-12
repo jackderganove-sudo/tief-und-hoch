@@ -6,18 +6,23 @@ export const SECONDS_PER_QUESTION = 25;
 export const METERS_PER_POINT = 10;
 export const MAX_POINTS = QUESTIONS_PER_DAY * 100;
 
+/**
+ * Stufen. Die IDs bleiben aus Kompatibilität (gespeicherte Spielstände) bei den alten
+ * Zonen-Namen; angezeigt werden Medaillen – gleiche Punkte = gleiche Medaille in beiden Modi:
+ * Bronze 10 · Silber 30 · Gold 60 · Platin 85 · Diamant 100 (Anzeigenamen in i18n „tiers“).
+ */
 export const TIERS: Record<TierId, Tier> = {
-  moss: { id: 'moss', points: 10, emoji: '🌿' },
-  stone: { id: 'stone', points: 30, emoji: '🪨' },
-  crystal: { id: 'crystal', points: 60, emoji: '💎' },
-  ember: { id: 'ember', points: 85, emoji: '🔥' },
-  core: { id: 'core', points: 100, emoji: '🌋' },
+  moss: { id: 'moss', points: 10, emoji: '🥉' },
+  stone: { id: 'stone', points: 30, emoji: '🥈' },
+  crystal: { id: 'crystal', points: 60, emoji: '🥇' },
+  ember: { id: 'ember', points: 85, emoji: '🏆' },
+  core: { id: 'core', points: 100, emoji: '💎' },
   tooClever: { id: 'tooClever', points: 15, emoji: '🤓' },
-  meadow: { id: 'meadow', points: 10, emoji: '🌱' },
-  treetops: { id: 'treetops', points: 30, emoji: '🌳' },
-  clouds: { id: 'clouds', points: 60, emoji: '☁️' },
-  sunset: { id: 'sunset', points: 85, emoji: '🌇' },
-  stars: { id: 'stars', points: 100, emoji: '⭐' },
+  meadow: { id: 'meadow', points: 10, emoji: '🥉' },
+  treetops: { id: 'treetops', points: 30, emoji: '🥈' },
+  clouds: { id: 'clouds', points: 60, emoji: '🥇' },
+  sunset: { id: 'sunset', points: 85, emoji: '🏆' },
+  stars: { id: 'stars', points: 100, emoji: '💎' },
   invalid: { id: 'invalid', points: 0, emoji: '⬛' },
 };
 

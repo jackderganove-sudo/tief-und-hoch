@@ -52,17 +52,17 @@
     "aiBadgeHint": "This answer was not on the list and was checked by an AI."
   },
   "tiers": {
-    "moss": "Moss",
-    "stone": "Stone",
-    "crystal": "Crystal",
-    "ember": "Ember",
-    "core": "Core",
+    "moss": "Bronze",
+    "stone": "Silver",
+    "crystal": "Gold",
+    "ember": "Platinum",
+    "core": "Diamond",
     "tooClever": "Too clever",
-    "meadow": "Meadow",
-    "treetops": "Treetops",
-    "clouds": "Clouds",
-    "sunset": "Sunset",
-    "stars": "Stars",
+    "meadow": "Bronze",
+    "treetops": "Silver",
+    "clouds": "Gold",
+    "sunset": "Platinum",
+    "stars": "Diamond",
     "invalid": "Miss"
   },
   "tierHints": {
