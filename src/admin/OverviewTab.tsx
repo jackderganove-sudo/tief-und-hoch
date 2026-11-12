@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { PxButton } from '../components/px';
-import { adminDb, loadAiStatus, type AiStatus, type Overview } from './adminApi';
+import { adminDb, loadAiStatus, loadRoomCounts, type AiStatus, type Overview } from './adminApi';
 import { Card, ErrorLine, Stat } from './ui';
 
 const n = (v: number | undefined | null) => (v ?? 0).toLocaleString('de-DE');
@@ -21,8 +21,10 @@ export function OverviewTab({
   onOpenReview: () => void;
 }) {
   const [ai, setAi] = useState<AiStatus | null>(null);
+  const [rooms, setRooms] = useState<{ active: number; players_online: number; today: number } | null>(null);
   useEffect(() => {
     void loadAiStatus(adminDb!).then(setAi).catch(() => {});
+    void loadRoomCounts(adminDb!).then(setRooms).catch(() => {});
   }, [o]);
 
   if (!o) return error ? <ErrorLine error={error} /> : <p className="mt-6 text-center opacity-70">Lade …</p>;
@@ -101,6 +103,16 @@ export function OverviewTab({
           </div>
         )}
       </Card>
+
+      {rooms && (
+        <Card title="Freunde-Modus (Räume)">
+          <dl className="grid grid-cols-3 gap-2">
+            <Stat label="Aktiv" value={n(rooms.active)} />
+            <Stat label="Spieler online" value={n(rooms.players_online)} />
+            <Stat label="Heute erstellt" value={n(rooms.today)} />
+          </dl>
+        </Card>
+      )}
 
       <Card title="Offene KI-Antworten">
         <div className="flex flex-wrap items-center gap-3">

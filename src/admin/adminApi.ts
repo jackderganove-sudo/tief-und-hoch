@@ -205,3 +205,26 @@ export async function confirmAdmin(db: SupabaseClient): Promise<boolean> {
   const { data, error } = await db.rpc('is_admin');
   return !error && data === true;
 }
+
+// ---------------------------------------------------------------- Freunde-Modus
+
+export interface AdminRoom {
+  id: string;
+  code: string;
+  status: string;
+  index: number;
+  count: number;
+  round: number;
+  mode: 'rare' | 'common';
+  scoring: string;
+  source: string;
+  created_at: string;
+  last_activity_at: string;
+  host: string | null;
+  players: { user_id: string; name: string; avatar: number; online: boolean; host: boolean; banned: boolean }[];
+}
+export const loadRooms = (db: SupabaseClient) => rpc<AdminRoom[]>(db, 'admin_rooms');
+export const loadRoomCounts = (db: SupabaseClient) => rpc<{ active: number; players_online: number; today: number }>(db, 'admin_room_counts');
+export const endRoom = (db: SupabaseClient, roomId: string) => rpc<null>(db, 'admin_end_room', { p_room: roomId });
+export const banInRoom = (db: SupabaseClient, roomId: string, userId: string, reason?: string) =>
+  rpc<null>(db, 'admin_room_ban', { p_room: roomId, p_user: userId, p_reason: reason ?? null });

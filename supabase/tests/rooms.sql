@@ -88,6 +88,32 @@ do $$ begin
 end $$;
 reset role;
 
+-- ================================================================ Admin-Funktionen für Räume
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000f1","role":"authenticated"}';
+do $$ begin
+  begin perform public.admin_rooms(); raise exception 'FAIL: Nicht-Admin sieht Räume'; exception when insufficient_privilege then null; end;
+  begin perform public.admin_end_room('00000000-0000-4000-8000-0000000000d1'); raise exception 'FAIL: Nicht-Admin beendet Raum'; exception when insufficient_privilege then null; end;
+  begin perform public.admin_room_ban('00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-0000000000f2'); raise exception 'FAIL: Nicht-Admin sperrt im Raum'; exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+insert into public.admins (user_id) values ('00000000-0000-4000-8000-0000000000f3');
+update public.room_players set kicked = false where user_id = '00000000-0000-4000-8000-0000000000f2';
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000f3","role":"authenticated"}';
+do $$ begin
+  if jsonb_array_length(public.admin_rooms()) < 1 then raise exception 'FAIL: Admin sieht den Raum nicht'; end if;
+  perform public.admin_room_ban('00000000-0000-4000-8000-0000000000d1', '00000000-0000-4000-8000-0000000000f2', 'Test');
+  if not public.is_banned('00000000-0000-4000-8000-0000000000f2') then raise exception 'FAIL: Spieler nicht gesperrt'; end if;
+  perform public.admin_end_room('00000000-0000-4000-8000-0000000000d1');
+end $$;
+reset role;
+do $$ begin
+  if (select status from public.rooms where code = 'TESTAB') <> 'finished' then raise exception 'FAIL: Raum nicht beendet'; end if;
+  if not (select kicked from public.room_players where user_id = '00000000-0000-4000-8000-0000000000f2') then raise exception 'FAIL: Spieler nicht entfernt'; end if;
+  if (select count(*) from public.admin_log where action in ('room.end', 'player.ban') and admin_id = '00000000-0000-4000-8000-0000000000f3') <> 2 then raise exception 'FAIL: nicht protokolliert'; end if;
+end $$;
+
 -- Aufräumen nach 2 h
 update public.rooms set last_activity_at = now() - interval '3 hours' where id = '00000000-0000-4000-8000-0000000000d1';
 do $$ begin

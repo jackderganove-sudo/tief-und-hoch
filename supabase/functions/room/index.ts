@@ -91,6 +91,7 @@ interface Room {
   phase_ends_at: string | null;
   round: number;
   version: number;
+  ended_by_admin: boolean;
 }
 interface Player {
   room_id: string;
@@ -210,6 +211,7 @@ async function create(uid: string, body: Record<string, unknown>) {
 
 async function join(uid: string, body: Record<string, unknown>) {
   const room = await loadRoom(body.code);
+  if (room.ended_by_admin) throw new Fail('not_found', 404);
   if (await isBanned(uid)) throw new Fail('banned', 403);
   const players = await loadPlayers(room.id);
   const existing = players.find((p) => p.user_id === uid);
@@ -574,6 +576,7 @@ async function again(uid: string, body: Record<string, unknown>) {
   const room = await loadRoom(body.code);
   requireHost(room, uid);
   if (room.status !== 'finished') throw new Fail('not_finished', 409);
+  if (room.ended_by_admin) throw new Fail('ended_by_admin', 409);
   await db.from('room_questions').delete().eq('room_id', room.id);
   await db.from('room_players').update({ from_index: 0 }).eq('room_id', room.id);
   await casUpdate(room, { status: 'lobby', current_index: -1, question_count: 0, phase_ends_at: null, round: room.round + 1 });

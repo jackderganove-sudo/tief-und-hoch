@@ -10,6 +10,7 @@ import { DebugTab } from './DebugTab';
 import { QuestionsTab } from './QuestionsTab';
 import { PlayersTab } from './PlayersTab';
 import { SystemTab } from './SystemTab';
+import { RoomsTab } from './RoomsTab';
 
 /**
  * Admin-Dashboard unter /admin (nur über den Button im Profil verlinkt).
@@ -97,6 +98,7 @@ const TABS = [
   ['review', '🤖 KI-Checker'],
   ['debug', '🛠 Debug'],
   ['questions', '❓ Fragen'],
+  ['rooms', '🎲 Räume'],
   ['players', '👥 Spieler'],
   ['system', '⚙ System'],
 ] as const;
@@ -179,6 +181,7 @@ function Dashboard({ name, userId, onSignOut }: { name: string; userId: string; 
         {tab === 'review' && <ReviewTab onChanged={refreshOverview} />}
         {tab === 'debug' && <DebugTab />}
         {tab === 'questions' && <QuestionsTab />}
+        {tab === 'rooms' && <RoomsTab selfId={userId} onChanged={refreshOverview} />}
         {tab === 'players' && <PlayersTab selfId={userId} onChanged={refreshOverview} />}
         {tab === 'system' && <SystemTab />}
       </main>
