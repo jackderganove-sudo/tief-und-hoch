@@ -133,6 +133,35 @@ Eine Datei pro Thema und Sprache: `src/data/questions/<lang>/<topic>.json`.
 Die `baseScore`-Werte sind Schätzungen. Hinweis: Wer Fragen hinzufügt, verändert die
 Tagesauswahl künftiger Tage; alle Spieler mit demselben Stand sehen weiter dieselben Fragen.
 
+## KI-Prüfung (Supabase + Gemini)
+
+Antworten, die die lokale Prüfung (Liste, Aliase, Tippfehler) nicht kennt, prüft die
+Supabase Edge Function `judge-answer` mit Gemini. Spieler brauchen keinen Key: das
+Frontend kennt nur Supabase-URL und anon key, der Gemini-Key liegt als Supabase-Secret.
+
+- **Anmeldung:** anonym (Supabase Anonymous Sign-In) – jeder Spieler hat eine ID.
+- **Ablauf:** Cache auf dem Gerät (localStorage, wird bei neuer App-Version geleert) →
+  Edge Function: Cache `ai_verdicts` → Limit (30 KI-Prüfungen pro Spieler in 24 h,
+  1000 insgesamt) → Gemini (Timeout ≈ 3,3 s, im Spiel max. 4 s) → Urteil cachen.
+  Fehler/Timeout/Limit: ungültig, aber „Konnte nicht geprüft werden“.
+- **Wertung:** Abstieg nach geschätzter Häufigkeit, höchstens „Glut“ (85) – der Kern
+  bleibt Listen-Antworten vorbehalten. Aufstieg: nicht in der Liste = „Wiese“ (10).
+  Erkennt die KI eine Variante einer Listen-Antwort, zählt die Listen-Antwort.
+- **Speichern:** jede Tagesantwort landet in `submissions` (Übung nicht).
+- **Datenbank:** `supabase/migrations/` (RLS überall, Rechte explizit vergeben).
+- **Ohne** `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` läuft alles rein lokal wie bisher.
+
+```bash
+cp .env.example .env.local                 # URL + anon key eintragen
+npx supabase db push                       # Migrationen anwenden
+npm run function-data                      # Fragen-Bundle der Funktion (nach Fragen-Änderungen)
+npx supabase functions deploy judge-answer
+npm run review-ai-answers -- --export=packs/ai-review.json   # KI-Antworten sichten/übernehmen
+```
+
+Optionale Function-Secrets: `GEMINI_MODEL` (Standard `gemini-3.8-flash`), `GEMINI_THINKING`
+(`low`), `AI_USER_DAILY_LIMIT` (30), `AI_GLOBAL_DAILY_LIMIT` (1000).
+
 ## Übungsmodus
 
 Startseite → „∞ Übung“: Abstieg oder Aufstieg wählen, Themen per Checkbox („Alle Themen“

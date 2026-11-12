@@ -6,3 +6,6 @@ dist
 .claude
 assets/_downloads
 screenshots
+.env
+.env.*
+!.env.example

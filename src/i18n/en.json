@@ -43,7 +43,14 @@
     "rareAnswer": "Very rare: {{answer}}",
     "points": "+{{points}}",
     "back": "Back",
-    "noQuestions": "No questions available for today."
+    "noQuestions": "No questions available for today.",
+    "aiChecking": "AI is checking your answer …",
+    "aiChecked": "checked by AI",
+    "aiRejected": "Not accepted by the AI",
+    "unchecked": "Couldn't be checked",
+    "uncheckedLimit": "Couldn't be checked (daily AI limit reached)",
+    "aiCapRare": "AI-checked answers go down to Ember at most – the Core is reserved for listed answers.",
+    "aiCommon": "Not on the list – counts as a rare answer."
   },
   "tiers": {
     "moss": "Moss",

@@ -138,7 +138,7 @@ export function useGame(mode: Mode, dateKey: string, lang: Lang) {
       lang: record.lang,
       mode,
       questionId: question.id,
-      answerText: result.matched,
+      result,
     });
 
     setState({ ...s, status: 'reveal', record, index: results.length - 1, lastResult: result, deadline: null });

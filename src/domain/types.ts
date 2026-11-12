@@ -97,4 +97,8 @@ export interface AnswerResult {
   tier: TierId;
   points: number;
   timedOut: boolean;
+  /** Woher die Wertung stammt: kuratierte Liste oder KI-Prüfung. Fehlt bei alten Spielständen (= Liste). */
+  source?: 'list' | 'ai';
+  /** KI-Prüfung nicht möglich (Fehler, Zeitüberschreitung, Limit) – gilt als ungültig. */
+  unchecked?: 'error' | 'limited';
 }

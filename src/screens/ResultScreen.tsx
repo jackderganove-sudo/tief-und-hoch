@@ -9,6 +9,7 @@ import { PixelWorld } from '../pixel/PixelWorld';
 import { TIER_COLOR } from '../components/tierStyle';
 import { modeTheme } from '../components/PlayShell';
 import { Panel, PxButton, TierIcon } from '../components/px';
+import { AiBadge } from '../components/TierReveal';
 import { localeFor } from '../i18n';
 import { useCountdown } from '../game/useBerlinDay';
 
@@ -119,7 +120,10 @@ export function ResultScreen({
                       <p className="truncate text-sm opacity-75">
                         {i + 1}. {q?.prompt ?? '…'}
                       </p>
-                      <p className="truncate text-lg">{r.matched ?? (r.input.trim() ? `„${r.input}“` : '—')}</p>
+                      <p className="flex items-center gap-2 text-lg">
+                        <span className="truncate">{r.matched ?? (r.input.trim() ? `„${r.input}“` : '—')}</span>
+                        {r.source === 'ai' && !r.unchecked && <AiBadge label={t('game.aiChecked')} compact />}
+                      </p>
                     </div>
                     <div className="text-right leading-tight">
                       <p className="text-base font-bold" style={{ color: TIER_COLOR[r.tier], textShadow: rare ? '1px 1px 0 #0e0a16' : undefined }}>

@@ -1,4 +1,4 @@
-import type { AnswerResult, Mode, Tier, TierId } from './types';
+import type { AnswerResult, Mode, Question, Tier, TierId } from './types';
 import type { Match } from './matchAnswer';
 
 export const QUESTIONS_PER_DAY = 7;
@@ -68,6 +68,7 @@ export function scoreAnswer(params: {
       tier: 'invalid',
       points: 0,
       timedOut,
+      source: 'list',
     };
   }
   const tier = tierFor(mode, frequency, match.answer.tooClever);
@@ -80,7 +81,60 @@ export function scoreAnswer(params: {
     tier,
     points: TIERS[tier].points,
     timedOut,
+    source: 'list',
   };
+}
+
+/** Urteil der KI-Prüfung, wie es das Spiel von der Edge Function bekommt. */
+export interface AiVerdict {
+  status: 'valid' | 'invalid' | 'error' | 'limited';
+  /** Antwort aus der Liste, wenn die Eingabe eine Variante davon ist. */
+  listAnswer?: string | null;
+  canonicalText?: string | null;
+  estimatedBaseScore?: number | null;
+}
+
+/** Bestes Ergebnis, das eine KI-akzeptierte Antwort im Abstieg erreichen kann. */
+export const AI_RARE_MAX_TIER: TierId = 'ember';
+
+/**
+ * Wertung einer Antwort, die erst die KI-Prüfung erkannt hat.
+ * - Variante einer Listen-Antwort → zählt wie diese Listen-Antwort.
+ * - Abstieg: Stufe aus der geschätzten Häufigkeit, aber höchstens „Glut“ –
+ *   100 Punkte gibt es nur für Antworten aus der kuratierten Liste.
+ * - Aufstieg: nicht in der Liste = per Definition selten → niedrigste Stufe.
+ * - Fehler/Limit: ungültig, aber als „nicht geprüft“ markiert.
+ */
+export function scoreAiVerdict(params: {
+  mode: Mode;
+  question: Question;
+  input: string;
+  verdict: AiVerdict;
+  timedOut?: boolean;
+}): AnswerResult {
+  const { mode, question, input, verdict, timedOut = false } = params;
+  const base = { questionId: question.id, input, fuzzy: false, timedOut, source: 'ai' as const };
+  const invalid: AnswerResult = { ...base, matched: null, frequency: null, tier: 'invalid', points: 0 };
+
+  if (verdict.status === 'error' || verdict.status === 'limited') return { ...invalid, unchecked: verdict.status };
+  if (verdict.status !== 'valid') return invalid;
+
+  const listed = verdict.listAnswer ? question.answers.find((a) => a.text === verdict.listAnswer) : undefined;
+  if (listed) {
+    const tier = tierFor(mode, listed.baseScore, listed.tooClever);
+    return { ...base, matched: listed.text, frequency: listed.baseScore, tier, points: TIERS[tier].points };
+  }
+
+  const matched = (verdict.canonicalText ?? '').trim() || input.trim();
+  const estimate = Math.max(0, Math.min(100, Math.round(verdict.estimatedBaseScore ?? 0)));
+  let tier: TierId;
+  if (mode === 'rare') {
+    tier = tierFor('rare', estimate);
+    if (tier === 'core') tier = AI_RARE_MAX_TIER;
+  } else {
+    tier = 'meadow';
+  }
+  return { ...base, matched, frequency: estimate, tier, points: TIERS[tier].points };
 }
 
 export function totalPoints(results: Pick<AnswerResult, 'points'>[]): number {

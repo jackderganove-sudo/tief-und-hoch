@@ -6,7 +6,7 @@ import type { Mode } from '../domain/types';
  * Schrumpfender Zeitbalken in Pixel-Segmenten. Rechnet mit einer festen
  * Deadline – stimmt auch nach Tab-Wechsel oder Reload.
  */
-export function TimerBar({ deadline, mode, onExpire }: { deadline: number; mode: Mode; onExpire: () => void }) {
+export function TimerBar({ deadline, mode, onExpire, paused = false }: { deadline: number; mode: Mode; onExpire: () => void; paused?: boolean }) {
   const bar = useRef<HTMLDivElement>(null);
   const label = useRef<HTMLSpanElement>(null);
   const expired = useRef(false);
@@ -35,9 +35,15 @@ export function TimerBar({ deadline, mode, onExpire }: { deadline: number; mode:
       }
       raf = requestAnimationFrame(tick);
     };
+    // Angehalten (Antwort abgeschickt): Balken bleibt stehen, kein Ablauf mehr.
+    if (paused) {
+      const left = Math.max(0, deadline - Date.now());
+      if (bar.current) bar.current.style.width = `${(Math.ceil((left / total) * 50) / 50) * 100}%`;
+      return;
+    }
     tick();
     return () => cancelAnimationFrame(raf);
-  }, [deadline]);
+  }, [deadline, paused]);
 
   const fill =
     mode === 'rare'
