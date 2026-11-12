@@ -42,9 +42,20 @@ function saveSetup(setup: Setup) {
 }
 
 /** Übungsmodus: erst Modus + Themen wählen, dann endlos spielen. */
-export function PracticeScreen({ lang, dateKey, onExit }: { lang: Lang; dateKey: string; onExit: () => void }) {
-  const [setup, setSetup] = useState<Setup>(loadSetup);
-  const [session, setSession] = useState(0); // 0 = Auswahl, sonst laufende Sitzung
+export function PracticeScreen({
+  lang,
+  dateKey,
+  onExit,
+  forced,
+}: {
+  lang: Lang;
+  dateKey: string;
+  onExit: () => void;
+  /** Admin-Debug: bestimmte Frage(n) direkt spielen, ohne Auswahl */
+  forced?: { mode: Mode; ids: string[] };
+}) {
+  const [setup, setSetup] = useState<Setup>(() => (forced ? { mode: forced.mode, topics: 'all' } : loadSetup()));
+  const [session, setSession] = useState(forced ? 1 : 0); // 0 = Auswahl, sonst laufende Sitzung
 
   if (session === 0) {
     return (
@@ -66,6 +77,7 @@ export function PracticeScreen({ lang, dateKey, onExit }: { lang: Lang; dateKey:
       lang={lang}
       dateKey={dateKey}
       setup={setup}
+      forcedIds={forced?.ids}
       onExit={onExit}
       onSetup={() => setSession(0)}
       onAgain={() => setSession((n) => n + 1)}
@@ -164,6 +176,7 @@ function PracticeSession({
   lang,
   dateKey,
   setup,
+  forcedIds,
   onExit,
   onSetup,
   onAgain,
@@ -171,6 +184,7 @@ function PracticeSession({
   lang: Lang;
   dateKey: string;
   setup: Setup;
+  forcedIds?: string[];
   onExit: () => void;
   onSetup: () => void;
   onAgain: () => void;
@@ -178,7 +192,7 @@ function PracticeSession({
   const { t } = useTranslation();
   const { mode } = setup;
   const theme = modeTheme(mode);
-  const game = usePractice(mode, lang, setup.topics, dateKey);
+  const game = usePractice(mode, lang, setup.topics, dateKey, forcedIds);
   const n = game.results.length;
   // Diese Session allein: 0 m am Start, danach Summe der Punkte × 10 m
   const { meters, average: avg } = practiceProgress(game.results);

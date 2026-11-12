@@ -2,6 +2,7 @@ import type { AnswerSubmission } from '../ScoreService';
 import { LocalScoreService } from '../ScoreService';
 import { normalize } from '../../domain/normalize';
 import { SUPABASE_URL, ensureSession, supabase } from './client';
+import { isDebug } from '../../debug/debugState';
 
 /**
  * Wie LocalScoreService, speichert aber jede Tagesantwort in `submissions`
@@ -33,6 +34,8 @@ export class SupabaseScoreService extends LocalScoreService {
         source: result.source ?? 'list',
         score: result.points,
         is_practice: practice,
+        // Admin-Debug: zählt nirgends (die Datenbank lässt das nur Admins zu)
+        is_debug: isDebug(),
       });
       // 23505 = Tagesantwort schon gespeichert (z. B. nach Reload) – kein Problem
       if (error && error.code !== '23505') console.warn('Antwort nicht gespeichert:', error.message);

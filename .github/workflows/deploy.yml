@@ -35,8 +35,6 @@ jobs:
       - name: Build
         run: npm run build
         env:
-          # Test-Version: Debug-Panel über ?debug=1 erreichbar. Zum Abschalten diese Zeile entfernen.
-          VITE_ENABLE_DEBUG: 'true'
           # Öffentliche Supabase-Werte (Repo-Variablen, keine Secrets). Fehlen sie, läuft das Spiel ohne KI-Prüfung.
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}

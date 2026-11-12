@@ -43,9 +43,8 @@ Schlägt ein Test oder die Validierung fehl, wird nicht veröffentlicht.
 - Repo `playhighsandlows/playhighsandlows.github.io` → die App liegt im Wurzelverzeichnis (`/`).
 - `/admin` und andere Pfade funktionieren auch beim direkten Aufruf: der Build kopiert
   `index.html` nach `404.html`.
-- Solange im Workflow `VITE_ENABLE_DEBUG: 'true'` steht, ist das Debug-Panel auch live über
-  [`?debug=1`](https://playhighsandlows.github.io/?debug=1) erreichbar.
-  Zum Abschalten die Zeile im Workflow entfernen.
+- Live hat `?debug=1` keine Wirkung. Debug-Werkzeuge gibt es dort nur im Admin-Dashboard
+  (`/admin` → Debug), und nur für Konten in der Tabelle `admins` (siehe unten).
 
 ## Lokal starten
 
@@ -83,8 +82,21 @@ Weitere Befehle:
 - **Fragen Abstieg / Aufstieg** klappt die Tagesfragen des angezeigten Tages mit Thema
   und ID auf (zum Prüfen der Themen-Mischung).
 
-In einem normalen Build (`npm run build`) ist der Debug-Code nicht enthalten, auch nicht mit `?debug=1`.
-Nur ein Build mit `VITE_ENABLE_DEBUG=true` (die Live-Testversion) nimmt ihn mit auf.
+Im Produktions-Build hat `?debug=1` keine Wirkung und das Panel ist nicht enthalten.
+
+**Live (nur Admins):** Admin-Dashboard → Tab *Debug* → „Debug auf diesem Gerät einschalten“.
+Beim Start prüft die App per `is_admin()` auf dem Server, ob das angemeldete Konto Admin ist –
+sonst wird der Schalter gelöscht. Im Debug-Modus
+
+- spielt man in einer **Sandbox** (Kopie des Spielstands unter `hal:v1:debug:*`): echte
+  Statistik, Serie und Konto-Sync bleiben unberührt;
+- werden gespeicherte Antworten als `is_debug` markiert. Die Datenbank nimmt das nur von Admins an
+  und zählt Debug-Runden nirgends (Häufigkeiten, Übersicht, spätere Bestenlisten);
+- gibt es zusätzlich: Frage direkt spielen (`?play=<id>&mode=rare`), Zone/Höhe anspringen
+  (`?world=rare&m=3000`), Medaille erzwingen (`?reveal=core&mode=rare`).
+
+Normale Runden muss die Datenbank „heute“ (Europe/Berlin, ±1 Tag) zuordnen können –
+vor- oder zurückdatierte Antworten lehnt sie ab.
 
 ## Fragen: Format, Themen, Import
 

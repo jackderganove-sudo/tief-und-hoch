@@ -27,7 +27,8 @@ function shuffled<T>(items: readonly T[]): T[] {
  * aufhört. Nichts davon wird gespeichert – keine Serie, kein Tagesergebnis.
  * Die heutigen Tagesfragen kommen nicht vor, damit die Übung sie nicht verrät.
  */
-export function usePractice(mode: Mode, lang: Lang, topics: TopicSelection, dateKey: string) {
+/** `forcedIds`: nur diese Fragen (Admin-Debug „Frage direkt spielen“). */
+export function usePractice(mode: Mode, lang: Lang, topics: TopicSelection, dateKey: string, forcedIds?: string[]) {
   const [state, setState] = useState<PracticeState>({ status: 'loading', question: null, deadline: null, lastResult: null, results: [] });
   const pool = useRef<Question[]>([]);
   const queue = useRef<Question[]>([]);
@@ -46,6 +47,15 @@ export function usePractice(mode: Mode, lang: Lang, topics: TopicSelection, date
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      if (forcedIds?.length) {
+        const forced = await services.questions.getQuestionsByIds(forcedIds, lang);
+        if (cancelled) return;
+        pool.current = forced;
+        queue.current = [];
+        if (forced.length === 0) setState((s) => ({ ...s, status: 'empty' }));
+        else next();
+        return;
+      }
       const [rare, common] = await Promise.all([
         services.questions.getDailyQuestions(dateKey, lang, 'rare'),
         services.questions.getDailyQuestions(dateKey, lang, 'common'),

@@ -326,8 +326,9 @@ function Profile({
       </dl>
 
       {admin && (
-        <a href={`${import.meta.env.BASE_URL}admin`} className="px-btn px-btn-teal px-btn-sm mt-4 block w-full text-center text-base">
-          <span className="px-btn-label">{t('account.admin')} →</span>
+        // Nur für Admins sichtbar; das Dashboard prüft den Zugriff zusätzlich serverseitig
+        <a href={`${import.meta.env.BASE_URL}admin`} className="px-btn px-btn-violet mt-4 block w-full text-center text-lg">
+          <span className="px-btn-label">🛠 {t('account.admin')}</span>
         </a>
       )}
 

@@ -113,3 +113,95 @@ export async function loadAiStatus(db: SupabaseClient): Promise<AiStatus> {
   if (error) throw new Error(error.message);
   return data as AiStatus;
 }
+
+// ---------------------------------------------------------------- Dashboard (alle serverseitig gegen admins geprüft)
+
+export interface Overview {
+  active_today: number;
+  active_week: number;
+  signed_in_today: number;
+  signed_in_week: number;
+  new_today: number;
+  new_week: number;
+  new_signed_in_week: number;
+  rounds_today: Partial<Record<'rare' | 'common', number>> | null;
+  rounds_week: Partial<Record<'rare' | 'common', number>> | null;
+  avg_points_today: Partial<Record<'rare' | 'common', number>> | null;
+  avg_points_week: Partial<Record<'rare' | 'common', number>> | null;
+  practice_today: number;
+  debug_today: number;
+  ai_today: { ok: number; cache: number; error: number; limited: number };
+  last_model: string | null;
+  primary_quota_hit_at: string | null;
+  /** 429/503 des Hauptmodells in den letzten 10 Minuten (Breaker aktiv) */
+  breaker_recent: number;
+  open_pending: number;
+  open_unchecked: number;
+  banned: number;
+}
+
+async function rpc<T>(db: SupabaseClient, fn: string, args?: Record<string, unknown>): Promise<T> {
+  const { data, error } = await db.rpc(fn, args);
+  if (error) throw new Error(error.message);
+  return data as T;
+}
+
+export const loadOverview = (db: SupabaseClient) => rpc<Overview>(db, 'admin_overview');
+
+export interface PlayerRow {
+  user_id: string;
+  display_name: string | null;
+  /** Login-Art (google, discord, github, email, anonym) – nie die E-Mail */
+  provider: string;
+  is_admin: boolean;
+  banned: boolean;
+  ban_reason: string | null;
+  created_at: string;
+  last_active: string | null;
+  rounds: number;
+  answers: number;
+  ai_today: number;
+}
+
+export const loadPlayers = (db: SupabaseClient, search: string) => rpc<PlayerRow[]>(db, 'admin_players', { p_search: search || null, p_limit: 200 });
+export const setBan = (db: SupabaseClient, userId: string, banned: boolean, reason?: string) =>
+  rpc<null>(db, 'admin_set_ban', { p_user: userId, p_banned: banned, p_reason: reason ?? null });
+export const resetName = (db: SupabaseClient, userId: string) => rpc<string | null>(db, 'admin_reset_name', { p_user: userId });
+
+export interface AnswerStat {
+  answer: string;
+  source: 'list' | 'ai';
+  plays: number;
+  avg_score: number;
+}
+export const loadQuestionStats = (db: SupabaseClient, questionId: string) => rpc<AnswerStat[]>(db, 'admin_question_stats', { p_question: questionId });
+
+export interface QuestionFlag {
+  question_id: string;
+  plays: number;
+  misses: number;
+  ai: number;
+  miss_rate: number;
+  ai_rate: number;
+}
+export const loadQuestionFlags = (db: SupabaseClient, minPlays = 5) => rpc<QuestionFlag[]>(db, 'admin_question_flags', { p_min_plays: minPlays });
+
+export interface AdminLogRow {
+  id: number;
+  admin_id: string | null;
+  action: string;
+  target: string | null;
+  detail: Record<string, unknown> | null;
+  created_at: string;
+}
+export async function loadAdminLog(db: SupabaseClient, limit = 50): Promise<AdminLogRow[]> {
+  const { data, error } = await db.from('admin_log').select('*').order('created_at', { ascending: false }).limit(limit);
+  if (error) throw new Error(error.message);
+  return data as AdminLogRow[];
+}
+
+/** Server-Bestätigung „bin ich Admin?“ (für den Debug-Schalter). */
+export async function confirmAdmin(db: SupabaseClient): Promise<boolean> {
+  const { data, error } = await db.rpc('is_admin');
+  return !error && data === true;
+}

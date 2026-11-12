@@ -387,8 +387,14 @@ async function handle(req: Request): Promise<Response> {
   const key = cacheKey(answer);
   if (!key) return json(verdict({ status: 'invalid' }));
 
-  // Admins (Tabelle admins) haben kein KI-Limit – im Spiel wie im Admin-Bereich
-  const isAdminUser = !!(await admin.from('admins').select('user_id').eq('user_id', user.id).maybeSingle()).data;
+  // Admins (Tabelle admins) haben kein KI-Limit – im Spiel wie im Admin-Bereich.
+  // Gesperrte Spieler (player_bans, Admin-Dashboard) bekommen keine KI-Prüfung.
+  const [adminRow, banRow] = await Promise.all([
+    admin.from('admins').select('user_id').eq('user_id', user.id).maybeSingle(),
+    admin.from('player_bans').select('user_id').eq('user_id', user.id).maybeSingle(),
+  ]);
+  if (banRow.data) return json(verdict({ status: 'limited' }));
+  const isAdminUser = !!adminRow.data;
   // Nachprüfung aus dem Admin-Bereich: ohne Cache, längere Wartezeit
   const isAdmin = body.recheck === true;
   if (isAdmin && !isAdminUser) return json({ error: 'forbidden' }, 403);

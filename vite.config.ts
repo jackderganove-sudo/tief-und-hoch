@@ -13,9 +13,12 @@ const buildId = process.env.GITHUB_SHA?.slice(0, 12) ?? `local-${Date.now()}`;
 
 export default defineConfig({
   base,
-  // Feste Konstante statt import.meta.env-Zugriff: nur so entfernt der Bundler
-  // den Debug-Code vollständig, wenn VITE_ENABLE_DEBUG nicht gesetzt ist.
-  define: { __DEBUG_BUILD__: JSON.stringify(process.env.VITE_ENABLE_DEBUG === 'true'), __BUILD_ID__: JSON.stringify(buildId) },
+  // Build-Infos fürs Admin-Dashboard (System). Debug gibt es im Live-Build nur für Admins.
+  define: {
+    __BUILD_ID__: JSON.stringify(buildId),
+    __COMMIT__: JSON.stringify(process.env.GITHUB_SHA ?? ''),
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     react(),
     tailwindcss(),

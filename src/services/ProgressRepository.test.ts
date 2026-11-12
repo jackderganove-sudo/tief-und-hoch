@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { LocalProgressRepository, type DayRecord } from './ProgressRepository';
 
 class MemoryStorage implements Storage {
@@ -57,5 +57,37 @@ describe('LocalProgressRepository', () => {
     repo.saveDay(day('2026-11-11', [10]));
     expect(repo.getDay('rare', '2026-09-01')).toBeNull();
     expect(repo.getDay('rare', '2026-11-11')).not.toBeNull();
+  });
+});
+
+describe('Debug-Runden zählen nicht (Sandbox)', async () => {
+  const { DebugAwareProgressRepository } = await import('./ProgressRepository');
+  it('im Debug-Modus landen Runden nur in der Sandbox; echter Stand, Serie und Sync bleiben unberührt', () => {
+    const storage = new MemoryStorage();
+    const real = new LocalProgressRepository(storage);
+    const sandbox = new LocalProgressRepository(storage, 'hal:v1:debug');
+    let debug = false;
+    const repo = new DebugAwareProgressRepository(real, sandbox, () => debug);
+    const synced = vi.fn();
+    real.onChange(synced); // so hängt ProgressSync am echten Repository
+
+    repo.saveDay(day('2026-11-09', [100]));
+    repo.recordFinished(day('2026-11-09', [100]));
+    expect(real.getStats('rare').played).toBe(1);
+    synced.mockClear();
+
+    debug = true;
+    repo.seedSandbox();
+    expect(repo.getStats('rare').played).toBe(1); // Kopie des echten Stands
+    repo.saveDay(day('2026-11-15', [100, 100]));
+    repo.recordFinished(day('2026-11-15', [100, 100]));
+    repo.clearStats('common');
+    expect(repo.getStats('rare').played).toBe(2);
+
+    debug = false;
+    expect(repo.getStats('rare')).toMatchObject({ played: 1, totalPoints: 100, currentStreak: 1 });
+    expect(real.getDay('rare', '2026-11-15')).toBeNull();
+    expect(Object.keys(real.exportSnapshot().days)).toEqual(['rare:2026-11-09']);
+    expect(synced).not.toHaveBeenCalled();
   });
 });

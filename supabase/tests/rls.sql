@@ -14,7 +14,7 @@ insert into public.admins (user_id) values ('00000000-0000-4000-8000-00000000a00
 insert into public.ai_verdicts (id, question_id, normalized_answer, valid, ai_valid, canonical_text, estimated_base_score, model)
 values ('00000000-0000-4000-8000-0000000000e1', 'de-food-001', 'rlstestgemuese', true, true, 'RLS-Testgemüse', 5, 'test');
 insert into public.submissions (user_id, question_id, lang, mode, day, raw_answer, normalized_answer, source, score)
-values ('00000000-0000-4000-8000-00000000b001', 'de-food-001', 'de', 'rare', '2000-01-01', 'geheim', 'geheim', 'list', 10);
+values ('00000000-0000-4000-8000-00000000b001', 'de-food-001', 'de', 'rare', public.berlin_today(), 'geheim', 'geheim', 'list', 10);
 
 -- ================================================================ anon (ohne Anmeldung)
 set local role anon;
@@ -69,12 +69,12 @@ begin
   begin update public.app_meta set value = 99; raise exception 'FAIL: Spieler ändert app_meta'; exception when insufficient_privilege then null; end;
   begin
     insert into public.submissions (user_id, question_id, lang, mode, day, raw_answer, source, score)
-    values ('00000000-0000-4000-8000-00000000b001', 'de-food-001', 'de', 'rare', '2000-01-02', 'fremd', 'list', 100);
+    values ('00000000-0000-4000-8000-00000000b001', 'de-food-001', 'de', 'rare', public.berlin_today(), 'fremd', 'list', 100);
     raise exception 'FAIL: Spieler schreibt Antwort für anderen';
   exception when insufficient_privilege then null; end;
   -- erlaubt: eigene Antwort speichern und lesen
   insert into public.submissions (question_id, lang, mode, day, raw_answer, source, score)
-  values ('de-food-001', 'de', 'rare', '2000-01-03', 'eigene', 'list', 10);
+  values ('de-food-001', 'de', 'rare', public.berlin_today(), 'eigene', 'list', 10);
   select count(*) into n from public.submissions; if n <> 1 then raise exception 'FAIL: Spieler sieht eigene Antwort nicht (%)', n; end if;
 end $$;
 reset role;
@@ -169,6 +169,90 @@ begin
     insert into public.player_progress (user_id, snapshot) values ('00000000-0000-4000-8000-00000000b001', '{}');
     raise exception 'FAIL: Fortschritt für anderen gespeichert';
   exception when insufficient_privilege or unique_violation then null; end;
+end $$;
+reset role;
+
+-- ================================================================ Admin-Dashboard: Nicht-Admin bekommt nichts
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-00000000c001","role":"authenticated"}';
+
+do $$
+declare n int;
+begin
+  begin perform public.admin_overview(); raise exception 'FAIL: Spieler ruft admin_overview'; exception when insufficient_privilege then null; end;
+  begin perform * from public.admin_players(); raise exception 'FAIL: Spieler ruft admin_players'; exception when insufficient_privilege then null; end;
+  begin perform public.admin_set_ban('00000000-0000-4000-8000-00000000a001', true, 'x'); raise exception 'FAIL: Spieler sperrt'; exception when insufficient_privilege then null; end;
+  begin perform public.admin_reset_name('00000000-0000-4000-8000-00000000a001'); raise exception 'FAIL: Spieler setzt Namen zurück'; exception when insufficient_privilege then null; end;
+  begin perform * from public.admin_question_stats('de-food-001'); raise exception 'FAIL: Spieler ruft admin_question_stats'; exception when insufficient_privilege then null; end;
+  begin perform * from public.admin_question_flags(); raise exception 'FAIL: Spieler ruft admin_question_flags'; exception when insufficient_privilege then null; end;
+  begin perform public.log_admin('fake', null); raise exception 'FAIL: Spieler schreibt admin_log'; exception when insufficient_privilege then null; end;
+  begin insert into public.admin_log (action) values ('fake'); raise exception 'FAIL: Spieler schreibt admin_log direkt'; exception when insufficient_privilege then null; end;
+  select count(*) into n from public.admin_log; if n > 0 then raise exception 'FAIL: Spieler liest admin_log'; end if;
+  begin perform 1 from public.player_bans; raise exception 'FAIL: Spieler liest player_bans'; exception when insufficient_privilege then null; end;
+  -- Debug-Runden nur für Admins, normale Runden nur „heute“
+  begin
+    insert into public.submissions (question_id, lang, mode, day, raw_answer, source, score, is_debug)
+    values ('de-food-002', 'de', 'rare', public.berlin_today(), 'debug', 'list', 100, true);
+    raise exception 'FAIL: Spieler speichert Debug-Runde';
+  exception when insufficient_privilege then null; end;
+  begin
+    insert into public.submissions (question_id, lang, mode, day, raw_answer, source, score)
+    values ('de-food-002', 'de', 'rare', public.berlin_today() + 5, 'zukunft', 'list', 100);
+    raise exception 'FAIL: Spieler datiert Runde vor';
+  exception when invalid_parameter_value then null; end;
+end $$;
+reset role;
+
+-- ================================================================ Admin-Dashboard: Admin
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-00000000a001","role":"authenticated"}';
+
+do $$
+declare n int; n0 int; o jsonb; o0 jsonb;
+begin
+  o0 := public.admin_overview();
+  -- Debug-Runde (auch an einem verschobenen Tag) ist erlaubt …
+  insert into public.submissions (question_id, lang, mode, day, raw_answer, normalized_answer, source, score, is_debug)
+  values ('de-food-001', 'de', 'rare', public.berlin_today() + 3, 'rlstestgemuese', 'rlstestgemuese', 'ai', 85, true);
+  -- … zählt aber nirgends: Häufigkeit, Fragen-Statistik, Übersicht
+  select plays into n from public.admin_verdicts where id = '00000000-0000-4000-8000-0000000000e1'; if n <> 0 then raise exception 'FAIL: Debug-Runde zählt in plays (%)', n; end if;
+  select count(*) into n from public.admin_question_stats('de-food-001') where answer like '%rlstestgemuese%'; if n > 0 then raise exception 'FAIL: Debug-Runde in Fragen-Statistik'; end if;
+  o := public.admin_overview();
+  if (o ->> 'debug_today')::int < 1 then raise exception 'FAIL: Debug-Runde nicht als Debug gezählt'; end if;
+  if o -> 'rounds_week' is distinct from o0 -> 'rounds_week' or o -> 'active_week' is distinct from o0 -> 'active_week' then
+    raise exception 'FAIL: Debug-Runde zählt in der Übersicht (% → %)', o0 -> 'rounds_week', o -> 'rounds_week';
+  end if;
+  -- Spielerliste ohne E-Mails
+  select count(*) into n from public.admin_players() p where p.user_id = '00000000-0000-4000-8000-00000000c001'; if n <> 1 then raise exception 'FAIL: Spieler fehlt in Liste'; end if;
+  -- sperren → protokolliert
+  perform public.admin_set_ban('00000000-0000-4000-8000-00000000c001', true, 'Spam im KI-Check');
+  select count(*) into n from public.admin_log where action = 'player.ban'; if n <> 1 then raise exception 'FAIL: Sperre nicht protokolliert'; end if;
+  begin perform public.admin_set_ban('00000000-0000-4000-8000-00000000a001', true); raise exception 'FAIL: Admin sperrt sich selbst'; exception when invalid_parameter_value then null; end;
+  -- Name zurücksetzen → protokolliert
+  if public.admin_reset_name('00000000-0000-4000-8000-00000000c001') is null then raise exception 'FAIL: Name nicht zurückgesetzt'; end if;
+  select count(*) into n from public.admin_log where action = 'player.reset_name'; if n <> 1 then raise exception 'FAIL: Namensreset nicht protokolliert'; end if;
+  -- Prüfentscheidung → automatisch protokolliert
+  perform public.reset_verdicts(array['00000000-0000-4000-8000-0000000000e1']::uuid[]);
+  select count(*) into n0 from public.admin_log where action = 'verdict.rejected';
+  perform public.reject_verdicts(array['00000000-0000-4000-8000-0000000000e1']::uuid[]);
+  select count(*) into n from public.admin_log where action = 'verdict.rejected'; if n <> n0 + 1 then raise exception 'FAIL: Ablehnen nicht protokolliert'; end if;
+end $$;
+reset role;
+
+-- ================================================================ Gesperrter Spieler
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-00000000c001","role":"authenticated"}';
+
+do $$ begin
+  if not public.is_banned() then raise exception 'FAIL: Sperre nicht erkannt'; end if;
+  begin
+    insert into public.submissions (question_id, lang, mode, day, raw_answer, source, score)
+    values ('de-food-003', 'de', 'common', public.berlin_today(), 'gesperrt', 'list', 10);
+    raise exception 'FAIL: gesperrter Spieler speichert Antwort';
+  exception when insufficient_privilege then null; end;
+  update public.profiles set display_name = 'Wieder Da' where user_id = '00000000-0000-4000-8000-00000000c001';
+  raise exception 'FAIL: gesperrter Spieler ändert Namen';
+exception when insufficient_privilege then null;
 end $$;
 reset role;
 

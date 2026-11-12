@@ -1,6 +1,6 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useState, useSyncExternalStore } from 'react';
 import { MotionConfig } from 'framer-motion';
-import { debugEnabled } from './debug/debugState';
+import { getDayOffset, isDebug, subscribeDebug } from './debug/debugState';
 import { useTranslation } from 'react-i18next';
 import type { Mode } from './domain/types';
 import { services } from './services';
@@ -13,8 +13,14 @@ import { PracticeScreen } from './screens/PracticeScreen';
 import { UpdateToast } from './pwa/UpdateToast';
 import { AccountNotice } from './components/AccountSheet';
 
-// Nur im Dev-Server oder mit VITE_ENABLE_DEBUG=true geladen; sonst fällt der Import komplett weg.
-const DebugPanel = import.meta.env.DEV || __DEBUG_BUILD__ ? lazy(() => import('./debug/DebugPanel')) : null;
+// Schwebendes Debug-Panel nur im Dev-Server (?debug=1). Im Live-Build gibt es Debug nur
+// über das Admin-Dashboard (serverseitig geprüfter Admin) – dann zeigt die App nur ein Abzeichen.
+const DebugPanel = import.meta.env.DEV ? lazy(() => import('./debug/DebugPanel')) : null;
+const DebugRoutes = lazy(() => import('./debug/DebugRoutes'));
+const debugRoute = (() => {
+  const p = new URLSearchParams(location.search);
+  return p.has('play') || p.has('world') || p.has('reveal');
+})();
 // Welt-Vorschau für Screenshots (nur Dev-Server): /?world=rare&m=3000
 const WorldPreview = import.meta.env.DEV ? lazy(() => import('./pixel/WorldPreview')) : null;
 const previewWorld = import.meta.env.DEV && new URLSearchParams(location.search).has('world');
@@ -36,6 +42,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>({ name: 'home' });
   // Erhöht sich bei Debug-Aktionen, damit die Startseite Stände neu einliest.
   const [refresh, setRefresh] = useState(0);
+  const debug = useSyncExternalStore(subscribeDebug, isDebug);
 
   const open = (mode: Mode) => {
     const day = services.progress.getDay(mode, today);
@@ -46,6 +53,14 @@ export default function App() {
     return (
       <Suspense fallback={null}>
         <AdminApp />
+      </Suspense>
+    );
+  }
+
+  if (debug && debugRoute) {
+    return (
+      <Suspense fallback={null}>
+        <DebugRoutes dateKey={today} />
       </Suspense>
     );
   }
@@ -68,7 +83,7 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      {screen.name === 'home' && <HomeScreen key={`${today}-${refresh}`} dateKey={today} onPlay={open} onPractice={() => setScreen({ name: 'practice' })} />}
+      {screen.name === 'home' && <HomeScreen key={`${today}-${refresh}-${debug}`} dateKey={today} onPlay={open} onPractice={() => setScreen({ name: 'practice' })} />}
       {screen.name === 'practice' && <PracticeScreen lang={currentLang()} dateKey={today} onExit={() => setScreen({ name: 'home' })} />}
       {screen.name === 'game' && (
         <GameScreen
@@ -92,7 +107,8 @@ export default function App() {
       {/* Update-Hinweis nie während einer Runde (Tagesspiel oder Übung) */}
       <UpdateToast hidden={screen.name === 'game' || screen.name === 'practice'} />
       {screen.name !== 'game' && <AccountNotice />}
-      {DebugPanel && debugEnabled && (
+      {debug && !DebugPanel && <DebugBadge />}
+      {DebugPanel && debug && (
         <Suspense fallback={null}>
           <DebugPanel
             dateKey={today}
@@ -104,5 +120,18 @@ export default function App() {
         </Suspense>
       )}
     </MotionConfig>
+  );
+}
+
+/** Admin-Debug aktiv (Live-Build): kleines Abzeichen, führt zurück ins Dashboard. */
+function DebugBadge() {
+  const offset = getDayOffset();
+  return (
+    <a
+      href={`${import.meta.env.BASE_URL}admin?tab=debug`}
+      className="fixed bottom-3 left-3 z-[100] rounded-full bg-black/80 px-3 py-1.5 font-mono text-xs text-lime-300 shadow-lg"
+    >
+      DEBUG{offset ? ` ${offset > 0 ? '+' : ''}${offset}d` : ''} · Sandbox
+    </a>
   );
 }

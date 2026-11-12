@@ -41,12 +41,18 @@ export interface ProgressRepository {
   onChange(listener: () => void): () => void;
 }
 
-const PREFIX = 'hal:v1';
 const KEEP_DAYS = 30;
 
 export class LocalProgressRepository implements ProgressRepository {
   private listeners = new Set<() => void>();
-  constructor(private storage: Storage | null = safeLocalStorage()) {}
+  /**
+   * @param prefix Schlüssel-Präfix; der Debug-Modus nutzt einen eigenen ('hal:v1:debug'),
+   *               damit Debug-Runden nie in den echten Fortschritt geraten.
+   */
+  constructor(
+    private storage: Storage | null = safeLocalStorage(),
+    private prefix = 'hal:v1',
+  ) {}
 
   private read<T>(key: string): T | null {
     try {
@@ -87,7 +93,7 @@ export class LocalProgressRepository implements ProgressRepository {
     try {
       for (let i = 0; i < (this.storage?.length ?? 0); i++) {
         const k = this.storage!.key(i);
-        if (k && /^hal:v1:day:\w+:\d{4}-\d{2}-\d{2}$/.test(k)) keys.push(k);
+        if (k && k.startsWith(`${this.prefix}:day:`) && /^\w+:\d{4}-\d{2}-\d{2}$/.test(k.slice(this.prefix.length + 5))) keys.push(k);
       }
     } catch {
       /* ignorieren */
@@ -97,36 +103,36 @@ export class LocalProgressRepository implements ProgressRepository {
 
   /** Verlauf eines Modus; alte Statistik (vor dem Verlauf) wird einmalig übernommen. */
   private progress(mode: Mode): ModeProgress {
-    const p = this.read<ModeProgress>(`${PREFIX}:progress:${mode}`);
+    const p = this.read<ModeProgress>(`${this.prefix}:progress:${mode}`);
     if (p) return { history: p.history ?? {}, legacy: { ...emptyModeProgress().legacy, ...p.legacy } };
-    const old = this.read<ModeStats>(`${PREFIX}:stats:${mode}`);
+    const old = this.read<ModeStats>(`${this.prefix}:stats:${mode}`);
     if (!old) return emptyModeProgress();
     const days = this.dayKeys()
-      .filter((k) => k.startsWith(`${PREFIX}:day:${mode}:`))
+      .filter((k) => k.startsWith(`${this.prefix}:day:${mode}:`))
       .map((k) => this.read<DayRecord>(k))
       .filter((d): d is DayRecord => !!d);
     const migrated = progressFromLegacy({ ...old, tierCounts: old.tierCounts ?? {} }, days);
-    this.write(`${PREFIX}:progress:${mode}`, migrated);
+    this.write(`${this.prefix}:progress:${mode}`, migrated);
     return migrated;
   }
 
   getDay(mode: Mode, dateKey: string) {
-    return this.read<DayRecord>(`${PREFIX}:day:${mode}:${dateKey}`);
+    return this.read<DayRecord>(`${this.prefix}:day:${mode}:${dateKey}`);
   }
 
   clearDay(mode: Mode, dateKey: string) {
-    this.remove(`${PREFIX}:day:${mode}:${dateKey}`);
+    this.remove(`${this.prefix}:day:${mode}:${dateKey}`);
     this.changed();
   }
 
   clearStats(mode: Mode) {
-    this.remove(`${PREFIX}:stats:${mode}`);
-    this.remove(`${PREFIX}:progress:${mode}`);
+    this.remove(`${this.prefix}:stats:${mode}`);
+    this.remove(`${this.prefix}:progress:${mode}`);
     this.changed();
   }
 
   saveDay(record: DayRecord) {
-    this.write(`${PREFIX}:day:${record.mode}:${record.dateKey}`, record);
+    this.write(`${this.prefix}:day:${record.mode}:${record.dateKey}`, record);
     this.prune(record.dateKey);
     this.changed();
   }
@@ -144,7 +150,7 @@ export class LocalProgressRepository implements ProgressRepository {
     const p = this.progress(record.mode);
     if (!p.history[record.dateKey]) {
       p.history[record.dateKey] = histOf(record);
-      this.write(`${PREFIX}:progress:${record.mode}`, p);
+      this.write(`${this.prefix}:progress:${record.mode}`, p);
       this.changed();
     }
     return computeStats(p);
@@ -157,18 +163,18 @@ export class LocalProgressRepository implements ProgressRepository {
       if (d) snap.days[`${d.mode}:${d.dateKey}`] = d;
     }
     for (const m of MODES) snap.modes[m] = this.progress(m);
-    const lang = this.storage?.getItem(`${PREFIX}:lang`);
+    const lang = this.storage?.getItem('hal:v1:lang');
     if (lang === 'de' || lang === 'en') snap.settings.lang = lang as Lang;
     return snap;
   }
 
   importSnapshot(snapshot: Snapshot) {
     for (const k of this.dayKeys()) this.remove(k);
-    for (const d of Object.values(snapshot.days)) this.write(`${PREFIX}:day:${d.mode}:${d.dateKey}`, d);
-    for (const m of MODES) this.write(`${PREFIX}:progress:${m}`, snapshot.modes[m] ?? emptyModeProgress());
+    for (const d of Object.values(snapshot.days)) this.write(`${this.prefix}:day:${d.mode}:${d.dateKey}`, d);
+    for (const m of MODES) this.write(`${this.prefix}:progress:${m}`, snapshot.modes[m] ?? emptyModeProgress());
     if (snapshot.settings.lang) {
       try {
-        this.storage?.setItem(`${PREFIX}:lang`, snapshot.settings.lang);
+        this.storage?.setItem('hal:v1:lang', snapshot.settings.lang);
       } catch {
         /* ignorieren */
       }
@@ -178,8 +184,8 @@ export class LocalProgressRepository implements ProgressRepository {
   clearAll() {
     for (const k of this.dayKeys()) this.remove(k);
     for (const m of MODES) {
-      this.remove(`${PREFIX}:progress:${m}`);
-      this.remove(`${PREFIX}:stats:${m}`);
+      this.remove(`${this.prefix}:progress:${m}`);
+      this.remove(`${this.prefix}:stats:${m}`);
     }
     this.changed();
   }
@@ -200,5 +206,62 @@ function safeLocalStorage(): Storage | null {
     return typeof window !== 'undefined' ? window.localStorage : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Reicht an den echten Fortschritt oder – im Debug-Modus – an die Sandbox weiter.
+ * Der Sync (ProgressSync) hängt nur am echten Repository, nie an der Sandbox.
+ */
+export class DebugAwareProgressRepository implements ProgressRepository {
+  constructor(
+    readonly real: ProgressRepository,
+    readonly sandbox: ProgressRepository,
+    private readonly debug: () => boolean,
+  ) {}
+  private get r() {
+    return this.debug() ? this.sandbox : this.real;
+  }
+  getDay(mode: Mode, dateKey: string) {
+    return this.r.getDay(mode, dateKey);
+  }
+  saveDay(record: DayRecord) {
+    this.r.saveDay(record);
+  }
+  getStats(mode: Mode) {
+    return this.r.getStats(mode);
+  }
+  getStreak(mode: Mode, today: string) {
+    return this.r.getStreak(mode, today);
+  }
+  recordFinished(record: DayRecord) {
+    return this.r.recordFinished(record);
+  }
+  clearDay(mode: Mode, dateKey: string) {
+    this.r.clearDay(mode, dateKey);
+  }
+  clearStats(mode: Mode) {
+    this.r.clearStats(mode);
+  }
+  exportSnapshot() {
+    return this.r.exportSnapshot();
+  }
+  importSnapshot(snapshot: Snapshot) {
+    this.r.importSnapshot(snapshot);
+  }
+  clearAll() {
+    this.r.clearAll();
+  }
+  onChange(listener: () => void) {
+    const a = this.real.onChange(listener);
+    const b = this.sandbox.onChange(listener);
+    return () => {
+      a();
+      b();
+    };
+  }
+  /** Sandbox mit einer Kopie des echten Stands füllen (beim Einschalten des Debug-Modus). */
+  seedSandbox() {
+    this.sandbox.importSnapshot(this.real.exportSnapshot());
   }
 }
