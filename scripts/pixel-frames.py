@@ -38,7 +38,9 @@ def panel(name, outline, ring, hi, sh, grain, inner, fill, fill_hi, nail=True, f
             elif x == 5 or y == 5 or x == S - 6 or y == S - 6:
                 p[x, y] = hexc(inner)
             else:
-                p[x, y] = hexc(fill_hi if (x == 6 or y == 6) else fill, fill_alpha)
+                # gleichmäßige Fläche: die Mitte wird per 9-Slice gestreckt – ein Glanzpixel
+                # hier würde zu einem breiten hellen Streifen (sichtbare Kante im Panel)
+                p[x, y] = hexc(fill, fill_alpha)
     # gerundete Innenecken des Rings
     for (x, y) in [(1, 1), (S - 2, 1), (1, S - 2), (S - 2, S - 2)]:
         p[x, y] = hexc(outline)

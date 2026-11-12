@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { QUESTIONS_PER_DAY, pointsToMeters, totalPoints } from '../domain/scoring';
+import { practiceProgress } from '../domain/scoring';
 import { MODES, TOPICS, type AnswerResult, type Lang, type Mode, type TopicId, type TopicSelection } from '../domain/types';
 import { usePractice } from '../game/usePractice';
 import { services } from '../services';
@@ -180,9 +180,8 @@ function PracticeSession({
   const theme = modeTheme(mode);
   const game = usePractice(mode, lang, setup.topics, dateKey);
   const n = game.results.length;
-  const avg = n ? totalPoints(game.results) / n : 0;
-  // Höhenmesser: Schnitt, hochgerechnet auf ein Tagesspiel mit 7 Fragen.
-  const meters = pointsToMeters(Math.round(avg * QUESTIONS_PER_DAY));
+  // Diese Session allein: 0 m am Start, danach Summe der Punkte × 10 m
+  const { meters, average: avg } = practiceProgress(game.results);
 
   return (
     <PlayShell

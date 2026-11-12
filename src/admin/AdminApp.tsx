@@ -5,6 +5,7 @@ import { compact } from '../domain/normalize';
 import { TOPICS, type Lang, type Question } from '../domain/types';
 import { LocalQuestionRepository } from '../services/QuestionRepository';
 import { Panel, PxButton } from '../components/px';
+import { setThemeColor } from '../pwa/themeColor';
 import { adminDb, approve, defaults, loadVerdicts, reject, reset, type AdminVerdict, type VerdictFilter } from './adminApi';
 
 /**
@@ -17,6 +18,7 @@ export default function AdminApp() {
 
   useEffect(() => {
     document.title = 'Highs & Lows – Admin';
+    setThemeColor('#17121f');
     if (!adminDb) return;
     void adminDb.auth.getSession().then(({ data }) => setSession(data.session));
     const { data } = adminDb.auth.onAuthStateChange((_e, s) => setSession(s));

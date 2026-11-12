@@ -230,3 +230,18 @@
     opacity: 0.8;
   }
 }
+
+/* iOS (installierte App): Statusleiste liegt über der Szene (black-translucent, weiße Schrift).
+   Ein leichter Verlauf nur im Safe-Area-Bereich hält die Uhrzeit auch über hellem Himmel lesbar.
+   Auf Android ist der Bereich 0 px hoch – dort färbt theme-color die Leiste. */
+@media (display-mode: standalone) {
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: env(safe-area-inset-top);
+    background: linear-gradient(rgba(14, 10, 22, 0.35), rgba(14, 10, 22, 0));
+    pointer-events: none;
+    z-index: 60;
+  }
+}

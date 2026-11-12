@@ -594,26 +594,36 @@ function medalSprite(kind: keyof typeof MEDAL_COLORS | 'diamond'): Sprite {
     );
   }
   const c = MEDAL_COLORS[kind];
+  // runde Medaille ohne Zahl: Band, Rand, eingeprägter Innenring, Glanz oben links
+  const rows = [
+    '...rrR....Rrr...',
+    '....rrR..Rrr....',
+    '.....rrRRrr.....',
+    '......rRRr......',
+    '.....kkkkkk.....',
+    '...kkllllllkk...',
+    '..kllmmmmmmmdk..',
+    '..klmmddddmmdk..',
+    '.klmmdmmmmdmmdk.',
+    '.klmdmlmmmmdmdk.',
+    '.klmdmmmmmmdmdk.',
+    '.kmmdmmmmmmdmdk.',
+    '.kmmmdmmmmdmmdk.',
+    '..kmmmddddmmdk..',
+    '..kddmmmmmmddk..',
+    '...kkkkkkkkkk...',
+  ].map((r) => r.split(''));
+  if (kind === 'platinum') {
+    // Platin: vierzackiger Glanzstern in der Mitte und ein Funkeln am Rand
+    for (const [x, y] of [[7, 8], [7, 9], [6, 10], [7, 10], [8, 10], [5, 10], [9, 10], [7, 11], [7, 12]] as [number, number][]) rows[y][x] = 'w';
+    rows[4][13] = 'w';
+    rows[3][14] = 'w';
+    rows[5][14] = 'w';
+    rows[4][15] = 'w';
+  }
   return fromRows(
-    [
-      '...rrR....Rrr...',
-      '....rrR..Rrr....',
-      '.....rrRRrr.....',
-      '......rRRr......',
-      '.....kkkkkk.....',
-      '...kkllllmmkk...',
-      '..kllmmmmmmddk..',
-      '..klmmmlmmmmdk..',
-      '.klmmmllmmmmmdk.',
-      '.klmmmmlmmmmmdk.',
-      '.klmmmmlmmmmmdk.',
-      '.kmmmmlllmmmmdk.',
-      '..kmmmmmmmmmdk..',
-      '..kdmmmmmmmddk..',
-      '...kkddddddkk...',
-      '.....kkkkkk.....',
-    ],
-    { k: '#2a2030', l: c.l, m: c.m, d: c.d, r: c.ribbon[0], R: c.ribbon[1] },
+    rows.map((r) => r.join('')),
+    { k: '#2a2030', l: c.l, m: c.m, d: c.d, r: c.ribbon[0], R: c.ribbon[1], w: '#ffffff' },
   );
 }
 

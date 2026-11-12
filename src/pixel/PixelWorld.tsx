@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { sampleTopColor, setThemeColor } from '../pwa/themeColor';
 import type { TierId } from '../domain/types';
 import { loadImages } from './assets';
 import { BALLOON_X, PPM, World, type ViewState } from './world';
@@ -25,6 +26,8 @@ export const HOME_LAYOUT = {
 };
 const homeLayout = (W: number, H: number) => (W > H ? HOME_LAYOUT.landscape : HOME_LAYOUT.portrait);
 const BALLOON_H = 74;
+/** Tiefste Stelle der Höhle (knapp über dem Lavasee). */
+const MAX_DEPTH_M = 7000;
 
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
@@ -83,12 +86,13 @@ export function PixelWorld({ view, meters = 0, fx = null }: { view: WorldView; m
     let mood: 'idle' | 'cheer' | 'flinch' = 'idle';
     let moodUntil = 0;
     let last = performance.now();
+    let lastTheme = 0;
 
     const fire = (f: WorldFx, now: number) => {
       if (!world) return;
       const power = 0.5 + f.points / 100;
       const calm = reduce.matches;
-      if (view === 'rare') world.burst(f.tier, 0, shown * PPM, power, calm);
+      if (view === 'rare') world.burst(f.tier, 0, Math.min(shown, MAX_DEPTH_M) * PPM, power, calm);
       else world.burst(f.tier, BALLOON_X, -shown * PPM - 40, power, calm);
       mood = f.points >= 100 ? 'cheer' : f.points === 0 ? 'flinch' : 'idle';
       moodUntil = now + (mood === 'cheer' ? 2600 : 900);
@@ -125,13 +129,15 @@ export function PixelWorld({ view, meters = 0, fx = null }: { view: WorldView; m
       }
       if (mood !== 'idle' && now > moodUntil) mood = 'idle';
 
-      const px = shown * PPM;
+      // Die Höhle endet am Lavasee: in endlosen Übungen bleibt die Figur dort, die Anzeige zählt weiter
+      const pos = view === 'rare' ? Math.min(shown, MAX_DEPTH_M) : shown;
+      const px = pos * PPM;
       const state: ViewState = {
         camX: view === 'common' ? BALLOON_X : 0,
         camY: view === 'rare' ? px : view === 'common' ? -px : 0,
         anchorY: Math.round(H * (view === 'home' ? homeLayout(W, H).ground : view === 'rare' ? 0.7 : 0.86)),
         time: now / 1000,
-        depth: view === 'rare' ? shown : view === 'home' ? Math.max(30, ((homeLayout(W, H).explorer - homeLayout(W, H).ground) * H) / PPM) : 0,
+        depth: view === 'rare' ? pos : view === 'home' ? Math.max(30, ((homeLayout(W, H).explorer - homeLayout(W, H).ground) * H) / PPM) : 0,
         // Startseite: Ballon schwebt im Himmel über dem Gerüst
         altitude: view === 'common' ? shown : view === 'home' ? Math.max(0, ((homeLayout(W, H).ground - homeLayout(W, H).balloonTop) * H - BALLOON_H) / PPM) : 0,
         explorerMood: view === 'rare' ? mood : 'idle',
@@ -143,6 +149,12 @@ export function PixelWorld({ view, meters = 0, fx = null }: { view: WorldView; m
         balloonX: view === 'home' ? 0 : BALLOON_X,
       };
       world.draw(ctx, W, H, state, dt);
+      // Systemleisten in der Farbe der Szene (Himmel bzw. aktuelle Höhlenzone)
+      if (now - lastTheme > 400) {
+        lastTheme = now;
+        const c = sampleTopColor(ctx, W);
+        if (c) setThemeColor(c);
+      }
     };
 
     void loadImages().then((images) => {

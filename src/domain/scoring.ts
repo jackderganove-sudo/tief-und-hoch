@@ -157,3 +157,12 @@ export function totalPoints(results: Pick<AnswerResult, 'points'>[]): number {
 export function pointsToMeters(points: number): number {
   return points * METERS_PER_POINT;
 }
+
+/**
+ * Stand einer Übungssession: startet immer bei 0 m; Tiefe bzw. Höhe ist die
+ * Summe der Punkte dieser Session × 10 m (keine Hochrechnung, nichts aus anderen Runden).
+ */
+export function practiceProgress(results: Pick<AnswerResult, 'points'>[]): { meters: number; points: number; average: number } {
+  const points = totalPoints(results);
+  return { meters: pointsToMeters(points), points, average: results.length ? points / results.length : 0 };
+}
