@@ -205,6 +205,11 @@ auf iPhone/iPad geht es über „Teilen → Zum Home-Bildschirm“ (Hinweis im H
 - **Offline:** App-Shell, Code inkl. Fragen, Grafiken und Schriften liegen im Cache – die
   Tagesrunde startet auch ohne Netz. Supabase (KI-Prüfung, Datenbank, Login) wird nie gecacht;
   offline zeigt die KI-Prüfung „Konnte nicht geprüft werden“.
+- **Vollbild:** installiert auf Android immersiv (`display_override: fullscreen`, ohne Status-/Gestenleiste),
+  Szene bis zum Rand, Bedienelemente in der Safe-Area. iOS: standalone mit durchscheinender Statusleiste.
+  Im Browser gibt es im Hilfe-Menü einen Vollbild-Knopf (nicht iOS). `theme-color` folgt Zone/Höhe.
+- **Test auf dem Handy:** `scripts/device-play.mjs` spielt per adb + Chrome-Remote-Debugging eine Übung
+  auf dem echten Gerät und speichert Screenshots (Anleitung im Kopf der Datei).
 - **Updates:** neue Version → kleiner Hinweis „Neue Version – Neu laden“, nie während einer Runde,
   nie automatisch.
 - **Icons:** `python3 scripts/make-icons.py [--preview]` zeichnet das Pixel-Icon (32er-Raster,
