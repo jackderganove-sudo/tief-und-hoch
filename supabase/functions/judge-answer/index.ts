@@ -55,14 +55,26 @@ function firstKey(name: string): string {
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const QUESTIONS = questions as Record<string, JudgeQuestion>;
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+/**
+ * Browser dürfen nur von der Spiel-Adresse (und lokal beim Entwickeln) zugreifen.
+ * Weitere Adressen per Secret ALLOWED_ORIGINS (kommagetrennt).
+ */
+const ALLOWED_ORIGINS = new Set(
+  (Deno.env.get('ALLOWED_ORIGINS') ?? 'https://playhighsandlows.github.io').split(',').map((s) => s.trim()).filter(Boolean),
+);
+const DEV_ORIGIN = /^http:\/\/(localhost|127\.0\.0\.1|\[::1\]|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?$/;
+
+function corsHeaders(origin: string | null): Record<string, string> {
+  const base = {
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    Vary: 'Origin',
+  };
+  return origin && (ALLOWED_ORIGINS.has(origin) || DEV_ORIGIN.test(origin)) ? { ...base, 'Access-Control-Allow-Origin': origin } : base;
+}
 
 const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
+  new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
 const verdict = (v: Partial<JudgeResponse> & { status: JudgeResponse['status'] }): JudgeResponse => ({
   list_answer: null,
@@ -166,8 +178,7 @@ async function askGemini(question: JudgeQuestion, answer: string): Promise<Verdi
   }
 }
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
+async function handle(req: Request): Promise<Response> {
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
 
   // Spieler (auch anonym angemeldet) prüfen
@@ -277,4 +288,12 @@ Deno.serve(async (req) => {
     log(user.id, questionId, 'error', Date.now() - t0, String(e));
     return json(verdict({ status: 'error' }));
   }
+}
+
+Deno.serve(async (req) => {
+  const cors = corsHeaders(req.headers.get('Origin'));
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  const res = await handle(req);
+  for (const [k, v] of Object.entries(cors)) res.headers.set(k, v);
+  return res;
 });
