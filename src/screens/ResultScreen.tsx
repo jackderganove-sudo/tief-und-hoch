@@ -9,7 +9,7 @@ import { PixelWorld } from '../pixel/PixelWorld';
 import { TIER_COLOR } from '../components/tierStyle';
 import { modeTheme } from '../components/PlayShell';
 import { Panel, PxButton, TierIcon } from '../components/px';
-import { AiBadge } from '../components/TierReveal';
+import { AiBadge } from '../components/AiBadge';
 import { localeFor } from '../i18n';
 import { useCountdown } from '../game/useBerlinDay';
 
@@ -28,6 +28,7 @@ export function ResultScreen({
   const [record] = useState<DayRecord | null>(() => services.progress.getDay(mode, dateKey));
   const [questions, setQuestions] = useState<Question[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  const [aiHintRow, setAiHintRow] = useState<number | null>(null);
   const countdown = useCountdown();
   const rare = mode === 'rare';
   const other: Mode = rare ? 'common' : 'rare';
@@ -120,10 +121,13 @@ export function ResultScreen({
                       <p className="truncate text-sm opacity-75">
                         {i + 1}. {q?.prompt ?? '…'}
                       </p>
-                      <p className="flex items-center gap-2 text-lg">
+                      <p className="flex items-center text-lg">
                         <span className="truncate">{r.matched ?? (r.input.trim() ? `„${r.input}“` : '—')}</span>
-                        {r.source === 'ai' && !r.unchecked && <AiBadge label={t('game.aiChecked')} compact />}
+                        {r.source === 'ai' && !r.unchecked && (
+                          <AiBadge mode={mode} open={aiHintRow === i} onToggle={() => setAiHintRow((v) => (v === i ? null : i))} />
+                        )}
                       </p>
+                      {aiHintRow === i && <p className="text-sm leading-snug opacity-85">{t('game.aiBadgeHint')}</p>}
                     </div>
                     <div className="text-right leading-tight">
                       <p className="text-base font-bold" style={{ color: TIER_COLOR[r.tier], textShadow: rare ? '1px 1px 0 #0e0a16' : undefined }}>

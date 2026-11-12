@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { pointsToMeters } from '../domain/scoring';
@@ -6,6 +7,7 @@ import { TIER_COLOR } from './tierStyle';
 import { localeFor } from '../i18n';
 import { modeTheme } from './PlayShell';
 import { Panel, PxButton, TierIcon } from './px';
+import { AiBadge } from './AiBadge';
 
 /** Stufen-Einblendung nach jeder Antwort – kompakt, damit die Fahrt darunter sichtbar bleibt. */
 export function TierReveal({
@@ -39,12 +41,16 @@ export function TierReveal({
   const ai = result.source === 'ai';
   const listedByAi = ai && result.matched !== null && question.answers.some((a) => a.text === result.matched);
 
-  let detail: string;
-  if (result.matched) detail = t('game.countedAs', { answer: result.matched });
+  const [showAiHint, setShowAiHint] = useState(false);
+  // KI-Badge direkt hinter der gewerteten (bzw. abgelehnten) Antwort
+  const badge = ai && !result.unchecked ? <AiBadge mode={mode} open={showAiHint} onToggle={() => setShowAiHint((v) => !v)} /> : null;
+
+  let detail: React.ReactNode;
+  if (result.matched) detail = <>{t('game.countedAs', { answer: result.matched })}{badge}</>;
   else if (result.timedOut && !result.input.trim()) detail = t('game.timeUp');
   else if (!result.input.trim()) detail = t('game.empty');
   else if (result.unchecked) detail = `„${result.input}“ – ${t(result.unchecked === 'limited' ? 'game.uncheckedLimit' : 'game.unchecked')}`;
-  else if (ai) detail = `„${result.input}“ – ${t('game.aiRejected')}`;
+  else if (ai) detail = <>„{result.input}“{badge} – {t('game.aiRejected')}</>;
   else detail = `„${result.input}“ – ${t('game.invalid')}`;
 
   let aiHint: string | null = null;
@@ -72,11 +78,7 @@ export function TierReveal({
         </div>
         {result.tier === 'tooClever' && <p className="mt-2 text-sm opacity-85">{t('tierHints.tooClever')}</p>}
         <p className="mt-3 text-lg leading-tight">{detail}</p>
-        {ai && !result.unchecked && (
-          <p className="mt-1 flex justify-center">
-            <AiBadge label={t('game.aiChecked')} />
-          </p>
-        )}
+        {showAiHint && <p className="mt-1 text-sm leading-snug opacity-85">{t('game.aiBadgeHint')}</p>}
         {aiHint && <p className="mt-1 text-sm leading-snug opacity-85">{aiHint}</p>}
         <div className="mt-1 text-sm leading-snug opacity-75">
           <p>{t('game.topAnswer', { answer: top.text })}</p>
@@ -95,18 +97,3 @@ export function TierReveal({
   );
 }
 
-/** Kleines Pixel-Schild „von KI geprüft“. */
-export function AiBadge({ label, compact = false }: { label: string; compact?: boolean }) {
-  return (
-    <span
-      title={label}
-      aria-label={compact ? label : undefined}
-      className="inline-flex items-center gap-1 border-2 border-current px-1 font-tiny text-[0.65rem] uppercase leading-4 opacity-80"
-    >
-      <svg viewBox="0 0 7 7" width="14" height="14" className="pixelated" aria-hidden shapeRendering="crispEdges">
-        <path fill="currentColor" d="M1 0h5v1H1zM0 1h1v4H0zM6 1h1v4H6zM1 5h2v1H1zM4 5h2v1H4zM3 6h1v1H3zM2 2h1v1H2zM4 2h1v1H4z" />
-      </svg>
-      {compact ? 'KI' : label}
-    </span>
-  );
-}

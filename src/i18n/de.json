@@ -45,12 +45,13 @@
     "back": "Zurück",
     "noQuestions": "Für heute sind keine Fragen hinterlegt.",
     "aiChecking": "KI prüft deine Antwort …",
-    "aiChecked": "von KI geprüft",
     "aiRejected": "Von der KI nicht anerkannt",
     "unchecked": "Konnte nicht geprüft werden",
     "uncheckedLimit": "Konnte nicht geprüft werden (KI-Tageslimit erreicht)",
     "aiCapRare": "KI-geprüfte Antworten reichen höchstens bis Glut – der Kern bleibt der Liste vorbehalten.",
-    "aiCommon": "Nicht in der Liste – gilt als seltene Antwort."
+    "aiCommon": "Nicht in der Liste – gilt als seltene Antwort.",
+    "aiBadge": "KI",
+    "aiBadgeHint": "Diese Antwort stand nicht in der Liste und wurde von einer KI geprüft."
   },
   "tiers": {
     "moss": "Moos",
