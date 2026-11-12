@@ -9,7 +9,7 @@
  * Nach Änderungen an den Fragen: Skript laufen lassen und die Funktion neu
  * deployen (npx supabase functions deploy judge-answer).
  */
-import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Question } from '../src/domain/types.ts';
@@ -38,6 +38,14 @@ const files: Record<string, string> = {
     readFileSync(join(ROOT, 'src/domain/normalize.ts'), 'utf8'),
 };
 
+// Spiel-Logik für die Edge Function "room" (Freunde-Modus): dieselben Regeln wie im Client.
+// Deno braucht Dateiendungen in Importen → './x' wird zu './x.ts'.
+const DOMAIN = ['normalize', 'levenshtein', 'matchAnswer', 'scoring', 'types', 'daily', 'room', 'roomScoring'];
+for (const name of DOMAIN) {
+  const src = readFileSync(join(ROOT, `src/domain/${name}.ts`), 'utf8').replace(/(from\s+'\.\/[A-Za-z]+)'/g, "$1.ts'");
+  files[`domain/${name}.ts`] = `// Automatisch kopiert aus src/domain/${name}.ts (npm run function-data) – nicht von Hand ändern.\n${src}`;
+}
+
 const check = process.argv.includes('--check');
 let stale = 0;
 for (const [name, content] of Object.entries(files)) {
@@ -48,6 +56,7 @@ for (const [name, content] of Object.entries(files)) {
     console.error(`veraltet: supabase/functions/_shared/${name} – bitte "npm run function-data" ausführen`);
     stale++;
   } else {
+    mkdirSync(dirname(path), { recursive: true });
     writeFileSync(path, content);
     console.log(`geschrieben: supabase/functions/_shared/${name}`);
   }

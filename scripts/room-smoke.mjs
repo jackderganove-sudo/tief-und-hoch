@@ -1,0 +1,138 @@
+/**
+ * Freunde-Modus Ende-zu-Ende gegen das echte Supabase-Projekt:
+ * mehrere anonyme Clients spielen eine komplette Runde.
+ *
+ *   node scripts/room-smoke.mjs [spieler=3] [--code=ABCDEF zum Beitreten in einen bestehenden Raum]
+ *
+ * Prüft: Erstellen/Beitreten, Start, Antworten (einmal, nur in der Fragephase),
+ * Abgabe nach Ablauf abgelehnt, Antworten erst in der Auflösung sichtbar,
+ * Realtime-Ankündigungen, Endstand.
+ */
+import { createClient } from '@supabase/supabase-js';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+
+const env = Object.fromEntries(readFileSync('.env.local', 'utf8').split('\n').filter((l) => l.includes('=')).map((l) => l.split(/=(.*)/s).slice(0, 2)));
+const URL = env.VITE_SUPABASE_URL;
+const KEY = env.VITE_SUPABASE_ANON_KEY;
+const N = Number(process.argv.find((a) => /^\d+$/.test(a)) ?? 3);
+const joinCode = process.argv.find((a) => a.startsWith('--code='))?.slice(7);
+const SESSIONS = process.env.ROOM_BOT_SESSIONS ?? '/tmp/hal-room-bots.json';
+const assert = (cond, msg) => {
+  if (!cond) {
+    console.error('FEHLER:', msg);
+    process.exit(1);
+  }
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** Anonyme Bots; Sitzungen werden wiederverwendet (Supabase begrenzt anonyme Anmeldungen pro Stunde). */
+async function bots(n) {
+  const saved = existsSync(SESSIONS) ? JSON.parse(readFileSync(SESSIONS, 'utf8')) : [];
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const sb = createClient(URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } });
+    let ok = false;
+    if (saved[i]) ok = !(await sb.auth.refreshSession({ refresh_token: saved[i] })).error;
+    if (!ok) {
+      const { error } = await sb.auth.signInAnonymously();
+      assert(!error, `anonyme Anmeldung ${i}: ${error?.message}`);
+    }
+    const { data } = await sb.auth.getSession();
+    saved[i] = data.session.refresh_token;
+    out.push({ sb, id: data.session.user.id, token: data.session.access_token, name: `Bot ${String.fromCharCode(65 + (i % 26))}${i >= 26 ? i : ''}` });
+  }
+  writeFileSync(SESSIONS, JSON.stringify(saved));
+  return out;
+}
+
+async function call(bot, action, body = {}) {
+  const res = await fetch(`${URL}/functions/v1/room`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bot.token}`, apikey: KEY },
+    body: JSON.stringify({ action, ...body }),
+  });
+  return { status: res.status, body: await res.json() };
+}
+const state = async (bot, code) => (await bot.sb.rpc('room_state', { p_code: code })).data;
+
+const ANSWERS = { de: ['Tomate', 'Apfel', 'Hund', 'Rot', 'Pizza', 'Berlin', 'Fußball', 'Mario'], en: ['Tomato', 'Apple', 'Dog', 'Red', 'Pizza'] };
+
+const t0 = Date.now();
+const players = await bots(N);
+const host = players[0];
+let code = joinCode;
+if (!code) {
+  const c = await call(host, 'create', { name: host.name, avatar: 1, settings: { mode: 'rare', scoring: 'group', count: 5, seconds: 15, lang: 'de' } });
+  assert(c.status === 200, `create ${JSON.stringify(c.body)}`);
+  code = c.body.code;
+}
+console.log('Raum', code);
+for (const p of joinCode ? players : players.slice(1)) {
+  const j = await call(p, 'join', { code, name: p.name, avatar: 2 });
+  assert(j.status === 200, `join ${p.name}: ${JSON.stringify(j.body)}`);
+}
+const dup = await call(players[1] ?? host, 'join', { code, name: host.name });
+if (players.length > 1) assert(dup.status === 409 && dup.body.error === 'name_taken', `doppelter Name nicht abgelehnt: ${JSON.stringify(dup.body)}`);
+
+// Realtime mithören (Ankündigungen ohne Inhalt)
+let events = 0;
+const ch = host.sb.channel(`room:${code}`).on('broadcast', { event: '*' }, () => events++);
+await new Promise((r) => ch.subscribe((s) => s === 'SUBSCRIBED' && r()));
+
+if (joinCode) {
+  console.log(`${N} Bots im Raum ${code} – warte auf den Start durch den Gastgeber …`);
+} else {
+  const s = await call(host, 'start', { code });
+  assert(s.status === 200, `start ${JSON.stringify(s.body)}`);
+}
+
+let lastIdx = -1;
+let checkedLate = false;
+for (;;) {
+  const st = await state(host, code);
+  if (st.status === 'finished') {
+    const ranking = [...st.players].sort((a, b) => b.points - a.points).map((p) => `${p.name} ${p.points}`);
+    console.log('Ende:', ranking.slice(0, 5).join(', '), ranking.length > 5 ? `… (${ranking.length})` : '');
+    assert((st.reveals ?? []).length === st.count, 'Auflösungen fürs Endbild fehlen');
+    break;
+  }
+  if (st.status === 'question' && st.index !== lastIdx) {
+    lastIdx = st.index;
+    // Gastfenster: Antworten anderer dürfen nicht sichtbar sein
+    assert(!st.reveal && !JSON.stringify(st).includes('"groups"'), 'Auflösung vor Ende sichtbar');
+    const lateBot = !checkedLate && players.length > 1 && st.index === 1 ? players[players.length - 1] : null;
+    await Promise.all(
+      players.map(async (p, i) => {
+        if (p === lateBot) return;
+        await sleep(Math.random() * 1500);
+        const words = ANSWERS.de;
+        const r = await call(p, 'answer', { code, idx: st.index, answer: words[(i * 7 + st.index) % (i % 3 === 0 ? 2 : words.length)] });
+        assert(r.status === 200, `answer ${p.name}: ${JSON.stringify(r.body)}`);
+      }),
+    );
+    const again = await call(players[0], 'answer', { code, idx: st.index, answer: 'Nochmal' });
+    assert(again.status === 409 && ['already_answered', 'too_late'].includes(again.body.error), `Doppelabgabe nicht abgelehnt: ${again.status} ${JSON.stringify(again.body)}`);
+    if (lateBot) {
+      // nach Ablauf (Serverzeit) abgeben → muss abgelehnt werden
+      const wait = Date.parse(st.ends_at) - Date.parse(st.now) + 1500;
+      await sleep(Math.max(0, wait));
+      const late = await call(lateBot, 'answer', { code, idx: st.index, answer: 'Zu spät' });
+      assert(late.status === 409 && late.body.error === 'too_late', `späte Abgabe angenommen: ${JSON.stringify(late.body)}`);
+      checkedLate = true;
+      console.log('  späte Abgabe abgelehnt ✓');
+    }
+  }
+  if (st.status === 'reveal' && st.reveal?.idx === st.index) {
+    const r = st.reveal;
+    console.log(`  Frage ${st.index + 1}/${st.count}: ${r.groups.map((g) => `${g.text}×${g.count}=${g.points}`).join(', ')}`);
+    if (!joinCode) await call(host, 'next', { code });
+    else await sleep(1500);
+  }
+  await call(host, 'tick', { code });
+  await sleep(700);
+}
+console.log(`Realtime-Ankündigungen empfangen: ${events}`);
+assert(events > 5, 'zu wenige Realtime-Ankündigungen');
+console.log(`OK in ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+await host.sb.removeAllChannels();
+process.exit(0);

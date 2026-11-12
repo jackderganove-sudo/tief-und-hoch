@@ -357,7 +357,7 @@ async function handle(req: Request): Promise<Response> {
   const reqStart = Date.now();
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
 
-  let body: { question_id?: unknown; answer?: unknown; recheck?: unknown; mode?: unknown; limit?: unknown };
+  let body: { question_id?: unknown; answer?: unknown; recheck?: unknown; mode?: unknown; limit?: unknown; room_code?: unknown; room_idx?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -378,6 +378,10 @@ async function handle(req: Request): Promise<Response> {
     : { data: { user: null }, error: true };
   const user = auth?.user;
   if (authError || !user) return json({ error: 'unauthorized' }, 401);
+
+  // Freunde-Modus: eigene Frage des Gastgebers (ohne Antwortliste). Nur für Mitspieler
+  // dieses Raums und nur für die gerade laufende eigene Frage; kein Cache (Frage ist einmalig).
+  if (typeof body.room_code === 'string') return judgeRoomCustom(user.id, body.room_code, Number(body.room_idx), body.answer);
 
   const questionId = typeof body.question_id === 'string' ? body.question_id : '';
   const answer = typeof body.answer === 'string' ? body.answer.trim().slice(0, MAX_ANSWER_LENGTH) : '';
@@ -467,6 +471,40 @@ async function handle(req: Request): Promise<Response> {
   // Spieler: Antwort spätestens RESPOND_WITHIN_MS nach Eingang (danach prüft der Hintergrund weiter)
   const waitMs = isAdmin ? 20_000 : Math.max(1500, RESPOND_WITHIN_MS - (Date.now() - reqStart));
   return json(await judgeAndStore(user.id, questionId, question, answer, key, waitMs));
+}
+
+async function judgeRoomCustom(userId: string, code: string, idx: number, rawAnswer: unknown): Promise<Response> {
+  const answer = typeof rawAnswer === 'string' ? rawAnswer.trim().slice(0, MAX_ANSWER_LENGTH) : '';
+  if (!cacheKey(answer)) return json(verdict({ status: 'invalid' }));
+  const { data: room } = await admin.from('rooms').select('id, status, current_index').eq('code', code.toUpperCase()).maybeSingle();
+  if (!room || room.current_index !== idx || !['question', 'scoring'].includes(room.status)) return json({ error: 'forbidden' }, 403);
+  const [{ data: member }, { data: rq }, { data: banned }] = await Promise.all([
+    admin.from('room_players').select('user_id').eq('room_id', room.id).eq('user_id', userId).eq('kicked', false).maybeSingle(),
+    admin.from('room_questions').select('custom_prompt, lang').eq('room_id', room.id).eq('idx', idx).maybeSingle(),
+    admin.from('player_bans').select('user_id').eq('user_id', userId).maybeSingle(),
+  ]);
+  if (!member || !rq?.custom_prompt || banned) return json({ error: 'forbidden' }, 403);
+  const logId = `custom:${code}`;
+  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const [mine, all] = await Promise.all([
+    admin.from('ai_judge_log').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('kind', 'model').gte('created_at', since),
+    admin.from('ai_judge_log').select('id', { count: 'exact', head: true }).eq('kind', 'model').gte('created_at', since),
+  ]);
+  if ((mine.count ?? 0) >= USER_LIMIT || (all.count ?? 0) >= GLOBAL_LIMIT) {
+    log(userId, logId, { kind: 'limited' });
+    return json(verdict({ status: 'limited' }));
+  }
+  const question: JudgeQuestion = { lang: rq.lang === 'en' ? 'en' : 'de', prompt: rq.custom_prompt, answers: [] };
+  const t0 = Date.now();
+  try {
+    const { model, primaryStatus, ...result } = await askGemini(question, answer, 8000);
+    log(userId, logId, { kind: 'model', ms: Date.now() - t0, model, primaryStatus });
+    return json(verdict(result));
+  } catch (e) {
+    const err = e as GeminiError & { primaryStatus?: number };
+    log(userId, logId, { kind: 'error', ms: Date.now() - t0, detail: err.message, model: err.model, primaryStatus: err.primaryStatus ?? null });
+    return json(verdict({ status: 'error' }));
+  }
 }
 
 Deno.serve(async (req) => {

@@ -226,11 +226,11 @@ begin
   select count(*) into n from public.admin_players() p where p.user_id = '00000000-0000-4000-8000-00000000c001'; if n <> 1 then raise exception 'FAIL: Spieler fehlt in Liste'; end if;
   -- sperren → protokolliert
   perform public.admin_set_ban('00000000-0000-4000-8000-00000000c001', true, 'Spam im KI-Check');
-  select count(*) into n from public.admin_log where action = 'player.ban'; if n <> 1 then raise exception 'FAIL: Sperre nicht protokolliert'; end if;
+  select count(*) into n from public.admin_log where action = 'player.ban' and target = '00000000-0000-4000-8000-00000000c001'; if n <> 1 then raise exception 'FAIL: Sperre nicht protokolliert'; end if;
   begin perform public.admin_set_ban('00000000-0000-4000-8000-00000000a001', true); raise exception 'FAIL: Admin sperrt sich selbst'; exception when invalid_parameter_value then null; end;
   -- Name zurücksetzen → protokolliert
   if public.admin_reset_name('00000000-0000-4000-8000-00000000c001') is null then raise exception 'FAIL: Name nicht zurückgesetzt'; end if;
-  select count(*) into n from public.admin_log where action = 'player.reset_name'; if n <> 1 then raise exception 'FAIL: Namensreset nicht protokolliert'; end if;
+  select count(*) into n from public.admin_log where action = 'player.reset_name' and target = '00000000-0000-4000-8000-00000000c001'; if n <> 1 then raise exception 'FAIL: Namensreset nicht protokolliert'; end if;
   -- Prüfentscheidung → automatisch protokolliert
   perform public.reset_verdicts(array['00000000-0000-4000-8000-0000000000e1']::uuid[]);
   select count(*) into n0 from public.admin_log where action = 'verdict.rejected';

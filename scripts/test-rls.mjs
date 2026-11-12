@@ -36,6 +36,19 @@ if (!res.ok || !body.includes('RLS-Tests bestanden')) {
 }
 console.log('RLS-Tests bestanden (anon, Spieler, fremder Spieler, Admin).');
 
+// Freunde-Modus: Antworten/Antwortlisten vor der Auflösung unerreichbar
+const roomsRes = await fetch(`https://api.supabase.com/v1/projects/${ref}/database/query`, {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ query: readFileSync('supabase/tests/rooms.sql', 'utf8') }),
+});
+const roomsBody = await roomsRes.text();
+if (!roomsRes.ok || !roomsBody.includes('Raum-Tests bestanden')) {
+  console.error('Raum-Tests FEHLGESCHLAGEN:', roomsBody.slice(0, 600));
+  process.exit(1);
+}
+console.log('Raum-Tests bestanden (keine Antworten vor der Auflösung, kein Direktzugriff, Aufräumen).');
+
 // Zusätzlich über die öffentliche API mit dem anon key: nichts Admin-Relevantes lesbar
 const env = Object.fromEntries(readFileSync('.env.local', 'utf8').split('\n').filter((l) => l.includes('=')).map((l) => l.split(/=(.*)/s).slice(0, 2)));
 const api = (path, init = {}) =>
@@ -52,6 +65,9 @@ const checks = [
   ['admin_set_ban aufrufen', await api('rpc/admin_set_ban', { method: 'POST', body: JSON.stringify({ p_user: '00000000-0000-4000-8000-00000000c001', p_banned: true }) })],
   ['admin_log lesen', await api('admin_log?select=id&limit=1')],
   ['player_bans lesen', await api('player_bans?select=user_id&limit=1')],
+  ['questions lesen (Antwortlisten)', await api('questions?select=answers&limit=1')],
+  ['room_answers lesen', await api('room_answers?select=raw&limit=1')],
+  ['room_state ohne Anmeldung', await api('rpc/room_state', { method: 'POST', body: JSON.stringify({ p_code: 'ABCDEF' }) })],
 ];
 let bad = 0;
 for (const [name, r] of checks) {
