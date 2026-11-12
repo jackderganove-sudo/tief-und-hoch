@@ -10,6 +10,7 @@ import { TIER_COLOR } from '../components/tierStyle';
 import { modeTheme } from '../components/PlayShell';
 import { Panel, PxButton, TierIcon } from '../components/px';
 import { AiBadge } from '../components/AiBadge';
+import { SaveProgressHint } from '../components/AccountSheet';
 import { isApprovedResult } from '../domain/approved';
 import { localeFor } from '../i18n';
 import { useCountdown } from '../game/useBerlinDay';
@@ -106,6 +107,7 @@ export function ResultScreen({
             </PxButton>
             {toast && <p className="mt-2 whitespace-pre-line text-sm">{toast}</p>}
             <p className="mt-3 text-sm opacity-80">{t('home.nextIn', { time: countdown })}</p>
+            <SaveProgressHint />
           </Panel>
         </motion.section>
 

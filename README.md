@@ -226,6 +226,25 @@ auf iPhone/iPad geht es über „Teilen → Zum Home-Bildschirm“ (Hinweis im H
 - **Icons:** `python3 scripts/make-icons.py [--preview]` zeichnet das Pixel-Icon (32er-Raster,
   nur ganzzahlig vergrößert) nach `public/icons/`, `public/apple-touch-icon.png`, `public/favicon-*.png`.
 
+## Konto (optional)
+
+Spielen geht immer anonym (Supabase Anonymous Sign-In). Anmelden ist nur ein Angebot:
+Profil-Knopf oben auf der Startseite bzw. ein wegklickbarer Hinweis nach der ersten fertigen Tagesrunde.
+
+- **Anbieter:** Google und GitHub (Supabase OAuth), kein E-Mail/Passwort.
+- **Upgrade statt Neuanlage:** anonym angemeldet → `linkIdentity` → gleiche `user_id`, alle Antworten,
+  Serie und Statistik bleiben (Supabase „Manual linking“ muss an sein).
+- **Zweites Gerät:** Gehört die Identität schon zu einem Konto, wird dort angemeldet und der Gerätestand
+  zusammengeführt (`src/domain/progressSync.ts`): Tagesrunden vereinigt (gleicher Tag nur einmal, Konto
+  gewinnt), Statistik/Serie aus dem Verlauf neu berechnet; kurze Meldung, was übernommen wurde.
+- **Sync:** Snapshot pro Konto in `player_progress` (RLS: nur eigener), localStorage bleibt Offline-Cache.
+- **Profil:** Spielername (eindeutig, 3–20 Zeichen, Beleidigungsfilter in der DB), 12 Pixel-Avatare.
+  Namen sind öffentlich lesbar (Freunde-Modus), sonst nichts.
+- **Konto löschen:** Edge Function `delete-account` löscht den Auth-Nutzer; per CASCADE verschwinden
+  Antworten, Fortschritt, Profil, KI-Log.
+- **Admins:** gleicher Login; Konten in `admins` haben im Spiel kein KI-Limit und im Profil einen Link zu `/admin`.
+- **Datenschutz-Seite** im ?-Menü und im Konto-Dialog (DE/EN).
+
 ## Übungsmodus
 
 Startseite → „∞ Übung“: Abstieg oder Aufstieg wählen, Themen per Checkbox („Alle Themen“

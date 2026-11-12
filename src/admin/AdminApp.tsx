@@ -5,6 +5,7 @@ import { compact } from '../domain/normalize';
 import { TOPICS, type Lang, type Question } from '../domain/types';
 import { LocalQuestionRepository } from '../services/QuestionRepository';
 import { Panel, PxButton } from '../components/px';
+import { SignInButtons } from '../components/AccountSheet';
 import { setThemeColor } from '../pwa/themeColor';
 import { adminDb, approve, defaults, loadAiStatus, loadVerdicts, recheck, reject, reset, type AdminVerdict, type AiStatus, type VerdictFilter } from './adminApi';
 
@@ -50,21 +51,15 @@ export default function AdminApp() {
   if (!adminDb) return shell(<Panel tone="stone">Supabase ist nicht konfiguriert (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).</Panel>);
   if (session === undefined) return shell(<p className="text-center opacity-70">…</p>);
 
-  if (!session) {
+  if (!session || session.user.is_anonymous) {
     return shell(
       <div className="mx-auto mt-[20vh] max-w-sm">
         <Panel tone="stone" className="px-2 text-center">
           <h1 className="text-3xl font-bold">Admin</h1>
           <p className="mt-2 text-base opacity-80">KI-Antworten prüfen</p>
-          <PxButton
-            tone="teal"
-            className="mt-4 w-full text-lg"
-            onClick={() =>
-              void adminDb!.auth.signInWithOAuth({ provider: 'github', options: { redirectTo: location.origin + location.pathname } })
-            }
-          >
-            Mit GitHub anmelden
-          </PxButton>
+          <div className="mt-4">
+            <SignInButtons />
+          </div>
         </Panel>
       </div>,
     );

@@ -10,6 +10,8 @@ import { Panel, PxButton } from '../components/px';
 import { useCountdown } from '../game/useBerlinDay';
 import { currentLang, localeFor } from '../i18n';
 import { InstallHint } from '../pwa/InstallHint';
+import { AccountButton } from '../components/AccountSheet';
+import { PrivacySheet } from '../components/PrivacySheet';
 
 /**
  * Startseite: Querschnitt der Welt – oben Himmel mit Ballon, unten der
@@ -27,6 +29,7 @@ export function HomeScreen({
   const { t } = useTranslation();
   const countdown = useCountdown();
   const [showRules, setShowRules] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
 
   return (
     <div className="relative h-dvh w-full overflow-hidden">
@@ -37,6 +40,7 @@ export function HomeScreen({
           ∞ {t('practice.name')}
         </PxButton>
         <div className="flex gap-1">
+          <AccountButton />
           <PxButton tone="wood" small onClick={() => setShowRules(true)} aria-label={t('home.rules')} className="text-base">
             ?
           </PxButton>
@@ -88,11 +92,23 @@ export function HomeScreen({
                   ∞ <b>{t('practice.name')}</b>: {t('practice.intro')}
                 </p>
                 <InstallHint />
+                <button
+                  type="button"
+                  className="mt-4 text-base underline decoration-dotted underline-offset-4"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowRules(false);
+                    setShowPrivacy(true);
+                  }}
+                >
+                  {t('account.privacy')}
+                </button>
               </Panel>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
+      <PrivacySheet open={showPrivacy} onClose={() => setShowPrivacy(false)} />
     </div>
   );
 }

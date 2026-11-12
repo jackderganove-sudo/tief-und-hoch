@@ -122,5 +122,65 @@ begin
 end $$;
 reset role;
 
+
+-- ================================================================ Konten: Profile & Fortschritt
+insert into public.profiles (user_id, display_name, avatar) values ('00000000-0000-4000-8000-00000000b001', 'Bodo Beispiel', 3);
+insert into public.player_progress (user_id, snapshot) values ('00000000-0000-4000-8000-00000000b001', '{"version":1,"days":{},"modes":{},"settings":{}}');
+
+set local role anon;
+set local request.jwt.claims to '{"role":"anon"}';
+do $$
+declare n int;
+begin
+  select count(*) into n from public.profiles; if n < 1 then raise exception 'FAIL: Spielernamen nicht öffentlich lesbar'; end if;
+  begin perform 1 from public.player_progress; raise exception 'FAIL: anon liest Fortschritt'; exception when insufficient_privilege then null; end;
+  begin insert into public.profiles (user_id, display_name) values ('00000000-0000-4000-8000-00000000b001', 'Hacker'); raise exception 'FAIL: anon schreibt Profil'; exception when insufficient_privilege then null; end;
+end $$;
+reset role;
+
+set local role authenticated;
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-00000000c001","role":"authenticated"}';
+do $$
+declare n int;
+begin
+  -- eigenes Profil anlegen und ändern geht
+  insert into public.profiles (user_id, display_name, avatar) values ('00000000-0000-4000-8000-00000000c001', 'Clara', 1);
+  update public.profiles set avatar = 5 where user_id = '00000000-0000-4000-8000-00000000c001';
+  -- fremdes Profil: lesbar (Name), aber nicht änderbar/löschbar
+  select count(*) into n from public.profiles where display_name = 'Bodo Beispiel'; if n <> 1 then raise exception 'FAIL: fremder Name nicht lesbar'; end if;
+  update public.profiles set display_name = 'Gekapert' where user_id = '00000000-0000-4000-8000-00000000b001';
+  get diagnostics n = row_count; if n > 0 then raise exception 'FAIL: fremdes Profil geändert'; end if;
+  delete from public.profiles where user_id = '00000000-0000-4000-8000-00000000b001';
+  get diagnostics n = row_count; if n > 0 then raise exception 'FAIL: fremdes Profil gelöscht'; end if;
+  begin
+    insert into public.profiles (user_id, display_name) values ('00000000-0000-4000-8000-00000000b001', 'Doppelt');
+    raise exception 'FAIL: Profil für anderen angelegt';
+  exception when insufficient_privilege or unique_violation then null; end;
+  -- Namensregeln: eindeutig (ohne Groß/Klein) und ohne Beleidigungen
+  begin update public.profiles set display_name = 'bodo beispiel' where user_id = '00000000-0000-4000-8000-00000000c001'; raise exception 'FAIL: doppelter Name'; exception when unique_violation then null; end;
+  begin update public.profiles set display_name = 'Fuck3r' where user_id = '00000000-0000-4000-8000-00000000c001'; raise exception 'FAIL: Beleidigung als Name'; exception when check_violation then null; end;
+  -- Fortschritt: nur der eigene
+  select count(*) into n from public.player_progress; if n <> 0 then raise exception 'FAIL: fremder Fortschritt sichtbar'; end if;
+  insert into public.player_progress (user_id, snapshot) values ('00000000-0000-4000-8000-00000000c001', '{"version":1}');
+  select count(*) into n from public.player_progress; if n <> 1 then raise exception 'FAIL: eigener Fortschritt nicht sichtbar'; end if;
+  update public.player_progress set snapshot = '{"x":1}' where user_id = '00000000-0000-4000-8000-00000000b001';
+  get diagnostics n = row_count; if n > 0 then raise exception 'FAIL: fremden Fortschritt geändert'; end if;
+  begin
+    insert into public.player_progress (user_id, snapshot) values ('00000000-0000-4000-8000-00000000b001', '{}');
+    raise exception 'FAIL: Fortschritt für anderen gespeichert';
+  exception when insufficient_privilege or unique_violation then null; end;
+end $$;
+reset role;
+
+-- ================================================================ Konto löschen: alle Daten verschwinden
+do $$
+declare n int;
+begin
+  delete from auth.users where id = '00000000-0000-4000-8000-00000000b001';
+  select count(*) into n from public.submissions where user_id = '00000000-0000-4000-8000-00000000b001'; if n > 0 then raise exception 'FAIL: Antworten nach Konto-Löschung übrig'; end if;
+  select count(*) into n from public.profiles where user_id = '00000000-0000-4000-8000-00000000b001'; if n > 0 then raise exception 'FAIL: Profil nach Konto-Löschung übrig'; end if;
+  select count(*) into n from public.player_progress where user_id = '00000000-0000-4000-8000-00000000b001'; if n > 0 then raise exception 'FAIL: Fortschritt nach Konto-Löschung übrig'; end if;
+end $$;
+
 select 'RLS-Tests bestanden' as result;
 rollback;

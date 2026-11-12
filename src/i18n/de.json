@@ -142,5 +142,51 @@
   "seo": {
     "title": "Highs & Lows – tägliches Trivia-Spiel: seltene vs. häufige Antworten",
     "description": "Jeden Tag 7 Fragen: Im Abstieg bringt dich die seltenste Antwort am tiefsten in die Höhle, im Aufstieg die häufigste am höchsten in den Himmel. Kostenloses Pixel-Trivia-Spiel, ohne Anmeldung."
+  },
+  "account": {
+    "signIn": "Anmelden",
+    "title": "Konto",
+    "saveTitle": "Fortschritt sichern",
+    "saveText": "Spielen geht auch ohne Konto. Mit einer Anmeldung bleiben Serie, Statistik und Tagesergebnisse erhalten und sind auf allen deinen Geräten da.",
+    "google": "Mit Google anmelden",
+    "github": "Mit GitHub anmelden",
+    "name": "Spielername",
+    "namePlaceholder": "3–20 Zeichen",
+    "save": "Speichern",
+    "saved": "Gespeichert",
+    "taken": "Dieser Name ist schon vergeben.",
+    "invalid": "Dieser Name ist nicht erlaubt (3–20 Zeichen: Buchstaben, Ziffern, Leerzeichen, . _ -).",
+    "avatar": "Avatar",
+    "stats": "Statistik",
+    "played": "Gespielt",
+    "best": "Bestwert",
+    "streak": "Serie",
+    "admin": "Admin-Bereich",
+    "logout": "Abmelden",
+    "delete": "Konto löschen",
+    "deleteConfirm": "Wirklich löschen? Alle deine Antworten, Ergebnisse und dein Profil werden endgültig gelöscht.",
+    "deleteYes": "Ja, endgültig löschen",
+    "cancel": "Abbrechen",
+    "deleted": "Konto gelöscht.",
+    "signedInWith": "Angemeldet mit {{provider}}",
+    "close": "Schließen",
+    "hintTitle": "Fortschritt sichern?",
+    "hintText": "Mit Google oder GitHub anmelden – dann bleibt deine Serie erhalten, auch auf anderen Geräten.",
+    "hintLater": "Nicht jetzt",
+    "merged": "Von diesem Gerät übernommen: {{rounds}} Tagesrunden. Serie Abstieg: {{rare}}, Aufstieg: {{common}}.",
+    "mergedDup": "{{dups}} Tage waren auf beiden – dort zählt das Ergebnis aus deinem Konto.",
+    "loginError": "Anmeldung fehlgeschlagen: {{message}}",
+    "privacy": "Datenschutz"
+  },
+  "privacy": {
+    "title": "Datenschutz",
+    "body": [
+      "Highs & Lows speichert so wenig wie möglich.",
+      "Ohne Anmeldung bekommst du eine anonyme Kennung (keine E-Mail, kein Name). Mit Anmeldung über Google oder GitHub speichern wir die Kennung dieses Kontos und deine E-Mail-Adresse, wie der Anbieter sie übermittelt.",
+      "Gespeichert werden deine Antworten mit Frage, Datum und Wertung (für Statistik und echte Häufigkeiten), dein Spielstand und – falls du einen wählst – Spielername und Avatar. Spielernamen sind öffentlich sichtbar.",
+      "Antworten, die nicht in unserer Liste stehen, prüft eine KI (Google Gemini). Dabei wird nur die Frage und deine Antwort übertragen – keine Kennung, kein Name.",
+      "Alle Daten liegen bei Supabase auf Servern in Frankfurt (EU). Die Website wird von GitHub Pages ausgeliefert.",
+      "Löschen: Im Profil unter „Konto löschen“ werden alle deine Daten endgültig entfernt. Ohne Konto genügt es, die Website-Daten im Browser zu löschen; Fragen an: über das GitHub-Projekt playhighsandlows."
+    ]
   }
 }

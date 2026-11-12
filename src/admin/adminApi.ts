@@ -1,19 +1,8 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import { supabase } from '../services/supabase/client';
 
-/**
- * Eigener Supabase-Client für den Admin-Bereich: eigene Sitzung (GitHub-Login),
- * getrennt von der anonymen Spieler-Sitzung. Nur URL + anon key – alle Rechte
- * kommen aus RLS (Tabelle admins), nie aus einem geheimen Schlüssel.
- */
-const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-
-export const adminDb: SupabaseClient | null =
-  url && anonKey
-    ? createClient(url, anonKey, {
-        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: 'pkce', storageKey: 'hal:v1:admin-auth' },
-      })
-    : null;
+/** Ein Login für alles: der Admin-Bereich nutzt denselben Supabase-Client wie das Spiel. */
+export const adminDb: SupabaseClient | null = supabase;
 
 export type ReviewStatus = 'pending' | 'approved' | 'rejected' | 'unchecked';
 

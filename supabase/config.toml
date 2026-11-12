@@ -429,3 +429,6 @@ enabled = true
 # selbst (auth.getUser), damit sie mit alten und neuen JWT-Signaturschlüsseln läuft.
 [functions.judge-answer]
 verify_jwt = false
+
+[functions.delete-account]
+verify_jwt = false

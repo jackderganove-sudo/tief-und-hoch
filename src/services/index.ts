@@ -6,6 +6,7 @@ import { supabase } from './supabase/client';
 import { SupabaseJudge } from './supabase/SupabaseJudge';
 import { SupabaseScoreService } from './supabase/SupabaseScoreService';
 import { ApprovedAnswers } from './supabase/ApprovedAnswers';
+import { startAccount } from './accountState';
 
 export interface Services {
   questions: QuestionRepository;
@@ -27,6 +28,9 @@ export const services: Services = {
   scores: supabase ? new SupabaseScoreService(new CachedJudge(new SupabaseJudge(), __BUILD_ID__)) : new LocalScoreService(),
   progress: new LocalProgressRepository(),
 };
+
+// Konto (optional), Rücksprung vom Login und Fortschritts-Sync starten
+startAccount(services.progress);
 
 export type { AnswerSubmission, ScoreService } from './ScoreService';
 export type { AnswerJudge } from './AnswerJudge';

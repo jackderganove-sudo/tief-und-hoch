@@ -142,5 +142,51 @@
   "seo": {
     "title": "Highs & Lows – daily trivia game: rare vs. common answers",
     "description": "7 questions a day: in the Descent the rarest answer takes you deepest into the cave, in the Ascent the most common one lifts you highest into the sky. Free pixel trivia game, no sign-up."
+  },
+  "account": {
+    "signIn": "Sign in",
+    "title": "Account",
+    "saveTitle": "Save your progress",
+    "saveText": "You can play without an account. Signing in keeps your streak, stats and daily results and syncs them across your devices.",
+    "google": "Sign in with Google",
+    "github": "Sign in with GitHub",
+    "name": "Player name",
+    "namePlaceholder": "3–20 characters",
+    "save": "Save",
+    "saved": "Saved",
+    "taken": "This name is already taken.",
+    "invalid": "This name is not allowed (3–20 characters: letters, digits, spaces, . _ -).",
+    "avatar": "Avatar",
+    "stats": "Stats",
+    "played": "Played",
+    "best": "Best",
+    "streak": "Streak",
+    "admin": "Admin area",
+    "logout": "Sign out",
+    "delete": "Delete account",
+    "deleteConfirm": "Really delete? All your answers, results and your profile will be permanently deleted.",
+    "deleteYes": "Yes, delete permanently",
+    "cancel": "Cancel",
+    "deleted": "Account deleted.",
+    "signedInWith": "Signed in with {{provider}}",
+    "close": "Close",
+    "hintTitle": "Save your progress?",
+    "hintText": "Sign in with Google or GitHub to keep your streak – on other devices too.",
+    "hintLater": "Not now",
+    "merged": "Taken over from this device: {{rounds}} daily rounds. Descent streak: {{rare}}, Ascent: {{common}}.",
+    "mergedDup": "{{dups}} days existed on both – your account result counts there.",
+    "loginError": "Sign-in failed: {{message}}",
+    "privacy": "Privacy"
+  },
+  "privacy": {
+    "title": "Privacy",
+    "body": [
+      "Highs & Lows stores as little as possible.",
+      "Without signing in you get an anonymous ID (no email, no name). If you sign in with Google or GitHub we store that account ID and your email address as provided by them.",
+      "We store your answers with question, date and score (for stats and real answer frequencies), your progress and – if you pick one – player name and avatar. Player names are public.",
+      "Answers that are not on our list are checked by an AI (Google Gemini). Only the question and your answer are sent – no ID, no name.",
+      "All data is stored with Supabase on servers in Frankfurt (EU). The website is served by GitHub Pages.",
+      "Deleting: “Delete account” in your profile permanently removes all your data. Without an account, clearing this site’s data in your browser is enough; questions via the GitHub project playhighsandlows."
+    ]
   }
 }

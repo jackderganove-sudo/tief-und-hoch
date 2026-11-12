@@ -9,10 +9,12 @@ const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 export const supabase: SupabaseClient | null =
-  url && anonKey ? createClient(url, anonKey, {
-        // detectSessionInUrl aus: den OAuth-Rückruf im Admin-Bereich verarbeitet nur dessen eigener Client
-        auth: { persistSession: true, autoRefreshToken: true, storageKey: 'hal:v1:auth', detectSessionInUrl: false },
-      }) : null;
+  url && anonKey
+    ? createClient(url, anonKey, {
+        // Ein Client für alles (Spiel, Konto, Admin): verarbeitet auch den OAuth-Rücksprung (PKCE)
+        auth: { persistSession: true, autoRefreshToken: true, storageKey: 'hal:v1:auth', detectSessionInUrl: true, flowType: 'pkce' },
+      })
+    : null;
 
 export const SUPABASE_URL = url ?? '';
 export const SUPABASE_ANON_KEY = anonKey ?? '';
