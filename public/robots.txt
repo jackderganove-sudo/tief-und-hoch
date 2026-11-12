@@ -1,0 +1,7 @@
+# Highs & Lows – https://playhighsandlows.github.io/
+User-agent: *
+Allow: /
+# Admin-Bereich nicht indexieren (zusätzlich noindex im Admin selbst)
+Disallow: /admin
+
+Sitemap: https://playhighsandlows.github.io/sitemap.xml

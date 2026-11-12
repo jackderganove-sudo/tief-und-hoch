@@ -17,6 +17,9 @@ const DebugPanel = import.meta.env.DEV || __DEBUG_BUILD__ ? lazy(() => import('.
 // Welt-Vorschau für Screenshots (nur Dev-Server): /?world=rare&m=3000
 const WorldPreview = import.meta.env.DEV ? lazy(() => import('./pixel/WorldPreview')) : null;
 const previewWorld = import.meta.env.DEV && new URLSearchParams(location.search).has('world');
+// Vorschaubild für Link-Vorschauen (nur Dev-Server): /?og
+const OgPreview = import.meta.env.DEV ? lazy(() => import('./seo/OgPreview')) : null;
+const previewOg = import.meta.env.DEV && new URLSearchParams(location.search).has('og');
 // Admin-Bereich: versteckte Route /admin, eigener Chunk (Spieler laden ihn nie)
 const AdminApp = lazy(() => import('./admin/AdminApp'));
 const adminRoute = /\/admin\/?$/.test(location.pathname);
@@ -42,6 +45,14 @@ export default function App() {
     return (
       <Suspense fallback={null}>
         <AdminApp />
+      </Suspense>
+    );
+  }
+
+  if (OgPreview && previewOg) {
+    return (
+      <Suspense fallback={null}>
+        <OgPreview />
       </Suspense>
     );
   }

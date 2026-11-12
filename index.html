@@ -5,7 +5,42 @@
     <!-- viewport-fit=cover: Inhalt bis unter Notch/Gestenleiste, Abstände per env(safe-area-inset-*).
          interactive-widget: Android verkleinert das Layout bei offener Tastatur (Eingabefeld bleibt sichtbar). -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
-    <meta name="description" content="Jeden Tag 7 Fragen: Je seltener deine Antwort, desto tiefer – je häufiger, desto höher. Ein Pixel-Trivia-Spiel." />
+    <title>Highs &amp; Lows – tägliches Trivia-Spiel: seltene vs. häufige Antworten</title>
+    <meta
+      name="description"
+      content="Jeden Tag 7 Fragen: Im Abstieg bringt dich die seltenste Antwort am tiefsten in die Höhle, im Aufstieg die häufigste am höchsten in den Himmel. Kostenloses Pixel-Trivia-Spiel, ohne Anmeldung."
+    />
+    <meta name="robots" content="index, follow" />
+    <!-- „/“ wählt die Sprache automatisch (x-default); ?lang=de / ?lang=en sind feste Sprachfassungen.
+         Canonical und Titel passt src/i18n/index.ts nach dem Laden an die Sprache an. -->
+    <link rel="canonical" href="https://playhighsandlows.github.io/" />
+    <link rel="alternate" hreflang="de" href="https://playhighsandlows.github.io/?lang=de" />
+    <link rel="alternate" hreflang="en" href="https://playhighsandlows.github.io/?lang=en" />
+    <link rel="alternate" hreflang="x-default" href="https://playhighsandlows.github.io/" />
+
+    <!-- Link-Vorschau (WhatsApp, Signal, Telegram, Facebook, LinkedIn …) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Highs &amp; Lows" />
+    <meta property="og:title" content="Highs &amp; Lows – tägliches Trivia-Spiel" />
+    <meta
+      property="og:description"
+      content="7 Fragen am Tag. Seltene Antworten führen tief in die Höhle, häufige hoch in den Himmel. Kostenlos, ohne Anmeldung."
+    />
+    <meta property="og:url" content="https://playhighsandlows.github.io/" />
+    <meta property="og:image" content="https://playhighsandlows.github.io/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Pixel-Art: Heißluftballon über einem Höhleneingang mit Forscher am Seil, Schild „Highs &amp; Lows“" />
+    <meta property="og:locale" content="de_DE" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <!-- X/Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Highs &amp; Lows – tägliches Trivia-Spiel" />
+    <meta name="twitter:description" content="7 Fragen am Tag. Seltene Antworten führen tief in die Höhle, häufige hoch in den Himmel." />
+    <meta name="twitter:image" content="https://playhighsandlows.github.io/og-image.png" />
+    <meta name="twitter:image:alt" content="Pixel-Art: Heißluftballon über einem Höhleneingang mit Forscher am Seil" />
+
     <meta name="theme-color" content="#2fbdff" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64.png" />
@@ -15,10 +50,62 @@
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Highs &amp; Lows" />
-    <title>Highs &amp; Lows</title>
+
+    <!-- Strukturierte Daten für Suchmaschinen -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": ["VideoGame", "WebApplication"],
+        "name": "Highs & Lows",
+        "alternateName": "Highs and Lows",
+        "url": "https://playhighsandlows.github.io/",
+        "image": "https://playhighsandlows.github.io/og-image.png",
+        "description": "Tägliches Trivia-Spiel: Jeden Tag 7 offene Fragen. Im Abstieg zählen seltene Antworten, im Aufstieg häufige. Pixel-Art, kostenlos, ohne Anmeldung, auf Deutsch und Englisch.",
+        "genre": ["Trivia", "Quiz", "Word game"],
+        "gamePlatform": ["Web browser", "Android", "iOS"],
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Any (web browser)",
+        "playMode": "SinglePlayer",
+        "inLanguage": ["de", "en"],
+        "isAccessibleForFree": true,
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
+      }
+    </script>
+    <style>
+      /* Statischer Inhalt (ohne JavaScript lesbar); die App ersetzt ihn beim Start. */
+      .static-about { min-height: 100dvh; margin: 0; padding: 2rem 1.25rem; background: #17121f; color: #f3e2bb; font: 16px/1.5 system-ui, sans-serif; }
+      .static-about main { max-width: 36rem; margin: 0 auto; }
+      .static-about h1 { font-size: 1.8rem; margin: 0 0 0.25rem; }
+      .static-about h2 { font-size: 1.15rem; margin: 1.5rem 0 0.25rem; }
+      .static-about p, .static-about li { margin: 0.35rem 0; }
+      .static-about a { color: #8be9fd; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Gleicher Inhalt wie die Spielanleitung im ?-Menü – kein verstecktes SEO-Textstück.
+           Sichtbar ohne JavaScript bzw. für einen Moment beim Laden. -->
+      <div class="static-about">
+        <main>
+          <h1>Highs &amp; Lows</h1>
+          <p>Jeden Tag 7 Fragen. Ganz hoch hinaus – oder tief hinab.</p>
+          <h2>So geht's</h2>
+          <p>7 offene Fragen, je 25 Sekunden, genau eine Antwort. Die Antwort muss passen – sonst gibt es 0 Punkte. 1 Punkt = 10 Meter.</p>
+          <ul>
+            <li><strong>▲ Aufstieg:</strong> Je häufiger deine Antwort, desto höher – im Heißluftballon bis zu den Sternen.</li>
+            <li><strong>▼ Abstieg:</strong> Je seltener deine Antwort, desto tiefer – mit Stirnlampe durch Kristallhöhlen bis zum Lavakern.</li>
+            <li><strong>∞ Übung:</strong> Endlos spielen, so lange du magst. Zählt nicht für Serie und Tagesergebnis.</li>
+          </ul>
+          <p>Kostenlos, ohne Anmeldung, auf Deutsch und Englisch – auch als App installierbar.</p>
+          <h2 lang="en">How to play</h2>
+          <p lang="en">
+            7 open questions a day, 25 seconds each, exactly one answer. <strong>Ascent:</strong> the more common your answer, the higher
+            you rise. <strong>Descent:</strong> the rarer your answer, the deeper you go. <a href="/?lang=en">Play in English</a>
+          </p>
+          <noscript><p>Zum Spielen bitte JavaScript aktivieren. · Please enable JavaScript to play.</p></noscript>
+        </main>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

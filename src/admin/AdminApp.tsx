@@ -18,6 +18,15 @@ export default function AdminApp() {
 
   useEffect(() => {
     document.title = 'Highs & Lows – Admin';
+    // nie in Suchergebnissen (robots.txt sperrt /admin zusätzlich)
+    let robots = document.querySelector<HTMLMetaElement>('meta[name="robots"]');
+    if (!robots) {
+      robots = document.createElement('meta');
+      robots.name = 'robots';
+      document.head.appendChild(robots);
+    }
+    robots.content = 'noindex, nofollow';
+    document.querySelector('link[rel="canonical"]')?.remove();
     setThemeColor('#16121f');
     if (!adminDb) return;
     void adminDb.auth.getSession().then(({ data }) => setSession(data.session));

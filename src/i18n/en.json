@@ -138,5 +138,9 @@
     "iosStep1Pad": "Tap “Share” at the top",
     "fullscreen": "⛶ Fullscreen",
     "exitFullscreen": "Exit fullscreen"
+  },
+  "seo": {
+    "title": "Highs & Lows – daily trivia game: rare vs. common answers",
+    "description": "7 questions a day: in the Descent the rarest answer takes you deepest into the cave, in the Ascent the most common one lifts you highest into the sky. Free pixel trivia game, no sign-up."
   }
 }
