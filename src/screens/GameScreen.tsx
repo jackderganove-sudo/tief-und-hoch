@@ -45,6 +45,7 @@ export function GameScreen({
       title={`${t(`modes.${mode}.name`)} ${theme.rare ? '⛏️' : '🎈'}`}
       backLabel={t('game.back')}
       onBack={onExit}
+      fx={game.lastResult ? { key: results.length, tier: game.lastResult.tier, points: game.lastResult.points } : null}
       info={total > 0 && game.status !== 'intro' && t('game.question', { n: Math.min(game.index + 1, total), total })}
       strip={
         <div className="flex justify-center gap-1.5" aria-hidden>

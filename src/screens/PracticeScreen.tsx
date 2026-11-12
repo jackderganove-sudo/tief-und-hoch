@@ -9,8 +9,7 @@ import { PlayShell, modeTheme } from '../components/PlayShell';
 import { QuestionCard } from '../components/QuestionCard';
 import { TierReveal } from '../components/TierReveal';
 import { TopicPicker } from '../components/TopicPicker';
-import { CaveScene } from '../components/scene/CaveScene';
-import { SkyScene } from '../components/scene/SkyScene';
+import { PixelWorld } from '../pixel/PixelWorld';
 import { localeFor } from '../i18n';
 
 const SETUP_KEY = 'tuh:v1:practice';
@@ -107,7 +106,7 @@ function PracticeSetup({
   return (
     <div className={`relative min-h-dvh w-full ${theme.text}`}>
       <div className="fixed inset-0">
-        {theme.rare ? <CaveScene progress={0.5} showLift={false} /> : <SkyScene progress={0.42} showBalloon={false} />}
+        <PixelWorld view={setup.mode} meters={setup.mode === 'rare' ? 2600 : 1800} />
       </div>
       <div className="relative z-10 mx-auto max-w-xl px-4 pb-8 pt-[max(1rem,env(safe-area-inset-top))]">
         <button type="button" onClick={onExit} className={`rounded-full px-3 py-1.5 text-sm font-medium backdrop-blur ${theme.ghost}`}>
@@ -206,6 +205,7 @@ function PracticeSession({
       onBack={game.status === 'summary' || n === 0 ? onSetup : game.finish}
       info={game.status === 'question' ? t('practice.questionNo', { n: n + 1 }) : n > 0 ? t('practice.average', { points: Math.round(avg) }) : null}
       strip={<EmojiStrip results={game.results} />}
+      fx={game.lastResult ? { key: n, tier: game.lastResult.tier, points: game.lastResult.points } : null}
     >
       <AnimatePresence mode="wait">
         {game.status === 'loading' && (

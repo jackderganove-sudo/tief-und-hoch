@@ -4,8 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { MAX_POINTS, totalPoints, pointsToMeters } from '../domain/scoring';
 import type { Mode } from '../domain/types';
 import { services } from '../services';
-import { CaveScene } from '../components/scene/CaveScene';
-import { SkyScene } from '../components/scene/SkyScene';
+import { PixelWorld } from '../pixel/PixelWorld';
 import { LanguageToggle } from '../components/LanguageToggle';
 import { useCountdown } from '../game/useBerlinDay';
 import { currentLang, localeFor } from '../i18n';
@@ -26,6 +25,7 @@ export function HomeScreen({
 
   return (
     <div className="relative flex h-dvh w-full flex-col overflow-hidden">
+      <PixelWorld view="home" />
       <ModeHalf mode="common" dateKey={dateKey} onPlay={onPlay} />
       <ModeHalf mode="rare" dateKey={dateKey} onPlay={onPlay} />
 
@@ -117,7 +117,6 @@ function ModeHalf({ mode, dateKey, onPlay }: { mode: Mode; dateKey: string; onPl
       className={`group relative flex-1 overflow-hidden text-left ${rare ? 'text-cream' : 'text-[#1d2a52]'}`}
       aria-label={`${t(`modes.${mode}.name`)} – ${action}`}
     >
-      {rare ? <CaveScene progress={0.5} showLift={false} /> : <SkyScene progress={0.42} showBalloon={false} />}
 
       <div
         className={`relative z-10 flex h-full flex-col items-center px-6 text-center ${

@@ -13,6 +13,9 @@ import { PracticeScreen } from './screens/PracticeScreen';
 
 // Nur im Dev-Server oder mit VITE_ENABLE_DEBUG=true geladen; sonst fällt der Import komplett weg.
 const DebugPanel = import.meta.env.DEV || __DEBUG_BUILD__ ? lazy(() => import('./debug/DebugPanel')) : null;
+// Welt-Vorschau für Screenshots (nur Dev-Server): /?world=rare&m=3000
+const WorldPreview = import.meta.env.DEV ? lazy(() => import('./pixel/WorldPreview')) : null;
+const previewWorld = import.meta.env.DEV && new URLSearchParams(location.search).has('world');
 
 type Screen =
   | { name: 'home' }
@@ -30,6 +33,14 @@ export default function App() {
     const day = services.progress.getDay(mode, today);
     setScreen(day?.finished ? { name: 'result', mode, dateKey: today } : { name: 'game', mode, dateKey: today });
   };
+
+  if (WorldPreview && previewWorld) {
+    return (
+      <Suspense fallback={null}>
+        <WorldPreview />
+      </Suspense>
+    );
+  }
 
   return (
     <MotionConfig reducedMotion="user">

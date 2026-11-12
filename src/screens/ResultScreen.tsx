@@ -5,8 +5,7 @@ import { MAX_POINTS, TIERS, pointsToMeters, totalPoints } from '../domain/scorin
 import { buildShareText } from '../domain/share';
 import type { Mode, Question } from '../domain/types';
 import { services, type DayRecord } from '../services';
-import { CaveScene } from '../components/scene/CaveScene';
-import { SkyScene } from '../components/scene/SkyScene';
+import { PixelWorld } from '../pixel/PixelWorld';
 import { TIER_COLOR } from '../components/tierStyle';
 import { localeFor } from '../i18n';
 import { useCountdown } from '../game/useBerlinDay';
@@ -81,7 +80,7 @@ export function ResultScreen({
   return (
     <div className="relative min-h-dvh w-full">
       <div className="fixed inset-0">
-        {rare ? <CaveScene progress={points / MAX_POINTS} showLift={false} /> : <SkyScene progress={points / MAX_POINTS} showBalloon={false} />}
+        <PixelWorld view={mode} meters={meters} />
       </div>
 
       <div className="relative z-10 mx-auto max-w-xl px-4 pb-10 pt-[max(1.25rem,env(safe-area-inset-top))]">

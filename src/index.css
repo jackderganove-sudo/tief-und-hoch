@@ -60,6 +60,14 @@
   }
 }
 
+@layer utilities {
+  /* Pixel-Art nie weichzeichnen */
+  .pixelated {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
+}
+
 @layer base {
   html,
   body,
