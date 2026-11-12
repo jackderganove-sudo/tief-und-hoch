@@ -10,6 +10,25 @@ Tägliches Wort-/Trivia-Spiel mit zwei Modi:
 Jeden Tag 7 Fragen pro Modus, 25 Sekunden pro Frage, eine Antwort. 1 Punkt = 10 m.
 Tageswechsel um Mitternacht Europe/Berlin.
 
+## Pixel-Look
+
+Die Welt wird auf einem Canvas in niedriger Auflösung gezeichnet und ganzzahlig
+hochskaliert (`image-rendering: pixelated`). Sie ist nach Metern aufgebaut: im Abstieg
+seilt sich ein Forscher mit Stirnlampe durch Erde, Felshöhle, Kristallhöhle, Pilzgrotte
+bis zum Lavakern ab; im Aufstieg fährt ein Heißluftballon über Wiese, Baumwipfel, Wolken,
+Abendrot bis zu den Sternen. Nach jeder Antwort bewegt sich die Figur sichtbar, die Stufe
+löst einen passenden Effekt aus. Mit `prefers-reduced-motion` gibt es keine Fahrten,
+Umgebungsanimationen oder fliegenden Partikel.
+
+Grafiken: CC0-Packs von ansimuz plus eigene Sprites, Schriften Pixelify Sans und
+Silkscreen (OFL) – alles aufgelistet in [assets/CREDITS.md](assets/CREDITS.md).
+Rahmen und Knöpfe (9-Slice) erzeugt `scripts/pixel-frames.py`.
+
+**Visuelle Kontrolle:** `npm run screenshots` spielt beide Modi mit Playwright durch
+und legt Bilder (Mobil 390×844, Desktop 1440×900) in `screenshots/` ab
+(`--only=mobile`, `--reduced` für reduzierte Bewegung). Im Dev-Server zeigt
+`/?world=rare&m=3000` die Welt in einer bestimmten Tiefe/Höhe.
+
 ## Live-Testversion
 
 **<https://jackderganove-sudo.github.io/tief-und-hoch/>**
@@ -134,10 +153,12 @@ src/
                QuestionRepository · ScoreService · ProgressRepository
                index.ts = die eine Stelle, an der die Implementierungen gewählt werden
   game/        useGame (Tagesspiel), usePractice (Übung), Tages-/Countdown-Hooks
-  components/  Szenen (Höhle, Himmel), Timer, Höhenmesser, Stufen-Einblendung, TopicPicker
+  pixel/       Canvas-Welt (world.ts), eigene Sprites, Asset-Lader, PixelWorld-Komponente
+  components/  Pixel-Bausteine (Panel, PxButton, TierIcon), Timer, Stufen-Einblendung, TopicPicker
+  assets/pixel Sprites/Tiles aus den CC0-Packs + Rahmen
   screens/     Start, Spiel, Ergebnis, Übung
   i18n/        de.json, en.json (react-i18next)
-scripts/       import-questions.ts
+scripts/       import-questions.ts · screenshots.mjs · pixel-frames.py
 packs/         example-pack.json (Vorlage für eigene Pakete)
 ```
 
