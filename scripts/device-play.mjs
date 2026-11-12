@@ -39,6 +39,11 @@ for (let i = 0; i < Number(steps); i++) {
   await p.waitForTimeout(3500);
   const hud = (await p.locator('header').innerText()).match(/[−-]?[\d.]+ m/)?.[0];
   const theme = await p.evaluate(() => document.querySelector('meta[name=theme-color]').content);
+  // HIDE_KB=1: Tastatur vor dem Screenshot schließen (Szene ganz sichtbar)
+  if (process.env.HIDE_KB) {
+    execSync(`adb ${serial} shell input keyevent KEYCODE_BACK`);
+    await p.waitForTimeout(700);
+  }
   shot(`${i + 1}`);
   console.log(`${mode} ${i + 1}: ${hud} theme ${theme}`);
 }
