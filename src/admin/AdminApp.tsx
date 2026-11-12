@@ -528,6 +528,24 @@ function StatusBar({ s }: { s: AiStatus }) {
           </div>
         ))}
       </dl>
+      {s.top_users.length > 0 && (
+        <div className="mt-2">
+          <p className="font-tiny text-[0.6rem] uppercase opacity-70">KI-Prüfungen heute pro Spieler (Top 5)</p>
+          <ul className="mt-0.5 grid gap-x-3 text-sm sm:grid-cols-2">
+            {s.top_users.map((u) => (
+              <li key={u.short_id} className="flex justify-between gap-2">
+                <span className="truncate">
+                  {u.short_id}… <span className="opacity-60">({u.is_admin ? 'Admin' : u.provider})</span>
+                </span>
+                <span className="tabular-nums">
+                  {u.checks}
+                  {u.limited ? <span style={{ color: '#e2603a' }}> · {u.limited}× Limit</span> : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {quota && (
         <p className="mt-1 text-sm" style={{ color: '#f2b53a' }}>
           Kontingent von 3.8 Flash heute erschöpft (zuletzt {quota.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}) – Flash-Lite urteilt.

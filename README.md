@@ -146,7 +146,7 @@ Frontend kennt nur Supabase-URL und anon key, der Gemini-Key liegt als Supabase-
 
 - **Anmeldung:** anonym (Supabase Anonymous Sign-In) – jeder Spieler hat eine ID.
 - **Ablauf:** Cache auf dem Gerät (localStorage, wird bei neuer App-Version geleert) →
-  Edge Function: Cache `ai_verdicts` → Limit (30 KI-Prüfungen pro Spieler in 24 h,
+  Edge Function: Cache `ai_verdicts` → Limit (100 KI-Prüfungen pro Spieler in 24 h, Admins ohne,
   1000 insgesamt) → Gemini (≈ 4,7 s, im Spiel max. 6 s mit Lade-Animation) → Urteil cachen.
   Fehler/Timeout/Limit: ungültig, aber „Konnte nicht geprüft werden“.
 - **Wertung:** Abstieg nach geschätzter Häufigkeit, höchstens Platin (85) – Diamant
@@ -182,8 +182,9 @@ Im Supabase-SQL-Editor z. B.:
 Modell: `gemini-3.8-flash` (genauer). Ist es nach 2 s nicht fertig oder scheitert (503 Überlastung),
 läuft `gemini-3.5-flash-lite` parallel mit; 3.8 Flash gewinnt, wenn es bis 4,7 s antwortet.
 `ai_verdicts.model` zeigt, welches Modell geurteilt hat.
-Optionale Function-Secrets: `GEMINI_MODEL`, `GEMINI_THINKING` (`low`), `GEMINI_FALLBACK_MODEL`
-(leer = kein Ersatz), `GEMINI_FALLBACK_THINKING` (`minimal`), `AI_USER_DAILY_LIMIT` (30), `AI_GLOBAL_DAILY_LIMIT` (1000).
+Limit: 100 KI-Prüfungen pro Spieler in 24 h (`AI_USER_DAILY_LIMIT`), Admins ohne Limit; Cache-Treffer
+und Freigaben zählen nie. Optionale Function-Secrets: `GEMINI_MODEL`, `GEMINI_THINKING` (`low`), `GEMINI_FALLBACK_MODEL`
+(leer = kein Ersatz), `GEMINI_FALLBACK_THINKING` (`minimal`), `AI_USER_DAILY_LIMIT` (100), `AI_GLOBAL_DAILY_LIMIT` (1000).
 
 ## Admin-Bereich (KI-Antworten prüfen)
 

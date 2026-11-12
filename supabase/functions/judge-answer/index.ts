@@ -46,7 +46,7 @@ const BLOCK_503_MS = 2 * 60_000;
 /** Geheimnis für den nächtlichen Nachprüf-Job (Supabase Cron). Leer = Job deaktiviert. */
 const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? '';
 /** KI-Anfragen (ohne Cache-Treffer) pro Spieler in 24 Stunden. */
-const USER_LIMIT = Number(Deno.env.get('AI_USER_DAILY_LIMIT') ?? 30);
+const USER_LIMIT = Number(Deno.env.get('AI_USER_DAILY_LIMIT') ?? 100);
 /** Schutz des Gratis-Kontingents: KI-Anfragen aller Spieler in 24 Stunden. */
 const GLOBAL_LIMIT = Number(Deno.env.get('AI_GLOBAL_DAILY_LIMIT') ?? 1000);
 
@@ -387,13 +387,11 @@ async function handle(req: Request): Promise<Response> {
   const key = cacheKey(answer);
   if (!key) return json(verdict({ status: 'invalid' }));
 
-  // Admin-Nachprüfung aus dem Admin-Bereich: ohne Spieler-Limit, ohne Cache
-  let isAdmin = false;
-  if (body.recheck === true) {
-    const { data: a } = await admin.from('admins').select('user_id').eq('user_id', user.id).maybeSingle();
-    if (!a) return json({ error: 'forbidden' }, 403);
-    isAdmin = true;
-  }
+  // Admins (Tabelle admins) haben kein KI-Limit – im Spiel wie im Admin-Bereich
+  const isAdminUser = !!(await admin.from('admins').select('user_id').eq('user_id', user.id).maybeSingle()).data;
+  // Nachprüfung aus dem Admin-Bereich: ohne Cache, längere Wartezeit
+  const isAdmin = body.recheck === true;
+  if (isAdmin && !isAdminUser) return json({ error: 'forbidden' }, 403);
 
   // Steht doch in der Liste (z. B. ältere App-Version) → ohne KI
   const listed = findListAnswer(question, answer);
@@ -415,8 +413,9 @@ async function handle(req: Request): Promise<Response> {
           .eq('normalized_answer', key)
           .neq('review_status', 'unchecked')
           .maybeSingle(),
-    isAdmin ? Promise.resolve({ count: 0 }) : admin.from('ai_judge_log').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('kind', 'model').gte('created_at', since),
-    isAdmin ? Promise.resolve({ count: 0 }) : admin.from('ai_judge_log').select('id', { count: 'exact', head: true }).eq('kind', 'model').gte('created_at', since),
+    // Nur echte KI-Anfragen zählen (kind 'model'); Cache-Treffer und Freigaben nie
+    isAdminUser ? Promise.resolve({ count: 0 }) : admin.from('ai_judge_log').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('kind', 'model').gte('created_at', since),
+    isAdminUser ? Promise.resolve({ count: 0 }) : admin.from('ai_judge_log').select('id', { count: 'exact', head: true }).eq('kind', 'model').gte('created_at', since),
   ]);
 
   // Von mir freigegeben (auch Schreibweisen/Aliase) → wie eine Listen-Antwort
@@ -452,7 +451,7 @@ async function handle(req: Request): Promise<Response> {
   }
 
   // Rate-Limit: pro Spieler und insgesamt, jeweils über die letzten 24 Stunden
-  if (!isAdmin && ((mine.count ?? 0) >= USER_LIMIT || (all.count ?? 0) >= GLOBAL_LIMIT)) {
+  if (!isAdminUser && ((mine.count ?? 0) >= USER_LIMIT || (all.count ?? 0) >= GLOBAL_LIMIT)) {
     log(user.id, questionId, { kind: 'limited' });
     storeUnchecked(questionId, key, 'limited');
     return json(verdict({ status: 'limited' }));

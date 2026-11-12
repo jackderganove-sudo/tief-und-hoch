@@ -115,6 +115,8 @@ export interface AiStatus {
   last_model: string | null;
   primary_quota_hit_at: string | null;
   unchecked_open: number;
+  /** KI-Prüfungen heute pro Spieler (Top 5) */
+  top_users: { short_id: string; is_admin: boolean; provider: string; checks: number; limited: number }[];
 }
 
 export async function loadAiStatus(db: SupabaseClient): Promise<AiStatus> {
