@@ -15,7 +15,7 @@ export const adminDb: SupabaseClient | null =
       })
     : null;
 
-export type ReviewStatus = 'pending' | 'approved' | 'rejected';
+export type ReviewStatus = 'pending' | 'approved' | 'rejected' | 'unchecked';
 
 export interface AdminVerdict {
   id: string;
@@ -31,9 +31,12 @@ export interface AdminVerdict {
   valid: boolean;
   ai_valid: boolean;
   review_status: ReviewStatus;
+  /** Warum (noch) nicht geprüft: KI-Fehler/Timeout oder Limit */
+  unchecked_reason: 'error' | 'limited' | null;
   reviewed_at: string | null;
   created_at: string;
   plays: number;
+  practice_plays: number;
   raw_answer: string | null;
   approved_id: string | null;
   approved_text: string | null;
@@ -92,4 +95,30 @@ export function defaults(v: AdminVerdict) {
   const aliases = v.approved_aliases ?? (raw && raw.toLowerCase() !== text.toLowerCase() ? [raw] : []);
   const baseScore = v.approved_base_score ?? v.estimated_base_score ?? 1;
   return { text, aliases, baseScore };
+}
+
+/** Antwort erneut von der KI prüfen lassen (Admin: ohne Spieler-Limit, wartet bis 20 s). */
+export async function recheck(db: SupabaseClient, v: AdminVerdict): Promise<string> {
+  const { data, error } = await db.functions.invoke('judge-answer', {
+    body: { question_id: v.question_id, answer: v.raw_answer ?? v.normalized_answer, recheck: true },
+  });
+  if (error) throw new Error(error.message);
+  return (data as { status: string }).status;
+}
+
+export interface AiStatus {
+  checks_today: number;
+  errors_today: number;
+  limited_today: number;
+  cache_today: number;
+  avg_ms_today: number | null;
+  last_model: string | null;
+  primary_quota_hit_at: string | null;
+  unchecked_open: number;
+}
+
+export async function loadAiStatus(db: SupabaseClient): Promise<AiStatus> {
+  const { data, error } = await db.rpc('admin_ai_status');
+  if (error) throw new Error(error.message);
+  return data as AiStatus;
 }

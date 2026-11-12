@@ -152,7 +152,17 @@ Frontend kennt nur Supabase-URL und anon key, der Gemini-Key liegt als Supabase-
 - **Wertung:** Abstieg nach geschätzter Häufigkeit, höchstens Platin (85) – Diamant
   bleibt Listen-Antworten vorbehalten. Aufstieg: nicht in der Liste = Bronze (10).
   Erkennt die KI eine Variante einer Listen-Antwort, zählt die Listen-Antwort.
-- **Speichern:** jede Tagesantwort landet in `submissions` (Übung nicht).
+- **Speichern:** jede Antwort landet in `submissions`; Übungsantworten mit `is_practice = true`. Diese
+  zählen später NICHT für echte Häufigkeiten (Wiederholungen verzerren), ihre KI-Urteile und
+  „nicht geprüften“ Antworten erscheinen aber genauso im Admin.
+- **Nichts geht verloren:** Kann die KI nicht rechtzeitig prüfen (Fehler, Zeitlimit, Limit), bekommt der
+  Spieler „Konnte nicht geprüft werden“ (0 P.); die Antwort wird als `review_status = 'unchecked'`
+  gespeichert und im Hintergrund (bis 25 s) weitergeprüft. Was dann noch offen ist, prüft ein
+  Cron-Job täglich 09:15 UTC nach (`recheck-unchecked-answers`, Secret `CRON_SECRET` + Vault
+  `judge_cron_secret`), im Admin gibt es dafür den Filter „nicht geprüft“ mit „Jetzt mit KI prüfen“.
+- **Modelle:** 3.8 Flash zuerst; bei 429/503 sofort Flash-Lite (zwei parallele Anfragen gegen
+  Ausreißer). Breaker gilt für alle Instanzen (Zustand im Log): 15 min nach 429, 2 min nach 503,
+  danach testet die nächste Anfrage das Hauptmodell erneut.
 - **Datenbank:** `supabase/migrations/` (RLS überall, Rechte explizit vergeben).
 - **Ohne** `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` läuft alles rein lokal wie bisher.
 

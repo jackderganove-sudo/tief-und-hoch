@@ -9,6 +9,8 @@ export interface AnswerSubmission {
   mode: Mode;
   questionId: string;
   result: AnswerResult;
+  /** Aus dem Endlos-Modus: wird gespeichert, zählt aber nicht für echte Häufigkeiten. */
+  practice?: boolean;
 }
 
 /**

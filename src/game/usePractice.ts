@@ -75,9 +75,11 @@ export function usePractice(mode: Mode, lang: Lang, topics: TopicSelection, date
       if (s.status !== 'question' || !s.question || submitting.current) return;
       submitting.current = true;
       const result = await services.scores.evaluate(s.question, input, mode, { timedOut });
+      // Auch Übungsantworten speichern (is_practice) – für den Admin und spätere Auswertungen
+      void services.scores.submit({ dateKey, lang, mode, questionId: s.question.id, result, practice: true });
       setState((prev) => ({ ...prev, status: 'reveal', deadline: null, lastResult: result, results: [...prev.results, result] }));
     },
-    [mode],
+    [mode, lang, dateKey],
   );
 
   const finish = useCallback(() => setState((s) => ({ ...s, status: 'summary', deadline: null })), []);

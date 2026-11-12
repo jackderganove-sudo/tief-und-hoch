@@ -21,7 +21,7 @@ for (const answer of answers.length ? answers : ['Mangold', 'gelbe Rübe', 'Gem�
 const sel = await sb.from('submissions').select('raw_answer');
 console.log('submissions select (eigene):', sel.error?.message ?? sel.data.length);
 const v = await sb.from('ai_verdicts').select('*').limit(1);
-console.log('ai_verdicts lesbar für Spieler?', v.error ? `nein (${v.error.code})` : `JA: ${v.data.length}`);
+console.log('ai_verdicts lesbar für Spieler?', v.error ? `nein (${v.error.code})` : v.data.length ? `JA (${v.data.length} Zeilen) – FEHLER` : 'nein (RLS: 0 Zeilen)');
 const anon = createClient(url, key, { auth: { persistSession: false } });
 const a = await anon.from('submissions').select('*').limit(1);
 console.log('submissions ohne Anmeldung:', a.error ? `gesperrt (${a.error.code})` : `Zeilen: ${a.data.length}`);

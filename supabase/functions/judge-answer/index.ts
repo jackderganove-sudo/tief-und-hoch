@@ -30,10 +30,19 @@ const THINKING = Deno.env.get('GEMINI_THINKING') ?? 'low';
 /** Springt ein, wenn das Hauptmodell überlastet (503) oder zu langsam ist. Leer = kein Ersatz. */
 const FALLBACK_MODEL = Deno.env.get('GEMINI_FALLBACK_MODEL') ?? 'gemini-3.5-flash-lite';
 const FALLBACK_THINKING = Deno.env.get('GEMINI_FALLBACK_THINKING') ?? 'minimal';
-/** Das Spiel wartet 6 s; der Rest bleibt für Anmeldung, Cache, Netz und Antwort. */
+/** Das Spiel wartet 6 s; so lange wartet die Funktion auf die KI, bevor sie dem Spieler antwortet. */
 const GEMINI_TIMEOUT_MS = 4700;
+/** Danach prüft sie im Hintergrund weiter und speichert das Urteil, sobald es da ist. */
+const BACKGROUND_TIMEOUT_MS = 25_000;
 /** Ist das Hauptmodell bis dahin nicht fertig, startet das Ersatzmodell parallel. */
 const HEDGE_AFTER_MS = 2000;
+/** Antwortet das Ersatzmodell bis dahin nicht, läuft eine zweite Anfrage parallel (die erste Antwort gewinnt). */
+const FALLBACK_HEDGE_MS = 1800;
+/** Breaker: so lange wird das Hauptmodell nach 429 (Kontingent) bzw. 503 (Überlastung) übersprungen. */
+const BLOCK_429_MS = 15 * 60_000;
+const BLOCK_503_MS = 2 * 60_000;
+/** Geheimnis für den nächtlichen Nachprüf-Job (Supabase Cron). Leer = Job deaktiviert. */
+const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? '';
 /** KI-Anfragen (ohne Cache-Treffer) pro Spieler in 24 Stunden. */
 const USER_LIMIT = Number(Deno.env.get('AI_USER_DAILY_LIMIT') ?? 30);
 /** Schutz des Gratis-Kontingents: KI-Anfragen aller Spieler in 24 Stunden. */
@@ -90,96 +99,274 @@ function background(p: PromiseLike<unknown>) {
   if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(task);
 }
 
-function log(userId: string, questionId: string, kind: string, ms?: number, detail?: string) {
-  background(admin.from('ai_judge_log').insert({ user_id: userId, question_id: questionId, kind, ms: ms ?? null, detail: detail?.slice(0, 400) ?? null }));
+interface LogEntry {
+  kind: string;
+  ms?: number;
+  detail?: string;
+  model?: string | null;
+  primaryStatus?: number | null;
+}
+
+function log(userId: string | null, questionId: string, e: LogEntry) {
+  background(
+    admin.from('ai_judge_log').insert({
+      user_id: userId,
+      question_id: questionId,
+      kind: e.kind,
+      ms: e.ms ?? null,
+      detail: e.detail?.slice(0, 400) ?? null,
+      model: e.model ?? null,
+      primary_status: e.primaryStatus ?? null,
+    }),
+  );
+}
+
+class GeminiError extends Error {
+  constructor(
+    readonly model: string,
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+  }
 }
 
 async function askGeminiOnce(model: string, thinking: string, question: JudgeQuestion, answer: string, timeoutMs: number) {
   const key = Deno.env.get('GEMINI_API_KEY');
-  if (!key) throw new Error('GEMINI_API_KEY fehlt');
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify(geminiRequestBody(question, answer, thinking)),
-    signal: AbortSignal.timeout(timeoutMs),
-  });
+  if (!key) throw new GeminiError(model, 0, 'GEMINI_API_KEY fehlt');
+  let res: Response;
+  try {
+    res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify(geminiRequestBody(question, answer, thinking)),
+      signal: AbortSignal.timeout(Math.max(300, timeoutMs)),
+    });
+  } catch (e) {
+    throw new GeminiError(model, 0, `${model}: ${String(e).slice(0, 120)}`);
+  }
   if (!res.ok) {
     // Nur Status und Fehlermeldung von Google loggen – nie Header oder Key.
     const detail = await res.text().catch(() => '');
-    throw new Error(`${model} ${res.status}: ${detail.replace(/\s+/g, ' ').slice(0, 200)}`);
+    throw new GeminiError(model, res.status, `${model} ${res.status}: ${detail.replace(/\s+/g, ' ').slice(0, 160)}`);
   }
   const result = parseModelOutput(extractText(await res.json()), question);
-  if (!result) throw new Error(`${model}: unlesbare KI-Antwort`);
+  if (!result) throw new GeminiError(model, 200, `${model}: unlesbare KI-Antwort`);
   return result;
 }
 
 type Verdict = Awaited<ReturnType<typeof askGeminiOnce>>;
+type Judged = Verdict & { model: string; primaryStatus: number | null; note?: string };
 
-/** Ersatzmodell; scheitert es schnell (z. B. 503), ein zweiter Versuch bis zur Deadline. */
+/** Erste erfolgreiche Antwort mehrerer Versuche; scheitern alle, gewinnt der letzte Fehler. */
+function firstSuccess<T>(attempts: Promise<T>[]): Promise<T> {
+  return new Promise((resolve, reject) => {
+    let failed = 0;
+    let lastErr: unknown;
+    for (const a of attempts)
+      a.then(resolve, (e) => {
+        lastErr = e;
+        if (++failed === attempts.length) reject(lastErr);
+      });
+  });
+}
+
+/**
+ * Ersatzmodell (Flash-Lite, größtes Gratis-Kontingent), abgesichert gegen langsame
+ * Ausreißer: Antwortet die erste Anfrage nicht in FALLBACK_HEDGE_MS oder scheitert sie
+ * schnell, läuft eine zweite parallel. Die erste gültige Antwort gewinnt.
+ */
 async function askFallback(question: JudgeQuestion, answer: string, deadline: number): Promise<Verdict> {
-  try {
-    return await askGeminiOnce(FALLBACK_MODEL, FALLBACK_THINKING, question, answer, Math.max(500, deadline - Date.now()));
-  } catch (e) {
-    if (deadline - Date.now() < 1500) throw e;
-    return await askGeminiOnce(FALLBACK_MODEL, FALLBACK_THINKING, question, answer, deadline - Date.now());
+  const left = () => deadline - Date.now();
+  const first = askGeminiOnce(FALLBACK_MODEL, FALLBACK_THINKING, question, answer, left());
+  first.catch(() => {});
+  const early = await Promise.race([
+    first.then(() => 'ok' as const, () => 'failed' as const),
+    new Promise<'slow'>((r) => setTimeout(() => r('slow'), FALLBACK_HEDGE_MS)),
+  ]);
+  if (early === 'ok') return first;
+  if (left() < 700) return first;
+  const second = askGeminiOnce(FALLBACK_MODEL, FALLBACK_THINKING, question, answer, left());
+  second.catch(() => {});
+  return early === 'failed' ? second : firstSuccess([first, second]);
+}
+
+/**
+ * Breaker für das Hauptmodell, gilt für ALLE Funktions-Instanzen (Zustand im Log):
+ * nach 429 für BLOCK_429_MS, nach 503 für BLOCK_503_MS überspringen. Danach ist die
+ * nächste Anfrage der Halb-offen-Test – scheitert sie wieder, beginnt das Fenster neu.
+ * Kurz im Speicher gepuffert, damit nicht jede Anfrage die Datenbank fragt.
+ */
+let breakerCache = { until: 0, checkedAt: 0 };
+async function primaryBlocked(): Promise<boolean> {
+  const now = Date.now();
+  if (now - breakerCache.checkedAt < 20_000) return now < breakerCache.until;
+  const { data } = await admin
+    .from('ai_judge_log')
+    .select('created_at, primary_status')
+    .in('primary_status', [429, 503])
+    .gte('created_at', new Date(now - BLOCK_429_MS).toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1);
+  const last = data?.[0];
+  const until = last ? Date.parse(last.created_at) + (last.primary_status === 429 ? BLOCK_429_MS : BLOCK_503_MS) : 0;
+  breakerCache = { until, checkedAt: now };
+  return now < until;
+}
+
+function notePrimaryFailure(status: number) {
+  if (status === 429 || status === 503) {
+    breakerCache = { until: Date.now() + (status === 429 ? BLOCK_429_MS : BLOCK_503_MS), checkedAt: Date.now() };
   }
 }
 
 /**
- * Sperre für das Hauptmodell (pro Funktions-Instanz): nach 429 (Kontingent
- * erschöpft) 10 min, nach 503 (Überlastung) 1 min – solange urteilt direkt
- * das Ersatzmodell mit voller Zeit.
+ * Hauptmodell zuerst (genauer). Bei 429/503 sofort, sonst nach HEDGE_AFTER_MS läuft das
+ * Ersatzmodell parallel; das Hauptmodell gewinnt, wenn es bis zur Deadline antwortet.
+ * Ist der Breaker offen, urteilt direkt das Ersatzmodell mit voller Zeit.
  */
-let primaryBlockedUntil = 0;
-function notePrimaryFailure(e: unknown) {
-  const msg = String(e);
-  const pause = / 429:/.test(msg) ? 10 * 60_000 : / 503:/.test(msg) ? 60_000 : 0;
-  if (pause) primaryBlockedUntil = Math.max(primaryBlockedUntil, Date.now() + pause);
-}
-
-/**
- * Hauptmodell zuerst. Ist es nach 2 s nicht fertig oder scheitert vorher
- * (z. B. 503 Überlastung), läuft das Ersatzmodell parallel mit. Das Urteil des
- * Hauptmodells gewinnt, wenn es rechtzeitig kommt; sonst zählt das Ersatzmodell.
- * Liefert auch, welches Modell geurteilt hat.
- */
-async function askGemini(question: JudgeQuestion, answer: string): Promise<Verdict & { model: string; fallbackReason?: string }> {
+async function askGemini(question: JudgeQuestion, answer: string, budgetMs: number): Promise<Judged> {
   const t0 = Date.now();
-  if (FALLBACK_MODEL && Date.now() < primaryBlockedUntil) {
-    const r = await askFallback(question, answer, t0 + GEMINI_TIMEOUT_MS);
-    return { model: FALLBACK_MODEL, fallbackReason: `${MODEL} pausiert (429/503)`, ...r };
+  const deadline = t0 + budgetMs;
+  if (FALLBACK_MODEL && (await primaryBlocked())) {
+    const r = await askFallback(question, answer, deadline);
+    return { ...r, model: FALLBACK_MODEL, primaryStatus: null, note: `${MODEL} pausiert (Breaker)` };
   }
-  const primary = askGeminiOnce(MODEL, THINKING, question, answer, GEMINI_TIMEOUT_MS);
-  primary.catch(notePrimaryFailure);
-  if (!FALLBACK_MODEL) return { model: MODEL, ...(await primary) };
+  const primary = askGeminiOnce(MODEL, THINKING, question, answer, deadline - Date.now());
+  primary.catch(() => {});
+  if (!FALLBACK_MODEL) return { ...(await primary), model: MODEL, primaryStatus: 200 };
 
-  let primaryError: unknown = null;
-  const primarySettled = primary.then(
+  let primaryErr: GeminiError | null = null;
+  const settled = primary.then(
     () => true,
-    (e) => ((primaryError = e), false),
+    (e) => ((primaryErr = e as GeminiError), false),
   );
-  // Ersatzmodell starten: nach HEDGE_AFTER_MS oder sofort bei einem Fehler des Hauptmodells
-  await Promise.race([primarySettled, new Promise((r) => setTimeout(r, HEDGE_AFTER_MS))]);
-  if (primaryError === null && (await Promise.race([primarySettled, Promise.resolve(null)])) === true) {
-    return { model: MODEL, ...(await primary) };
+  await Promise.race([settled, new Promise((r) => setTimeout(r, HEDGE_AFTER_MS))]);
+  if (!primaryErr && (await Promise.race([settled, Promise.resolve(null)])) === true) {
+    return { ...(await primary), model: MODEL, primaryStatus: 200 };
   }
-  const fallback = askFallback(question, answer, t0 + GEMINI_TIMEOUT_MS);
-
+  const fallback = askFallback(question, answer, deadline);
+  fallback.catch(() => {});
   try {
-    return { model: MODEL, ...(await primary) };
+    return { ...(await primary), model: MODEL, primaryStatus: 200 };
   } catch (e) {
+    const err = e as GeminiError;
+    notePrimaryFailure(err.status);
     try {
-      return { model: FALLBACK_MODEL, fallbackReason: String(e), ...(await fallback) };
+      return { ...(await fallback), model: FALLBACK_MODEL, primaryStatus: err.status || null, note: err.message };
     } catch (e2) {
-      throw new Error(`${String(e).slice(0, 190)} | ${String(e2).slice(0, 190)}`);
+      const err2 = new GeminiError(FALLBACK_MODEL, (e2 as GeminiError).status ?? 0, `${err.message.slice(0, 180)} | ${String((e2 as Error).message).slice(0, 180)}`);
+      (err2 as GeminiError & { primaryStatus?: number }).primaryStatus = err.status;
+      throw err2;
     }
-  } finally {
-    fallback.catch(() => {}); // unbenutztes Ersatz-Ergebnis still verwerfen
   }
+}
+
+/** Antwort, die (noch) nicht geprüft werden konnte, festhalten – taucht im Admin unter „Nicht geprüft“ auf. */
+function storeUnchecked(questionId: string, key: string, reason: 'error' | 'limited') {
+  background(
+    admin.from('ai_verdicts').upsert(
+      { question_id: questionId, normalized_answer: key, valid: false, ai_valid: false, model: 'none', review_status: 'unchecked', unchecked_reason: reason },
+      { onConflict: 'question_id,normalized_answer', ignoreDuplicates: true },
+    ),
+  );
+}
+
+/** KI fragen und das Urteil speichern (überschreibt einen „unchecked“-Eintrag). */
+async function judgeAndStore(
+  userId: string | null,
+  questionId: string,
+  question: JudgeQuestion,
+  answer: string,
+  key: string,
+  waitMs = GEMINI_TIMEOUT_MS,
+): Promise<JudgeResponse> {
+  const t0 = Date.now();
+  // Die eigentliche Prüfung darf länger dauern als der Spieler wartet (Hintergrund).
+  const work = (async (): Promise<JudgeResponse> => {
+    try {
+      const { model, primaryStatus, note, ...result } = await askGemini(question, answer, BACKGROUND_TIMEOUT_MS);
+      const ms = Date.now() - t0;
+      log(userId, questionId, { kind: 'model', ms, model, primaryStatus, detail: [note && `Ersatzmodell ${model} – ${note}`, ms > waitMs && 'im Hintergrund fertig'].filter(Boolean).join(' · ') || undefined });
+      const { error } = await admin.from('ai_verdicts').upsert(
+        {
+          question_id: questionId,
+          normalized_answer: key,
+          valid: result.status === 'valid',
+          ai_valid: result.status === 'valid',
+          canonical_text: result.canonical_text,
+          list_answer: result.list_answer,
+          estimated_base_score: result.estimated_base_score,
+          reason: result.reason,
+          model,
+          review_status: 'pending',
+          unchecked_reason: null,
+        },
+        { onConflict: 'question_id,normalized_answer' },
+      );
+      if (error) console.error('verdict not stored', error.message);
+      return verdict(result);
+    } catch (e) {
+      const err = e as GeminiError & { primaryStatus?: number };
+      console.error('judge failed', questionId, Date.now() - t0, 'ms', err.message);
+      log(userId, questionId, { kind: 'error', ms: Date.now() - t0, detail: err.message, model: err.model, primaryStatus: err.primaryStatus ?? null });
+      storeUnchecked(questionId, key, 'error');
+      return verdict({ status: 'error' });
+    }
+  })();
+  const timeout = new Promise<null>((r) => setTimeout(() => r(null), waitMs));
+  const first = await Promise.race([work, timeout]);
+  if (first) return first;
+  // Zu langsam für den Spieler: „nicht geprüft“ melden, festhalten, im Hintergrund weiterprüfen
+  storeUnchecked(questionId, key, 'error');
+  background(work);
+  return verdict({ status: 'error' });
+}
+
+/** Nächtlicher Job: offene „unchecked“-Antworten erneut prüfen, solange Kontingent da ist. */
+async function recheckBatch(limit: number): Promise<Response> {
+  const { data: rows, error } = await admin
+    .from('ai_verdicts')
+    .select('question_id, normalized_answer')
+    .eq('review_status', 'unchecked')
+    .order('created_at')
+    .limit(limit);
+  if (error) return json({ error: error.message }, 500);
+  const results: Record<string, number> = {};
+  for (const r of rows ?? []) {
+    const q = QUESTIONS[r.question_id];
+    if (!q) continue;
+    // Originalschreibweise (mit Umlauten) aus den gespeicherten Antworten, sonst die normalisierte
+    const { data: sub } = await admin
+      .from('submissions')
+      .select('raw_answer')
+      .eq('question_id', r.question_id)
+      .eq('normalized_answer', r.normalized_answer)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    const res = await judgeAndStore(null, r.question_id, q, sub?.[0]?.raw_answer ?? r.normalized_answer, r.normalized_answer, BACKGROUND_TIMEOUT_MS);
+    results[res.status] = (results[res.status] ?? 0) + 1;
+    if (res.status === 'error') break; // Kontingent/Störung: beim nächsten Lauf weiter
+  }
+  return json({ checked: rows?.length ?? 0, results });
 }
 
 async function handle(req: Request): Promise<Response> {
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
+
+  let body: { question_id?: unknown; answer?: unknown; recheck?: unknown; mode?: unknown; limit?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: 'bad request' }, 400);
+  }
+
+  // Cron: Nachprüfen aller offenen Antworten (eigenes Geheimnis, kein Spieler)
+  if (body.mode === 'recheck-batch') {
+    const secret = req.headers.get('x-cron-secret') ?? '';
+    if (!CRON_SECRET || secret !== CRON_SECRET) return json({ error: 'unauthorized' }, 401);
+    return recheckBatch(Math.min(50, Number(body.limit) || 20));
+  }
 
   // Spieler (auch anonym angemeldet) prüfen
   const jwt = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '') ?? '';
@@ -189,12 +376,6 @@ async function handle(req: Request): Promise<Response> {
   const user = auth?.user;
   if (authError || !user) return json({ error: 'unauthorized' }, 401);
 
-  let body: { question_id?: unknown; answer?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return json({ error: 'bad request' }, 400);
-  }
   const questionId = typeof body.question_id === 'string' ? body.question_id : '';
   const answer = typeof body.answer === 'string' ? body.answer.trim().slice(0, MAX_ANSWER_LENGTH) : '';
   const question = QUESTIONS[questionId];
@@ -203,10 +384,18 @@ async function handle(req: Request): Promise<Response> {
   const key = cacheKey(answer);
   if (!key) return json(verdict({ status: 'invalid' }));
 
+  // Admin-Nachprüfung aus dem Admin-Bereich: ohne Spieler-Limit, ohne Cache
+  let isAdmin = false;
+  if (body.recheck === true) {
+    const { data: a } = await admin.from('admins').select('user_id').eq('user_id', user.id).maybeSingle();
+    if (!a) return json({ error: 'forbidden' }, 403);
+    isAdmin = true;
+  }
+
   // Steht doch in der Liste (z. B. ältere App-Version) → ohne KI
   const listed = findListAnswer(question, answer);
   if (listed) {
-    log(user.id, questionId, 'list');
+    log(user.id, questionId, { kind: 'list' });
     return json(verdict({ status: 'valid', list_answer: listed, canonical_text: listed }));
   }
 
@@ -217,7 +406,7 @@ async function handle(req: Request): Promise<Response> {
     .eq('question_id', questionId);
   const approved = findApproved(approvedRows ?? [], answer);
   if (approved) {
-    log(user.id, questionId, 'list');
+    log(user.id, questionId, { kind: 'list' });
     const merged = findListAnswer(question, approved.merged_into);
     return json(
       verdict({
@@ -230,64 +419,44 @@ async function handle(req: Request): Promise<Response> {
     );
   }
 
-  // Cache (abgelehnte Urteile stehen hier mit valid = false)
-  const { data: hit } = await admin
-    .from('ai_verdicts')
-    .select('valid, list_answer, canonical_text, estimated_base_score, reason')
-    .eq('question_id', questionId)
-    .eq('normalized_answer', key)
-    .maybeSingle();
-  if (hit) {
-    log(user.id, questionId, 'cache');
-    return json(
-      verdict({
-        status: hit.valid ? 'valid' : 'invalid',
-        list_answer: hit.list_answer,
-        canonical_text: hit.canonical_text,
-        estimated_base_score: hit.estimated_base_score,
-        reason: hit.reason,
-        cached: true,
-      }),
-    );
+  // Cache (abgelehnte Urteile stehen hier mit valid = false; „unchecked“ ist KEIN Treffer)
+  if (!isAdmin) {
+    const { data: hit } = await admin
+      .from('ai_verdicts')
+      .select('valid, list_answer, canonical_text, estimated_base_score, reason, review_status')
+      .eq('question_id', questionId)
+      .eq('normalized_answer', key)
+      .neq('review_status', 'unchecked')
+      .maybeSingle();
+    if (hit) {
+      log(user.id, questionId, { kind: 'cache' });
+      return json(
+        verdict({
+          status: hit.valid ? 'valid' : 'invalid',
+          list_answer: hit.list_answer,
+          canonical_text: hit.canonical_text,
+          estimated_base_score: hit.estimated_base_score,
+          reason: hit.reason,
+          cached: true,
+        }),
+      );
+    }
+
+    // Rate-Limit: pro Spieler und insgesamt, jeweils über die letzten 24 Stunden
+    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const [mine, all] = await Promise.all([
+      admin.from('ai_judge_log').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('kind', 'model').gte('created_at', since),
+      admin.from('ai_judge_log').select('id', { count: 'exact', head: true }).eq('kind', 'model').gte('created_at', since),
+    ]);
+    if ((mine.count ?? 0) >= USER_LIMIT || (all.count ?? 0) >= GLOBAL_LIMIT) {
+      log(user.id, questionId, { kind: 'limited' });
+      storeUnchecked(questionId, key, 'limited');
+      return json(verdict({ status: 'limited' }));
+    }
   }
 
-  // Rate-Limit: pro Spieler und insgesamt, jeweils über die letzten 24 Stunden
-  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const [mine, all] = await Promise.all([
-    admin.from('ai_judge_log').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('kind', 'model').gte('created_at', since),
-    admin.from('ai_judge_log').select('id', { count: 'exact', head: true }).eq('kind', 'model').gte('created_at', since),
-  ]);
-  if ((mine.count ?? 0) >= USER_LIMIT || (all.count ?? 0) >= GLOBAL_LIMIT) {
-    log(user.id, questionId, 'limited');
-    return json(verdict({ status: 'limited' }));
-  }
-
-  const t0 = Date.now();
-  try {
-    const { model, fallbackReason, ...result } = await askGemini(question, answer);
-    log(user.id, questionId, 'model', Date.now() - t0, fallbackReason ? `Ersatzmodell ${model} – ${fallbackReason}` : undefined);
-    background(
-      admin.from('ai_verdicts').upsert(
-        {
-          question_id: questionId,
-          normalized_answer: key,
-          valid: result.status === 'valid',
-          ai_valid: result.status === 'valid',
-          canonical_text: result.canonical_text,
-          list_answer: result.list_answer,
-          estimated_base_score: result.estimated_base_score,
-          reason: result.reason,
-          model,
-        },
-        { onConflict: 'question_id,normalized_answer', ignoreDuplicates: true },
-      ),
-    );
-    return json(verdict(result));
-  } catch (e) {
-    console.error('judge failed', questionId, Date.now() - t0, 'ms', String(e));
-    log(user.id, questionId, 'error', Date.now() - t0, String(e));
-    return json(verdict({ status: 'error' }));
-  }
+  // Admin-Nachprüfung: länger warten (kein Spieler-Timer)
+  return json(await judgeAndStore(user.id, questionId, question, answer, key, isAdmin ? 20_000 : GEMINI_TIMEOUT_MS));
 }
 
 Deno.serve(async (req) => {

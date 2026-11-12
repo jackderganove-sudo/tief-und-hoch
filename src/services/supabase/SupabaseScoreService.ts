@@ -18,7 +18,7 @@ export class SupabaseScoreService extends LocalScoreService {
     void fetch(`${SUPABASE_URL}/functions/v1/judge-answer`, { method: 'OPTIONS' }).catch(() => {});
   }
 
-  async submit({ dateKey, lang, mode, questionId, result }: AnswerSubmission): Promise<void> {
+  async submit({ dateKey, lang, mode, questionId, result, practice = false }: AnswerSubmission): Promise<void> {
     if (!supabase) return;
     try {
       if (!(await ensureSession())) return;
@@ -32,8 +32,9 @@ export class SupabaseScoreService extends LocalScoreService {
         matched_answer: result.matched?.slice(0, 100) ?? null,
         source: result.source ?? 'list',
         score: result.points,
+        is_practice: practice,
       });
-      // 23505 = schon gespeichert (z. B. nach Reload) – kein Problem
+      // 23505 = Tagesantwort schon gespeichert (z. B. nach Reload) – kein Problem
       if (error && error.code !== '23505') console.warn('Antwort nicht gespeichert:', error.message);
     } catch (e) {
       console.warn('Antwort nicht gespeichert:', e);

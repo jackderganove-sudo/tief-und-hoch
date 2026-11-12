@@ -6,7 +6,7 @@ import { TOPICS, type Lang, type Question } from '../domain/types';
 import { LocalQuestionRepository } from '../services/QuestionRepository';
 import { Panel, PxButton } from '../components/px';
 import { setThemeColor } from '../pwa/themeColor';
-import { adminDb, approve, defaults, loadVerdicts, reject, reset, type AdminVerdict, type VerdictFilter } from './adminApi';
+import { adminDb, approve, defaults, loadAiStatus, loadVerdicts, recheck, reject, reset, type AdminVerdict, type AiStatus, type VerdictFilter } from './adminApi';
 
 /**
  * Admin-Bereich unter /admin (nicht verlinkt). Login per GitHub, Zugriff nur
@@ -106,10 +106,13 @@ function Review({ name, onSignOut }: { name: string; onSignOut: () => void }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [focus, setFocus] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<AiStatus | null>(null);
+  const [progress, setProgress] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
       setError(null);
+      void loadAiStatus(db).then(setStatus).catch(() => {});
       const data = await loadVerdicts(db, filter);
       const byLang = new Map<Lang, string[]>();
       for (const v of data) if (v.lang === 'de' || v.lang === 'en') byLang.set(v.lang, [...(byLang.get(v.lang) ?? []), v.question_id]);
@@ -144,6 +147,20 @@ function Review({ name, onSignOut }: { name: string; onSignOut: () => void }) {
 
   const quickApprove = useCallback((vs: AdminVerdict[]) => run(() => Promise.all(vs.map((v) => approve(db, v, defaults(v))))), [db, run]);
   const quickReject = useCallback((vs: AdminVerdict[]) => run(() => reject(db, vs.map((v) => v.id))), [db, run]);
+  // Nacheinander nachprüfen (schont das Kontingent), mit Fortschritt
+  const recheckAll = useCallback(
+    (vs: AdminVerdict[]) =>
+      run(async () => {
+        const count: Record<string, number> = {};
+        for (let i = 0; i < vs.length; i++) {
+          setProgress(`KI prüft ${i + 1}/${vs.length} …`);
+          const st = await recheck(db, vs[i]).catch(() => 'error');
+          count[st] = (count[st] ?? 0) + 1;
+        }
+        setProgress(`Fertig: ${Object.entries(count).map(([k, n]) => `${n}× ${k}`).join(', ')}`);
+      }),
+    [db, run],
+  );
 
   // Gruppiert nach Frage, Reihenfolge = Tastatur-Reihenfolge
   const groups = useMemo(() => {
@@ -193,9 +210,11 @@ function Review({ name, onSignOut }: { name: string; onSignOut: () => void }) {
         </div>
       </header>
 
+      {status && <StatusBar s={status} />}
+
       <Panel tone="stone" className="mt-3 px-1">
         <div className="grid gap-2 sm:grid-cols-2">
-          <Chips label="Status" value={filter.status} onChange={(status) => setFilter({ ...filter, status })} options={[['pending', 'offen'], ['approved', 'freigegeben'], ['rejected', 'abgelehnt'], ['all', 'alle']]} />
+          <Chips label="Status" value={filter.status} onChange={(status) => setFilter({ ...filter, status })} options={[['pending', 'offen'], ['unchecked', 'nicht geprüft'], ['approved', 'freigegeben'], ['rejected', 'abgelehnt'], ['all', 'alle']]} />
           <Chips label="KI-Urteil" value={filter.ai} onChange={(ai) => setFilter({ ...filter, ai })} options={[['all', 'alle'], ['valid', 'gültig'], ['invalid', 'von KI abgelehnt']]} />
           <Chips label="Sprache" value={filter.lang} onChange={(lang) => setFilter({ ...filter, lang })} options={[['all', 'alle'], ['de', 'DE'], ['en', 'EN']]} />
           <label className="flex items-center gap-2 text-sm">
@@ -218,6 +237,12 @@ function Review({ name, onSignOut }: { name: string; onSignOut: () => void }) {
       </Panel>
 
       {error && <p className="mt-3 border-2 border-[#e2541e] bg-[#3a1a14] p-2 text-sm">{error}</p>}
+      {progress && <p className="mt-3 text-sm opacity-85">{progress}</p>}
+      {filter.status === 'unchecked' && flat.length > 0 && (
+        <PxButton tone="gold" small disabled={busy} className="mt-3 text-base" onClick={() => void recheckAll(flat)}>
+          🤖 Alle {flat.length} jetzt mit KI prüfen
+        </PxButton>
+      )}
       {rows === null && !error && <p className="mt-6 text-center opacity-70">Lade …</p>}
       {rows?.length === 0 && <p className="mt-6 text-center opacity-70">Nichts zu prüfen.</p>}
 
@@ -247,6 +272,7 @@ function Review({ name, onSignOut }: { name: string; onSignOut: () => void }) {
                   onApprove={(opts) => run(() => approve(db, v, opts))}
                   onReject={() => quickReject([v])}
                   onReset={() => run(() => reset(db, [v.id]))}
+                  onRecheck={() => void recheckAll([v])}
                 />
               );
             })}
@@ -306,6 +332,7 @@ function Chips<T extends string>({ label, value, options, onChange }: { label: s
 // ---------------------------------------------------------------- Karte pro Urteil
 
 const STATUS_STYLE = {
+  unchecked: ['nicht geprüft', '#9aa3b5'],
   pending: ['offen', '#f2b53a'],
   approved: ['freigegeben', '#7ec850'],
   rejected: ['abgelehnt', '#e2603a'],
@@ -323,6 +350,7 @@ function VerdictCard({
   onApprove,
   onReject,
   onReset,
+  onRecheck,
 }: {
   v: AdminVerdict;
   question: Question | undefined;
@@ -335,6 +363,7 @@ function VerdictCard({
   onApprove: (opts: { text: string; aliases: string[]; baseScore: number; mergedInto?: string | null }) => void;
   onReject: () => void;
   onReset: () => void;
+  onRecheck: () => void;
 }) {
   const [mode, setMode] = useState<'none' | 'approve' | 'merge'>('none');
   const d = defaults(v);
@@ -370,11 +399,17 @@ function VerdictCard({
               {v.list_answer && <span className="text-sm opacity-80">(Variante von „{v.list_answer}“)</span>}
             </div>
             <p className="mt-1 text-sm leading-snug">
-              <span style={{ color: v.ai_valid ? '#7ec850' : '#e2603a' }}>KI: {v.ai_valid ? 'gültig' : 'abgelehnt'}</span>
-              {v.reason && <span className="opacity-80"> – {v.reason}</span>}
+              {v.review_status === 'unchecked' ? (
+                <span style={{ color: '#9aa3b5' }}>KI: nicht geprüft – {v.unchecked_reason === 'limited' ? 'Limit erreicht' : 'Fehler/Zeitüberschreitung'}</span>
+              ) : (
+                <>
+                  <span style={{ color: v.ai_valid ? '#7ec850' : '#e2603a' }}>KI: {v.ai_valid ? 'gültig' : 'abgelehnt'}</span>
+                  {v.reason && <span className="opacity-80"> – {v.reason}</span>}
+                </>
+              )}
             </p>
             <p className="mt-1 font-tiny text-[0.65rem] uppercase leading-relaxed opacity-70">
-              <span style={{ color }}>{label}</span> · Score {v.estimated_base_score ?? '–'} · {v.plays}× gespielt · {new Date(v.created_at).toLocaleDateString('de-DE')} · {v.model}
+              <span style={{ color }}>{label}</span> · Score {v.estimated_base_score ?? '–'} · {v.plays}× gespielt{v.practice_plays ? ` (${v.practice_plays}× Übung)` : ''} · {new Date(v.created_at).toLocaleDateString('de-DE')} · {v.model}
             </p>
             {v.review_status === 'approved' && v.approved_text && (
               <p className="mt-1 text-sm">
@@ -386,6 +421,11 @@ function VerdictCard({
         </div>
 
         <div className="mt-2 flex flex-wrap gap-1">
+          {v.review_status === 'unchecked' && (
+            <PxButton tone="gold" small disabled={busy} className="text-base" onClick={onRecheck}>
+              🤖 Jetzt mit KI prüfen
+            </PxButton>
+          )}
           <PxButton tone="teal" small disabled={busy} className="text-base" onClick={() => setMode(mode === 'approve' ? 'none' : 'approve')}>
             ✓ Freigeben
           </PxButton>
@@ -462,5 +502,37 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="font-tiny text-[0.65rem] uppercase opacity-70">{label}</span>
       <span className="px-field px-field-dark mt-0.5 block [--px:2px]">{children}</span>
     </label>
+  );
+}
+
+/** Kopfzeile: KI-Prüfungen heute, Fehler, Modell, Kontingent. */
+function StatusBar({ s }: { s: AiStatus }) {
+  const quota = s.primary_quota_hit_at ? new Date(s.primary_quota_hit_at) : null;
+  const items: [string, string, string?][] = [
+    ['KI heute', String(s.checks_today)],
+    ['Fehler heute', String(s.errors_today + s.limited_today), s.errors_today + s.limited_today ? '#e2603a' : undefined],
+    ['Aus Cache', String(s.cache_today)],
+    ['Ø Zeit', s.avg_ms_today ? `${(s.avg_ms_today / 1000).toFixed(1)} s` : '–'],
+    ['Modell', (s.last_model ?? '–').replace('gemini-', '')],
+    ['Nicht geprüft', String(s.unchecked_open), s.unchecked_open ? '#f2b53a' : undefined],
+  ];
+  return (
+    <Panel tone="stone" className="mt-3 px-1">
+      <dl className="grid grid-cols-3 gap-x-3 gap-y-1 sm:grid-cols-6">
+        {items.map(([label, value, color]) => (
+          <div key={label}>
+            <dt className="font-tiny text-[0.6rem] uppercase opacity-70">{label}</dt>
+            <dd className="text-lg font-bold leading-tight" style={{ color }}>
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      {quota && (
+        <p className="mt-1 text-sm" style={{ color: '#f2b53a' }}>
+          Kontingent von 3.8 Flash heute erschöpft (zuletzt {quota.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}) – Flash-Lite urteilt.
+        </p>
+      )}
+    </Panel>
   );
 }
