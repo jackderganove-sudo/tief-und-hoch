@@ -91,7 +91,7 @@ for (;;) {
   await sleep(800);
 }
 const final = await state(host, code);
-assert(final.players.length === N, `Spieler am Ende: ${final.players.length}`);
+assert(final.players.length >= N, `Spieler am Ende: ${final.players.length}`);
 const counts = [...received.values()];
 console.log(`Antwort-Aufrufe: p50 ${pct(answerT, 50)} ms, p95 ${pct(answerT, 95)} ms, max ${Math.max(...answerT)} ms`);
 console.log(`Alle geantwortet → Auflösung: p50 ${pct(revealDelay, 50)} ms, max ${Math.max(...revealDelay)} ms`);

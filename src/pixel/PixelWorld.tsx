@@ -200,7 +200,9 @@ export function PixelWorld({ view, meters = 0, fx = null, crew }: { view: WorldV
           if (!el) return;
           const m = crewShown.get(c.id) ?? 0;
           const x = view === 'rare' ? ox + xs[i] : ox + BALLOON_X + xs[i];
-          const y = view === 'rare' ? oy + m * PPM - 9 : oy - m * PPM - 33;
+          // bei vielen Spielern Schilder abwechselnd versetzt, damit sie sich nicht überdecken
+          const stagger = others.length > 4 ? (i % 4) * 7 : 0;
+          const y = (view === 'rare' ? oy + m * PPM - 9 : oy - m * PPM - 33) - stagger;
           el.style.transform = `translate(${x * scale}px, ${y * scale}px) translate(-50%, -100%)`;
         });
         const mine = all.find((c) => c.me);
@@ -258,7 +260,7 @@ export function PixelWorld({ view, meters = 0, fx = null, crew }: { view: WorldV
             className={`pointer-events-none absolute left-0 top-0 max-w-[6rem] truncate whitespace-nowrap px-1 text-[0.7rem] font-bold leading-4 text-white ${c.me ? 'z-10 ring-1 ring-white' : ''}`}
             style={{ background: c.color, transform: 'translate(-999px, -999px)' }}
           >
-            {c.name}
+            {!c.me && crew.length > 5 ? c.name.slice(0, 6) : c.name}
           </div>
         ))}
     </div>
