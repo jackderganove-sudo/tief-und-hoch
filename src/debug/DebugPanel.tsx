@@ -5,7 +5,7 @@ import { totalPoints } from '../domain/scoring';
 import { services } from '../services';
 import { getDayOffset, setDayOffset } from './debugState';
 
-const OPEN_KEY = 'tuh:v1:debug:panelOpen';
+const OPEN_KEY = 'hal:v1:debug:panelOpen';
 const daysLabel = (n: number) => `${n > 0 ? '+' : ''}${n} ${Math.abs(n) === 1 ? 'Tag' : 'Tage'}`;
 
 /**

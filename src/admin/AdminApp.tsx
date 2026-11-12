@@ -16,7 +16,7 @@ export default function AdminApp() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   useEffect(() => {
-    document.title = 'Tief & Hoch – Admin';
+    document.title = 'Highs & Lows – Admin';
     if (!adminDb) return;
     void adminDb.auth.getSession().then(({ data }) => setSession(data.session));
     const { data } = adminDb.auth.onAuthStateChange((_e, s) => setSession(s));

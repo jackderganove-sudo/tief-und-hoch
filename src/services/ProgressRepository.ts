@@ -52,7 +52,7 @@ export interface ProgressRepository {
   clearStats(mode: Mode): void;
 }
 
-const PREFIX = 'tuh:v1';
+const PREFIX = 'hal:v1';
 const KEEP_DAYS = 30;
 
 export class LocalProgressRepository implements ProgressRepository {
@@ -138,7 +138,7 @@ export class LocalProgressRepository implements ProgressRepository {
     try {
       for (let i = this.storage.length - 1; i >= 0; i--) {
         const key = this.storage.key(i);
-        const m = key && /^tuh:v1:day:\w+:(\d{4}-\d{2}-\d{2})$/.exec(key);
+        const m = key && /^hal:v1:day:\w+:(\d{4}-\d{2}-\d{2})$/.exec(key);
         if (m && m[1] < cutoff) this.storage.removeItem(key!);
       }
     } catch {

@@ -11,7 +11,7 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 export const supabase: SupabaseClient | null =
   url && anonKey ? createClient(url, anonKey, {
         // detectSessionInUrl aus: den OAuth-Rückruf im Admin-Bereich verarbeitet nur dessen eigener Client
-        auth: { persistSession: true, autoRefreshToken: true, storageKey: 'tuh:v1:auth', detectSessionInUrl: false },
+        auth: { persistSession: true, autoRefreshToken: true, storageKey: 'hal:v1:auth', detectSessionInUrl: false },
       }) : null;
 
 export const SUPABASE_URL = url ?? '';

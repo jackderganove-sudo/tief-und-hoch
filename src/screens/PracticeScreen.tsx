@@ -13,7 +13,7 @@ import { Panel, PxButton, TierIcon } from '../components/px';
 import { PixelWorld } from '../pixel/PixelWorld';
 import { localeFor } from '../i18n';
 
-const SETUP_KEY = 'tuh:v1:practice';
+const SETUP_KEY = 'hal:v1:practice';
 
 interface Setup {
   mode: Mode;

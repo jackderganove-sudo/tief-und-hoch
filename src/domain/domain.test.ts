@@ -190,11 +190,11 @@ describe('share', () => {
       });
     });
     const text = buildShareText('common', '2026-11-11', results, {
-      title: 'Tief & Hoch',
+      title: 'Highs & Lows',
       modeName: 'Aufstieg',
       measureLabel: 'Höhe',
       locale: 'de-DE',
     });
-    expect(text).toBe('Tief & Hoch · Aufstieg 🎈 11.11.2026\n🌇⭐⬛\nHöhe: 1.850 m (185/700)');
+    expect(text).toBe('Highs & Lows · Aufstieg 🎈 11.11.2026\n🌇⭐⬛\nHöhe: 1.850 m (185/700)');
   });
 });

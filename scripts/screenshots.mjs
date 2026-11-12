@@ -82,7 +82,7 @@ try {
     const { name: vpName, ...opts } = vp;
     const name = reduced ? `reduced-${vpName}` : vpName;
     const ctx = await browser.newContext({ ...opts, viewport: { width: vp.width, height: vp.height }, locale: 'de-DE', reducedMotion: reduced ? 'reduce' : 'no-preference' });
-    await ctx.addInitScript(() => localStorage.setItem('tuh:v1:lang', 'de'));
+    await ctx.addInitScript(() => localStorage.setItem('hal:v1:lang', 'de'));
     const page = await ctx.newPage();
     page.on('pageerror', (e) => problems.push(`${name}: ${e.message}`));
     page.on('console', (m) => m.type() === 'error' && problems.push(`${name}: ${m.text()}`));

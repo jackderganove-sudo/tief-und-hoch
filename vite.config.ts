@@ -2,8 +2,8 @@ import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
-// Für GitHub Pages liegt die App unter /tief-und-hoch/ – der Workflow setzt
-// VITE_BASE entsprechend. Lokal (dev, preview, build) bleibt es bei "/".
+// Die App liegt im Wurzelverzeichnis (https://playhighsandlows.github.io/).
+// VITE_BASE nur setzen, falls sie einmal in einem Unterordner laufen soll.
 const base = process.env.VITE_BASE ?? '/';
 
 // Kennung dieses Builds (Commit in CI, sonst Zeitpunkt) – z. B. leert eine neue

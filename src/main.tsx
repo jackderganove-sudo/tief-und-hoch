@@ -1,3 +1,5 @@
+// Muss als Erstes laufen: alte localStorage-Schlüssel übernehmen (Umbenennung)
+import './migrateStorage';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource/pixelify-sans/400.css';

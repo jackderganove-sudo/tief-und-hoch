@@ -1,4 +1,4 @@
-# Tief & Hoch
+# Highs & Lows
 
 Tägliches Wort-/Trivia-Spiel mit zwei Modi:
 
@@ -31,15 +31,17 @@ und legt Bilder (Mobil 390×844, Desktop 1440×900) in `screenshots/` ab
 
 ## Live-Testversion
 
-**<https://jackderganove-sudo.github.io/tief-und-hoch/>**
+**<https://playhighsandlows.github.io/>**
 
 Jeder Push auf `main` baut und veröffentlicht die App über GitHub Actions
 (`.github/workflows/deploy.yml`): `npm ci` → Tests → Fragen-Validierung → Build → GitHub Pages.
 Schlägt ein Test oder die Validierung fehl, wird nicht veröffentlicht.
 
-- Der Pages-Build setzt `VITE_BASE=/tief-und-hoch/`; lokal bleibt die Basis `/`.
+- Repo `playhighsandlows/playhighsandlows.github.io` → die App liegt im Wurzelverzeichnis (`/`).
+- `/admin` und andere Pfade funktionieren auch beim direkten Aufruf: der Build kopiert
+  `index.html` nach `404.html`.
 - Solange im Workflow `VITE_ENABLE_DEBUG: 'true'` steht, ist das Debug-Panel auch live über
-  [`?debug=1`](https://jackderganove-sudo.github.io/tief-und-hoch/?debug=1) erreichbar.
+  [`?debug=1`](https://playhighsandlows.github.io/?debug=1) erreichbar.
   Zum Abschalten die Zeile im Workflow entfernen.
 
 ## Lokal starten
@@ -234,7 +236,7 @@ Tag *n* nimmt die nächsten 7 Positionen; jede Tagesfrage hat ein anderes Thema,
 keine Frage kommt am selben Tag in beiden Modi vor. Eine Frage kommt in der Regel erst
 wieder, wenn alle anderen dran waren.
 
-**Spielstand:** `localStorage` (`tuh:v1:…`): Tages-Spielstand pro Modus, Statistik,
+**Spielstand:** `localStorage` (`hal:v1:…`): Tages-Spielstand pro Modus, Statistik,
 Serie. Der Timer rechnet mit einem gespeicherten Startzeitpunkt, deshalb läuft er auch
 über einen Reload weiter.
 

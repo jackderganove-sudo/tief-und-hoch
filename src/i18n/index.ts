@@ -4,7 +4,7 @@ import de from './de.json';
 import en from './en.json';
 import type { Lang } from '../domain/types';
 
-const LANG_KEY = 'tuh:v1:lang';
+const LANG_KEY = 'hal:v1:lang';
 
 function initialLang(): Lang {
   try {

@@ -1,7 +1,7 @@
 /**
  * Debug-Zustand, aktiv mit ?debug=1 – aber nur, wenn `debugAvailable` gilt.
  */
-const KEY = 'tuh:v1:debug:dayOffset';
+const KEY = 'hal:v1:debug:dayOffset';
 
 /**
  * Debug-Code ist im Bundle, wenn der Dev-Server läuft oder der Build mit

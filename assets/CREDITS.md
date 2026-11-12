@@ -1,6 +1,6 @@
 # Credits
 
-Alle Grafiken und Schriften in „Tief & Hoch“ sind entweder **CC0** (gemeinfrei),
+Alle Grafiken und Schriften in „Highs & Lows“ sind entweder **CC0** (gemeinfrei),
 **SIL Open Font License 1.1** oder selbst erstellt. Es wird nichts mit
 „non-commercial“ oder unklarer Lizenz verwendet.
 

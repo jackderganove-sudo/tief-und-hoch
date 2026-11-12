@@ -3,7 +3,7 @@ import type { AiVerdict } from '../domain/scoring';
 import type { Question } from '../domain/types';
 import type { AnswerJudge } from './AnswerJudge';
 
-const KEY = 'tuh:v1:ai-verdicts';
+const KEY = 'hal:v1:ai-verdicts';
 /** Älteste Einträge fliegen raus, damit localStorage klein bleibt. */
 const MAX_ENTRIES = 400;
 

@@ -1,7 +1,7 @@
 import type { ApprovedAnswer } from '../../domain/approved';
 import { supabase } from './client';
 
-const KEY = 'tuh:v1:approved';
+const KEY = 'hal:v1:approved';
 /** Länger wartet die App beim Laden der Fragen nicht – danach gilt der gespeicherte Stand. */
 const WAIT_MS = 1500;
 
