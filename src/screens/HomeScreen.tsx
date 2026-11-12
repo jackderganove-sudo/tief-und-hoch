@@ -21,10 +21,12 @@ export function HomeScreen({
   dateKey,
   onPlay,
   onPractice,
+  onFriends,
 }: {
   dateKey: string;
   onPlay: (mode: Mode) => void;
   onPractice: () => void;
+  onFriends: () => void;
 }) {
   const { t } = useTranslation();
   const countdown = useCountdown();
@@ -63,6 +65,13 @@ export function HomeScreen({
       </div>
       <div className="absolute inset-x-0 top-[73%] z-20 flex justify-center px-6 [@media(min-aspect-ratio:1/1)]:left-[calc(50%+8rem)] [@media(min-aspect-ratio:1/1)]:right-auto [@media(min-aspect-ratio:1/1)]:top-[71%] [@media(min-aspect-ratio:1/1)]:w-80 [@media(min-aspect-ratio:1/1)]:px-0">
         <ModeChoice mode="rare" dateKey={dateKey} onPlay={onPlay} />
+      </div>
+
+      {/* Freunde-Modus: unter dem Abstieg, über dem Countdown */}
+      <div className="absolute inset-x-0 bottom-[calc(max(0.75rem,env(safe-area-inset-bottom))+1.6rem)] z-20 flex justify-center px-6 [@media(min-aspect-ratio:1/1)]:left-[calc(50%+8rem)] [@media(min-aspect-ratio:1/1)]:right-auto [@media(min-aspect-ratio:1/1)]:w-80 [@media(min-aspect-ratio:1/1)]:px-0">
+        <PxButton tone="gold" small onClick={onFriends} className="w-full max-w-xs text-lg">
+          👥 {t('friends.home')}
+        </PxButton>
       </div>
 
       <p className="absolute inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-20 text-center text-sm text-[#f3e2bb] px-shadow">

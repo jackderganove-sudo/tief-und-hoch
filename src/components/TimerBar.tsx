@@ -6,7 +6,20 @@ import type { Mode } from '../domain/types';
  * Schrumpfender Zeitbalken in Pixel-Segmenten. Rechnet mit einer festen
  * Deadline – stimmt auch nach Tab-Wechsel oder Reload.
  */
-export function TimerBar({ deadline, mode, onExpire, paused = false }: { deadline: number; mode: Mode; onExpire: () => void; paused?: boolean }) {
+export function TimerBar({
+  deadline,
+  mode,
+  onExpire,
+  paused = false,
+  totalMs = SECONDS_PER_QUESTION * 1000,
+}: {
+  deadline: number;
+  mode: Mode;
+  onExpire: () => void;
+  paused?: boolean;
+  /** Gesamtdauer (Freunde-Modus: 15/25/40 s) */
+  totalMs?: number;
+}) {
   const bar = useRef<HTMLDivElement>(null);
   const label = useRef<HTMLSpanElement>(null);
   const expired = useRef(false);
@@ -15,7 +28,7 @@ export function TimerBar({ deadline, mode, onExpire, paused = false }: { deadlin
 
   useEffect(() => {
     expired.current = false;
-    const total = SECONDS_PER_QUESTION * 1000;
+    const total = totalMs;
     let raf = 0;
     const tick = () => {
       const left = Math.max(0, deadline - Date.now());
@@ -43,7 +56,7 @@ export function TimerBar({ deadline, mode, onExpire, paused = false }: { deadlin
     }
     tick();
     return () => cancelAnimationFrame(raf);
-  }, [deadline, paused]);
+  }, [deadline, paused, totalMs]);
 
   const fill =
     mode === 'rare'

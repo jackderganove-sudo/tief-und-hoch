@@ -441,6 +441,39 @@ const GLYPHS: Record<string, string[]> = {
   ' ': ['.', '.', '.', '.', '.'],
 };
 
+/** Kleiner Ballon (17×30) in einer Spielerfarbe – Mitspieler im Freunde-Modus. */
+export function miniBalloonSprite(color: string): Sprite {
+  const [c, ctx] = canvas(17, 30);
+  const dark = shadeHex(color, -0.35);
+  const light = shadeHex(color, 0.35);
+  for (let y = 0; y < 19; y++) {
+    const half = y < 9 ? Math.round(Math.sqrt(1 - ((9 - y) / 9) ** 2) * 8) : Math.round(8 * (1 - ((y - 9) / 10) ** 1.6 * 0.75));
+    for (let x = -half; x <= half; x++) {
+      let col = x > half * 0.45 ? dark : x < -half * 0.4 && y < 12 ? light : color;
+      if (Math.abs(x) <= 1 && y > 1) col = '#f6e2b3'; // Mittelbahn
+      if (x === -half || x === half || y === 0) col = '#3a2030';
+      ctx.fillStyle = col;
+      ctx.fillRect(8 + x, y, 1, 1);
+    }
+  }
+  ctx.fillStyle = '#5b4636';
+  ctx.fillRect(5, 19, 1, 5);
+  ctx.fillRect(11, 19, 1, 5);
+  ctx.fillStyle = '#3a2030';
+  ctx.fillRect(5, 24, 7, 1);
+  ctx.fillStyle = '#a8703c';
+  ctx.fillRect(5, 25, 7, 4);
+  ctx.fillStyle = '#7a4e28';
+  ctx.fillRect(5, 28, 7, 1);
+  return c;
+}
+
+function shadeHex(hex: string, amt: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const f = (v: number) => Math.max(0, Math.min(255, Math.round(amt < 0 ? v * (1 + amt) : v + (255 - v) * amt)));
+  return `#${[(n >> 16) & 255, (n >> 8) & 255, n & 255].map((v) => f(v).toString(16).padStart(2, '0')).join('')}`;
+}
+
 /** Holzschild mit Text wie "-500 m". */
 export function signSprite(text: string): Sprite {
   const glyphs = [...text].map((ch) => GLYPHS[ch] ?? GLYPHS[' ']);

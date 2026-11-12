@@ -8,7 +8,8 @@
  * Abgabe nach Ablauf abgelehnt, Antworten erst in der Auflösung sichtbar,
  * Realtime-Ankündigungen, Endstand.
  */
-import { assert, bots, call, sleep, state } from './lib/room-bots.mjs';
+import { assert, bots, call, listAnswers, sleep, state } from './lib/room-bots.mjs';
+const smart = process.argv.includes('--smart');
 const N = Number(process.argv.find((a) => /^\d+$/.test(a)) ?? 3);
 const joinCode = process.argv.find((a) => a.startsWith('--code='))?.slice(7);
 
@@ -44,6 +45,7 @@ if (joinCode) {
 }
 
 let lastIdx = -1;
+const smartCache = {};
 let checkedLate = false;
 for (;;) {
   const st = await state(host, code);
@@ -63,7 +65,13 @@ for (;;) {
         if (p === lateBot) return;
         await sleep(Math.random() * 1500);
         const words = ANSWERS.de;
-        const r = await call(p, 'answer', { code, idx: st.index, answer: words[(i * 7 + st.index) % (i % 3 === 0 ? 2 : words.length)] });
+        // --smart: echte Antworten aus der Liste (nur Test, über die Verwaltungs-API) – mal gleich, mal selten
+        let text = words[(i * 7 + st.index) % (i % 3 === 0 ? 2 : words.length)];
+        if (smart && !st.question?.custom) {
+          const list = (smartCache[st.index] ??= await listAnswers(code, st.index)).slice().sort((a, b) => b.baseScore - a.baseScore);
+          if (list.length) text = list[[0, 0, 1, 2, list.length - 1, 1, 3, 0][i % 8] % list.length].text;
+        }
+        const r = await call(p, 'answer', { code, idx: st.index, answer: text });
         assert(r.status === 200, `answer ${p.name}: ${JSON.stringify(r.body)}`);
       }),
     );

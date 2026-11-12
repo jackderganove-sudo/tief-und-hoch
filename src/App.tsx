@@ -12,6 +12,9 @@ import { ResultScreen } from './screens/ResultScreen';
 import { PracticeScreen } from './screens/PracticeScreen';
 import { UpdateToast } from './pwa/UpdateToast';
 import { AccountNotice } from './components/AccountSheet';
+import { urlRoomCode } from './friends/roomUrl';
+// Freunde-Modus: eigener Chunk, wird erst beim Öffnen geladen
+const FriendsScreen = lazy(() => import('./friends/FriendsScreen').then((m) => ({ default: m.FriendsScreen })));
 
 // Schwebendes Debug-Panel nur im Dev-Server (?debug=1). Im Live-Build gibt es Debug nur
 // über das Admin-Dashboard (serverseitig geprüfter Admin) – dann zeigt die App nur ein Abzeichen.
@@ -34,12 +37,17 @@ const adminRoute = /\/admin\/?$/.test(location.pathname);
 type Screen =
   | { name: 'home' }
   | { name: 'practice' }
+  | { name: 'friends'; code: string | null }
   | { name: 'game'; mode: Mode; dateKey: string } | { name: 'result'; mode: Mode; dateKey: string };
 
 export default function App() {
   useTranslation(); // bei Sprachwechsel neu rendern
   const today = useBerlinDay();
-  const [screen, setScreen] = useState<Screen>({ name: 'home' });
+  // Einladungslink ?room=CODE öffnet direkt den Raum
+  const [screen, setScreen] = useState<Screen>(() => {
+    const code = urlRoomCode();
+    return code ? { name: 'friends', code } : { name: 'home' };
+  });
   // Erhöht sich bei Debug-Aktionen, damit die Startseite Stände neu einliest.
   const [refresh, setRefresh] = useState(0);
   const debug = useSyncExternalStore(subscribeDebug, isDebug);
@@ -83,7 +91,20 @@ export default function App() {
 
   return (
     <MotionConfig reducedMotion="user">
-      {screen.name === 'home' && <HomeScreen key={`${today}-${refresh}-${debug}`} dateKey={today} onPlay={open} onPractice={() => setScreen({ name: 'practice' })} />}
+      {screen.name === 'home' && (
+        <HomeScreen
+          key={`${today}-${refresh}-${debug}`}
+          dateKey={today}
+          onPlay={open}
+          onPractice={() => setScreen({ name: 'practice' })}
+          onFriends={() => setScreen({ name: 'friends', code: null })}
+        />
+      )}
+      {screen.name === 'friends' && (
+        <Suspense fallback={null}>
+          <FriendsScreen initialCode={screen.code} onExit={() => setScreen({ name: 'home' })} />
+        </Suspense>
+      )}
       {screen.name === 'practice' && <PracticeScreen lang={currentLang()} dateKey={today} onExit={() => setScreen({ name: 'home' })} />}
       {screen.name === 'game' && (
         <GameScreen
@@ -106,7 +127,7 @@ export default function App() {
       )}
       {/* Update-Hinweis nie während einer Runde (Tagesspiel oder Übung) */}
       <UpdateToast hidden={screen.name === 'game' || screen.name === 'practice'} />
-      {screen.name !== 'game' && <AccountNotice />}
+      {screen.name !== 'game' && screen.name !== 'friends' && <AccountNotice />}
       {debug && !DebugPanel && <DebugBadge />}
       {DebugPanel && debug && (
         <Suspense fallback={null}>

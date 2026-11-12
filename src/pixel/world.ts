@@ -27,6 +27,7 @@ import {
   satelliteSprite,
   signSprite,
   sunSprite,
+  miniBalloonSprite,
   type Sprite,
 } from './sprites';
 
@@ -62,6 +63,17 @@ export interface ViewState {
   show: { explorer: boolean; balloon: boolean; cave: boolean };
   /** Welt-x des Ballons (Startseite: über dem Schacht, sonst sein Startplatz). */
   balloonX: number;
+  /** Freunde-Modus: die anderen Spieler (eigene Seile bzw. Ballons). */
+  crew?: CrewMember[];
+}
+
+/** Ein anderer Spieler in der Szene (Freunde-Modus). */
+export interface CrewMember {
+  /** Welt-x relativ zur eigenen Figur */
+  x: number;
+  meters: number;
+  color: string;
+  mood: Mood;
 }
 
 interface Particle {
@@ -426,6 +438,7 @@ export class World {
     }
     if (groundY > -60 && groundY < H + 200) this.drawSurface(ctx, W, ox, groundY, v.show.cave);
 
+    if (v.crew) for (const c of v.crew) v.show.cave ? this.drawCrewExplorer(ctx, v, c, ox, oy, groundY) : this.drawCrewBalloon(ctx, v, c, ox, groundY);
     if (v.show.explorer) this.drawExplorer(ctx, v, ox, oy, groundY);
     if (v.show.balloon) this.drawBalloon(ctx, v, ox, groundY);
 
@@ -477,6 +490,49 @@ export class World {
     const shake = v.explorerMood === 'flinch' ? Math.round(Math.sin(v.time * 40) * 1) : 0;
     ctx.drawImage(frame, ox - 7 + sway + shake, ey - 9);
     this.lights.push([ox + 5 + sway, ey - 5, 72, '#ffe9a8']);
+  }
+
+  /** Mitspieler im Abstieg: eigenes Seil, kleine Figur mit Hemd in Spielerfarbe. */
+  private drawCrewExplorer(ctx: CanvasRenderingContext2D, v: ViewState, c: CrewMember, ox: number, oy: number, groundY: number) {
+    const x = ox + Math.round(c.x);
+    const ey = Math.round(c.meters * PPM) + oy;
+    const ropeTop = Math.max(-2, groundY - 34);
+    ctx.fillStyle = '#b8935e';
+    if (ey - 6 > ropeTop) ctx.fillRect(x, ropeTop, 1, ey - 6 - ropeTop);
+    const bob = v.calm ? 0 : Math.round(Math.sin(v.time * 1.6 + c.x) * 1);
+    const jump = c.mood === 'cheer' && Math.floor(v.time * 6) % 2 ? -2 : 0;
+    const shake = c.mood === 'flinch' ? Math.round(Math.sin(v.time * 40) * 1) : 0;
+    const fx = x - 3 + bob + shake;
+    const fy = ey - 6 + jump;
+    const r = (dx: number, dy: number, w: number, h: number, col: string) => {
+      ctx.fillStyle = col;
+      ctx.fillRect(fx + dx, fy + dy, w, h);
+    };
+    r(1, 0, 5, 2, '#f2d03a'); // Helm
+    r(3, 0, 1, 1, '#fff3a0'); // Lampe
+    r(1, 2, 5, 2, '#f2c48d'); // Gesicht
+    r(2, 2, 1, 1, '#2a2030');
+    r(4, 2, 1, 1, '#2a2030');
+    r(0, 4, 7, 3, c.color); // Hemd in Spielerfarbe
+    if (c.mood === 'cheer') {
+      r(0, 1, 1, 3, c.color);
+      r(6, 1, 1, 3, c.color);
+    }
+    r(1, 7, 2, 2, '#3a2a40');
+    r(4, 7, 2, 2, '#3a2a40');
+    this.lights.push([x, fy + 2, 34, '#ffe9a8']);
+  }
+
+  private crewBalloons = new Map<string, Sprite>();
+  /** Mitspieler im Aufstieg: kleiner Ballon in Spielerfarbe. */
+  private drawCrewBalloon(ctx: CanvasRenderingContext2D, v: ViewState, c: CrewMember, ox: number, groundY: number) {
+    let s = this.crewBalloons.get(c.color);
+    if (!s) this.crewBalloons.set(c.color, (s = miniBalloonSprite(c.color)));
+    const by = groundY - Math.round(c.meters * PPM);
+    const bob = v.calm ? 0 : Math.round(Math.sin(v.time * 1.3 + c.x * 0.1) * 1.5);
+    const shake = c.mood === 'flinch' ? Math.round(Math.sin(v.time * 36) * 1) : 0;
+    const jump = c.mood === 'cheer' && Math.floor(v.time * 5) % 2 ? -2 : 0;
+    ctx.drawImage(s, ox + v.balloonX + Math.round(c.x) - 8 + shake, by - 30 + bob + jump);
   }
 
   private drawBalloon(ctx: CanvasRenderingContext2D, v: ViewState, ox: number, groundY: number) {

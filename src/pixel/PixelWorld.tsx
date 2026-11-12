@@ -3,7 +3,7 @@ import { setThemeColor } from '../pwa/themeColor';
 import { systemBarColor } from './barColors';
 import type { TierId } from '../domain/types';
 import { loadImages } from './assets';
-import { BALLOON_X, PPM, World, type ViewState } from './world';
+import { BALLOON_X, PPM, World, type CrewMember, type ViewState } from './world';
 
 export type WorldView = 'home' | 'rare' | 'common';
 
@@ -12,6 +12,31 @@ export interface WorldFx {
   key: number;
   tier: TierId;
   points: number;
+}
+
+/** Freunde-Modus: ein Spieler in der Szene (die eigene Figur hat me = true). */
+export interface CrewInput {
+  id: string;
+  name: string;
+  color: string;
+  meters: number;
+  me?: boolean;
+  mood?: 'idle' | 'cheer' | 'flinch';
+  /** Namensschild zeigen (bei vielen Spielern nur ausgewählte) */
+  label?: boolean;
+}
+
+/** x-Versatz der Mitspieler: links/rechts neben der eigenen Figur, bei vielen enger (gestaffelt). */
+export function crewOffsets(n: number, view: WorldView): number[] {
+  const rare = view === 'rare';
+  const inner = rare ? 9 : 24;
+  const outer = rare ? 42 : 96;
+  const perSide = Math.ceil(n / 2);
+  const step = perSide <= 1 ? 0 : Math.min(rare ? 9 : 22, (outer - inner) / (perSide - 1));
+  return Array.from({ length: n }, (_, i) => {
+    const k = Math.floor(i / 2);
+    return (i % 2 ? -1 : 1) * (inner + k * step);
+  });
 }
 
 /** Startseite: Schacht im linken, Ballon im rechten Drittel – auch auf breiten Bildschirmen. */
@@ -40,13 +65,16 @@ const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 
  * Figur dorthin; je weiter der Weg, desto länger die Fahrt. Bei der Ankunft
  * wird `fx` ausgelöst (Partikel, Jubel bei 100 Punkten, Zucken bei 0).
  */
-export function PixelWorld({ view, meters = 0, fx = null }: { view: WorldView; meters?: number; fx?: WorldFx | null }) {
+export function PixelWorld({ view, meters = 0, fx = null, crew }: { view: WorldView; meters?: number; fx?: WorldFx | null; crew?: CrewInput[] }) {
   const wrap = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const target = useRef(meters);
   const fxRef = useRef<WorldFx | null>(fx);
+  const crewRef = useRef<CrewInput[] | undefined>(crew);
+  const labels = useRef(new Map<string, HTMLDivElement>());
   target.current = meters;
   fxRef.current = fx;
+  crewRef.current = crew;
 
   useEffect(() => {
     const el = wrap.current!;
@@ -58,13 +86,15 @@ export function PixelWorld({ view, meters = 0, fx = null }: { view: WorldView; m
     let stopped = false;
     let W = 200;
     let H = 300;
+    let scale = 2;
+    const crewShown = new Map<string, number>();
 
     const resize = () => {
       const cw = el.clientWidth;
       const ch = el.clientHeight;
       // ganzzahliger Maßstab: virtuelle Breite ca. 180–360 px
       // Startseite etwas weiter herausgezoomt, damit Ballon und Höhleneingang übereinander passen
-      const scale = Math.max(2, Math.min(6, Math.floor(Math.min(cw / 180, ch / (view === 'home' ? 300 : 200)))));
+      scale = Math.max(2, Math.min(6, Math.floor(Math.min(cw / 180, ch / (view === 'home' ? 300 : 200)))));
       W = Math.ceil(cw / scale);
       H = Math.ceil(ch / scale);
       cv.width = W;
@@ -149,6 +179,38 @@ export function PixelWorld({ view, meters = 0, fx = null }: { view: WorldView; m
         show: { explorer: view !== 'common', balloon: view !== 'rare', cave: view !== 'common' },
         balloonX: view === 'home' ? 0 : BALLOON_X,
       };
+
+      // Freunde-Modus: Mitspieler gleiten zu ihren Punkten; Kamera folgt der eigenen Figur
+      const all = crewRef.current;
+      const ox = Math.round(W / 2 - state.camX);
+      const oy = Math.round(state.anchorY - state.camY);
+      if (all && view !== 'home') {
+        const others = all.filter((c) => !c.me);
+        const xs = crewOffsets(others.length, view);
+        state.crew = others.map((c, i): CrewMember => {
+          const prev = crewShown.get(c.id) ?? c.meters;
+          const goal = view === 'rare' ? Math.min(c.meters, MAX_DEPTH_M) : c.meters;
+          const next = calm || Math.abs(goal - prev) < 2 ? goal : prev + (goal - prev) * Math.min(1, dt * 1.6);
+          crewShown.set(c.id, next);
+          return { x: xs[i], meters: next, color: c.color, mood: c.mood ?? 'idle' };
+        });
+        // Namensschilder (DOM, gestochen scharf) über den Figuren
+        others.forEach((c, i) => {
+          const el = labels.current.get(c.id);
+          if (!el) return;
+          const m = crewShown.get(c.id) ?? 0;
+          const x = view === 'rare' ? ox + xs[i] : ox + BALLOON_X + xs[i];
+          const y = view === 'rare' ? oy + m * PPM - 9 : oy - m * PPM - 33;
+          el.style.transform = `translate(${x * scale}px, ${y * scale}px) translate(-50%, -100%)`;
+        });
+        const mine = all.find((c) => c.me);
+        const el = mine && labels.current.get(mine.id);
+        if (el) {
+          const x = view === 'rare' ? ox : ox + BALLOON_X;
+          const y = view === 'rare' ? oy + pos * PPM - 12 : oy - pos * PPM - 78;
+          el.style.transform = `translate(${x * scale}px, ${y * scale}px) translate(-50%, -100%)`;
+        }
+      }
       world.draw(ctx, W, H, state, dt);
       // Systemleisten: feste Farbe je Ort (Himmel nach Höhe, Höhle nach Zone)
       if (now - lastTheme > 300) {
@@ -184,6 +246,21 @@ export function PixelWorld({ view, meters = 0, fx = null }: { view: WorldView; m
   return (
     <div ref={wrap} className="absolute inset-0 overflow-hidden bg-[#0b0b22]" aria-hidden>
       <canvas ref={canvasRef} className="pixelated absolute left-0 top-0" />
+      {crew
+        ?.filter((c) => c.label !== false)
+        .map((c) => (
+          <div
+            key={c.id}
+            ref={(el) => {
+              if (el) labels.current.set(c.id, el);
+              else labels.current.delete(c.id);
+            }}
+            className={`pointer-events-none absolute left-0 top-0 max-w-[6rem] truncate whitespace-nowrap px-1 text-[0.7rem] font-bold leading-4 text-white ${c.me ? 'z-10 ring-1 ring-white' : ''}`}
+            style={{ background: c.color, transform: 'translate(-999px, -999px)' }}
+          >
+            {c.name}
+          </div>
+        ))}
     </div>
   );
 }
