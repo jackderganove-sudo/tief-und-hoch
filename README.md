@@ -142,7 +142,7 @@ Frontend kennt nur Supabase-URL und anon key, der Gemini-Key liegt als Supabase-
 - **Anmeldung:** anonym (Supabase Anonymous Sign-In) – jeder Spieler hat eine ID.
 - **Ablauf:** Cache auf dem Gerät (localStorage, wird bei neuer App-Version geleert) →
   Edge Function: Cache `ai_verdicts` → Limit (30 KI-Prüfungen pro Spieler in 24 h,
-  1000 insgesamt) → Gemini (Timeout ≈ 3,3 s, im Spiel max. 4 s) → Urteil cachen.
+  1000 insgesamt) → Gemini (≈ 4,7 s, im Spiel max. 6 s mit Lade-Animation) → Urteil cachen.
   Fehler/Timeout/Limit: ungültig, aber „Konnte nicht geprüft werden“.
 - **Wertung:** Abstieg nach geschätzter Häufigkeit, höchstens „Glut“ (85) – der Kern
   bleibt Listen-Antworten vorbehalten. Aufstieg: nicht in der Liste = „Wiese“ (10).
@@ -164,8 +164,11 @@ node scripts/smoke-judge.mjs de-food-001 Mangold Gemüse     # Live-Test der Fun
 Im Supabase-SQL-Editor z. B.:
 `select kind, count(*), round(avg(ms)) from ai_judge_log where created_at > now() - interval '1 day' group by kind;`
 
-Optionale Function-Secrets: `GEMINI_MODEL` (Standard `gemini-3.5-flash-lite` – `gemini-3.8-flash` war
-im Test oft langsamer als das Zeitlimit), `GEMINI_THINKING` (`minimal`), `AI_USER_DAILY_LIMIT` (30), `AI_GLOBAL_DAILY_LIMIT` (1000).
+Modell: `gemini-3.8-flash` (genauer). Ist es nach 2 s nicht fertig oder scheitert (503 Überlastung),
+läuft `gemini-3.5-flash-lite` parallel mit; 3.8 Flash gewinnt, wenn es bis 4,7 s antwortet.
+`ai_verdicts.model` zeigt, welches Modell geurteilt hat.
+Optionale Function-Secrets: `GEMINI_MODEL`, `GEMINI_THINKING` (`low`), `GEMINI_FALLBACK_MODEL`
+(leer = kein Ersatz), `GEMINI_FALLBACK_THINKING` (`minimal`), `AI_USER_DAILY_LIMIT` (30), `AI_GLOBAL_DAILY_LIMIT` (1000).
 
 ## Übungsmodus
 

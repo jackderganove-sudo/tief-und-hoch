@@ -4,7 +4,7 @@ import type { AnswerJudge } from '../AnswerJudge';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, ensureSession } from './client';
 
 /** Höchstens so lange wartet das Spiel auf die KI-Prüfung. */
-export const JUDGE_TIMEOUT_MS = 4000;
+export const JUDGE_TIMEOUT_MS = 6000;
 
 interface JudgeResponse {
   status: AiVerdict['status'];

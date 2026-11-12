@@ -23,10 +23,16 @@ import {
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
 
-// Flash-Lite mit minimalem Denken: zuverlässig unter 3 s (3.8 Flash lag oft über dem Timeout).
-const MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-3.5-flash-lite';
-const THINKING = Deno.env.get('GEMINI_THINKING') ?? 'minimal';
-const GEMINI_TIMEOUT_MS = 3300;
+// Genauigkeit vor Tempo – das Urteil wird ohnehin gecacht.
+const MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-3.8-flash';
+const THINKING = Deno.env.get('GEMINI_THINKING') ?? 'low';
+/** Springt ein, wenn das Hauptmodell überlastet (503) oder zu langsam ist. Leer = kein Ersatz. */
+const FALLBACK_MODEL = Deno.env.get('GEMINI_FALLBACK_MODEL') ?? 'gemini-3.5-flash-lite';
+const FALLBACK_THINKING = Deno.env.get('GEMINI_FALLBACK_THINKING') ?? 'minimal';
+/** Das Spiel wartet 6 s; der Rest bleibt für Anmeldung, Cache, Netz und Antwort. */
+const GEMINI_TIMEOUT_MS = 4700;
+/** Ist das Hauptmodell bis dahin nicht fertig, startet das Ersatzmodell parallel. */
+const HEDGE_AFTER_MS = 2000;
 /** KI-Anfragen (ohne Cache-Treffer) pro Spieler in 24 Stunden. */
 const USER_LIMIT = Number(Deno.env.get('AI_USER_DAILY_LIMIT') ?? 30);
 /** Schutz des Gratis-Kontingents: KI-Anfragen aller Spieler in 24 Stunden. */
@@ -71,39 +77,91 @@ function background(p: PromiseLike<unknown>) {
   if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(task);
 }
 
-function log(userId: string, questionId: string, kind: string, ms?: number) {
-  background(admin.from('ai_judge_log').insert({ user_id: userId, question_id: questionId, kind, ms: ms ?? null }));
+function log(userId: string, questionId: string, kind: string, ms?: number, detail?: string) {
+  background(admin.from('ai_judge_log').insert({ user_id: userId, question_id: questionId, kind, ms: ms ?? null, detail: detail?.slice(0, 400) ?? null }));
 }
 
-async function askGeminiOnce(question: JudgeQuestion, answer: string, timeoutMs: number) {
+async function askGeminiOnce(model: string, thinking: string, question: JudgeQuestion, answer: string, timeoutMs: number) {
   const key = Deno.env.get('GEMINI_API_KEY');
   if (!key) throw new Error('GEMINI_API_KEY fehlt');
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-    body: JSON.stringify(geminiRequestBody(question, answer, THINKING)),
+    body: JSON.stringify(geminiRequestBody(question, answer, thinking)),
     signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) {
     // Nur Status und Fehlermeldung von Google loggen – nie Header oder Key.
     const detail = await res.text().catch(() => '');
-    throw new Error(`Gemini ${res.status}: ${detail.slice(0, 300)}`);
+    throw new Error(`${model} ${res.status}: ${detail.replace(/\s+/g, ' ').slice(0, 200)}`);
   }
   const result = parseModelOutput(extractText(await res.json()), question);
-  if (!result) throw new Error('unlesbare KI-Antwort');
+  if (!result) throw new Error(`${model}: unlesbare KI-Antwort`);
   return result;
 }
 
-/** Ein schneller Fehlschlag (z. B. 503) wird einmal wiederholt – innerhalb desselben Zeitbudgets. */
-async function askGemini(question: JudgeQuestion, answer: string) {
-  const deadline = Date.now() + GEMINI_TIMEOUT_MS;
+type Verdict = Awaited<ReturnType<typeof askGeminiOnce>>;
+
+/** Ersatzmodell; scheitert es schnell (z. B. 503), ein zweiter Versuch bis zur Deadline. */
+async function askFallback(question: JudgeQuestion, answer: string, deadline: number): Promise<Verdict> {
   try {
-    return await askGeminiOnce(question, answer, GEMINI_TIMEOUT_MS);
+    return await askGeminiOnce(FALLBACK_MODEL, FALLBACK_THINKING, question, answer, Math.max(500, deadline - Date.now()));
   } catch (e) {
-    const left = deadline - Date.now();
-    if (left < 1200) throw e;
-    console.warn('judge retry', String(e).slice(0, 200));
-    return await askGeminiOnce(question, answer, left);
+    if (deadline - Date.now() < 1500) throw e;
+    return await askGeminiOnce(FALLBACK_MODEL, FALLBACK_THINKING, question, answer, deadline - Date.now());
+  }
+}
+
+/**
+ * Sperre für das Hauptmodell (pro Funktions-Instanz): nach 429 (Kontingent
+ * erschöpft) 10 min, nach 503 (Überlastung) 1 min – solange urteilt direkt
+ * das Ersatzmodell mit voller Zeit.
+ */
+let primaryBlockedUntil = 0;
+function notePrimaryFailure(e: unknown) {
+  const msg = String(e);
+  const pause = / 429:/.test(msg) ? 10 * 60_000 : / 503:/.test(msg) ? 60_000 : 0;
+  if (pause) primaryBlockedUntil = Math.max(primaryBlockedUntil, Date.now() + pause);
+}
+
+/**
+ * Hauptmodell zuerst. Ist es nach 2 s nicht fertig oder scheitert vorher
+ * (z. B. 503 Überlastung), läuft das Ersatzmodell parallel mit. Das Urteil des
+ * Hauptmodells gewinnt, wenn es rechtzeitig kommt; sonst zählt das Ersatzmodell.
+ * Liefert auch, welches Modell geurteilt hat.
+ */
+async function askGemini(question: JudgeQuestion, answer: string): Promise<Verdict & { model: string; fallbackReason?: string }> {
+  const t0 = Date.now();
+  if (FALLBACK_MODEL && Date.now() < primaryBlockedUntil) {
+    const r = await askFallback(question, answer, t0 + GEMINI_TIMEOUT_MS);
+    return { model: FALLBACK_MODEL, fallbackReason: `${MODEL} pausiert (429/503)`, ...r };
+  }
+  const primary = askGeminiOnce(MODEL, THINKING, question, answer, GEMINI_TIMEOUT_MS);
+  primary.catch(notePrimaryFailure);
+  if (!FALLBACK_MODEL) return { model: MODEL, ...(await primary) };
+
+  let primaryError: unknown = null;
+  const primarySettled = primary.then(
+    () => true,
+    (e) => ((primaryError = e), false),
+  );
+  // Ersatzmodell starten: nach HEDGE_AFTER_MS oder sofort bei einem Fehler des Hauptmodells
+  await Promise.race([primarySettled, new Promise((r) => setTimeout(r, HEDGE_AFTER_MS))]);
+  if (primaryError === null && (await Promise.race([primarySettled, Promise.resolve(null)])) === true) {
+    return { model: MODEL, ...(await primary) };
+  }
+  const fallback = askFallback(question, answer, t0 + GEMINI_TIMEOUT_MS);
+
+  try {
+    return { model: MODEL, ...(await primary) };
+  } catch (e) {
+    try {
+      return { model: FALLBACK_MODEL, fallbackReason: String(e), ...(await fallback) };
+    } catch (e2) {
+      throw new Error(`${String(e).slice(0, 190)} | ${String(e2).slice(0, 190)}`);
+    }
+  } finally {
+    fallback.catch(() => {}); // unbenutztes Ersatz-Ergebnis still verwerfen
   }
 }
 
@@ -174,8 +232,8 @@ Deno.serve(async (req) => {
 
   const t0 = Date.now();
   try {
-    const result = await askGemini(question, answer);
-    log(user.id, questionId, 'model', Date.now() - t0);
+    const { model, fallbackReason, ...result } = await askGemini(question, answer);
+    log(user.id, questionId, 'model', Date.now() - t0, fallbackReason ? `Ersatzmodell ${model} – ${fallbackReason}` : undefined);
     background(
       admin.from('ai_verdicts').upsert(
         {
@@ -186,7 +244,7 @@ Deno.serve(async (req) => {
           list_answer: result.list_answer,
           estimated_base_score: result.estimated_base_score,
           reason: result.reason,
-          model: MODEL,
+          model,
         },
         { onConflict: 'question_id,normalized_answer', ignoreDuplicates: true },
       ),
@@ -194,7 +252,7 @@ Deno.serve(async (req) => {
     return json(verdict(result));
   } catch (e) {
     console.error('judge failed', questionId, Date.now() - t0, 'ms', String(e));
-    log(user.id, questionId, 'error', Date.now() - t0);
+    log(user.id, questionId, 'error', Date.now() - t0, String(e));
     return json(verdict({ status: 'error' }));
   }
 });
