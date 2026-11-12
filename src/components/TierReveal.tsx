@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { pointsToMeters } from '../domain/scoring';
@@ -39,11 +38,9 @@ export function TierReveal({
   const rarest = [...question.answers].filter((a) => !a.tooClever).sort((a, b) => a.baseScore - b.baseScore)[0];
 
   const ai = result.source === 'ai';
-  const listedByAi = ai && result.matched !== null && question.answers.some((a) => a.text === result.matched);
 
-  const [showAiHint, setShowAiHint] = useState(false);
-  // KI-Badge direkt hinter der gewerteten (bzw. abgelehnten) Antwort
-  const badge = ai && !result.unchecked ? <AiBadge mode={mode} open={showAiHint} onToggle={() => setShowAiHint((v) => !v)} /> : null;
+  // KI-Badge direkt hinter der gewerteten (bzw. abgelehnten) Antwort; Erklärung nur als Tooltip
+  const badge = ai && !result.unchecked ? <AiBadge mode={mode} /> : null;
 
   let detail: React.ReactNode;
   if (result.matched) detail = <>{t('game.countedAs', { answer: result.matched })}{badge}</>;
@@ -53,8 +50,6 @@ export function TierReveal({
   else if (ai) detail = <>„{result.input}“{badge} – {t('game.aiRejected')}</>;
   else detail = `„${result.input}“ – ${t('game.invalid')}`;
 
-  let aiHint: string | null = null;
-  if (ai && result.matched && !listedByAi) aiHint = rare ? (result.tier === 'ember' ? t('game.aiCapRare') : null) : t('game.aiCommon');
 
   return (
     <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }} transition={{ duration: 0.22 }} aria-live="polite">
@@ -78,8 +73,6 @@ export function TierReveal({
         </div>
         {result.tier === 'tooClever' && <p className="mt-2 text-sm opacity-85">{t('tierHints.tooClever')}</p>}
         <p className="mt-3 text-lg leading-tight">{detail}</p>
-        {showAiHint && <p className="mt-1 text-sm leading-snug opacity-85">{t('game.aiBadgeHint')}</p>}
-        {aiHint && <p className="mt-1 text-sm leading-snug opacity-85">{aiHint}</p>}
         <div className="mt-1 text-sm leading-snug opacity-75">
           <p>{t('game.topAnswer', { answer: top.text })}</p>
           {rare && rarest && rarest.text !== result.matched && <p>{t('game.rareAnswer', { answer: rarest.text })}</p>}

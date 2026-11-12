@@ -48,8 +48,6 @@
     "aiRejected": "Not accepted by the AI",
     "unchecked": "Couldn't be checked",
     "uncheckedLimit": "Couldn't be checked (daily AI limit reached)",
-    "aiCapRare": "AI-checked answers go down to Ember at most – the Core is reserved for listed answers.",
-    "aiCommon": "Not on the list – counts as a rare answer.",
     "aiBadge": "AI",
     "aiBadgeHint": "This answer was not on the list and was checked by an AI."
   },

@@ -28,7 +28,6 @@ export function ResultScreen({
   const [record] = useState<DayRecord | null>(() => services.progress.getDay(mode, dateKey));
   const [questions, setQuestions] = useState<Question[]>([]);
   const [toast, setToast] = useState<string | null>(null);
-  const [aiHintRow, setAiHintRow] = useState<number | null>(null);
   const countdown = useCountdown();
   const rare = mode === 'rare';
   const other: Mode = rare ? 'common' : 'rare';
@@ -124,10 +123,9 @@ export function ResultScreen({
                       <p className="flex items-center text-lg">
                         <span className="truncate">{r.matched ?? (r.input.trim() ? `„${r.input}“` : '—')}</span>
                         {r.source === 'ai' && !r.unchecked && (
-                          <AiBadge mode={mode} open={aiHintRow === i} onToggle={() => setAiHintRow((v) => (v === i ? null : i))} />
+                          <AiBadge mode={mode} />
                         )}
                       </p>
-                      {aiHintRow === i && <p className="text-sm leading-snug opacity-85">{t('game.aiBadgeHint')}</p>}
                     </div>
                     <div className="text-right leading-tight">
                       <p className="text-base font-bold" style={{ color: TIER_COLOR[r.tier], textShadow: rare ? '1px 1px 0 #0e0a16' : undefined }}>
