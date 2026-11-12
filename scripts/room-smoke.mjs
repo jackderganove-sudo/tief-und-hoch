@@ -8,52 +8,9 @@
  * Abgabe nach Ablauf abgelehnt, Antworten erst in der Auflösung sichtbar,
  * Realtime-Ankündigungen, Endstand.
  */
-import { createClient } from '@supabase/supabase-js';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
-
-const env = Object.fromEntries(readFileSync('.env.local', 'utf8').split('\n').filter((l) => l.includes('=')).map((l) => l.split(/=(.*)/s).slice(0, 2)));
-const URL = env.VITE_SUPABASE_URL;
-const KEY = env.VITE_SUPABASE_ANON_KEY;
+import { assert, bots, call, sleep, state } from './lib/room-bots.mjs';
 const N = Number(process.argv.find((a) => /^\d+$/.test(a)) ?? 3);
 const joinCode = process.argv.find((a) => a.startsWith('--code='))?.slice(7);
-const SESSIONS = process.env.ROOM_BOT_SESSIONS ?? '/tmp/hal-room-bots.json';
-const assert = (cond, msg) => {
-  if (!cond) {
-    console.error('FEHLER:', msg);
-    process.exit(1);
-  }
-};
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-/** Anonyme Bots; Sitzungen werden wiederverwendet (Supabase begrenzt anonyme Anmeldungen pro Stunde). */
-async function bots(n) {
-  const saved = existsSync(SESSIONS) ? JSON.parse(readFileSync(SESSIONS, 'utf8')) : [];
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    const sb = createClient(URL, KEY, { auth: { persistSession: false, autoRefreshToken: false } });
-    let ok = false;
-    if (saved[i]) ok = !(await sb.auth.refreshSession({ refresh_token: saved[i] })).error;
-    if (!ok) {
-      const { error } = await sb.auth.signInAnonymously();
-      assert(!error, `anonyme Anmeldung ${i}: ${error?.message}`);
-    }
-    const { data } = await sb.auth.getSession();
-    saved[i] = data.session.refresh_token;
-    out.push({ sb, id: data.session.user.id, token: data.session.access_token, name: `Bot ${String.fromCharCode(65 + (i % 26))}${i >= 26 ? i : ''}` });
-  }
-  writeFileSync(SESSIONS, JSON.stringify(saved));
-  return out;
-}
-
-async function call(bot, action, body = {}) {
-  const res = await fetch(`${URL}/functions/v1/room`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bot.token}`, apikey: KEY },
-    body: JSON.stringify({ action, ...body }),
-  });
-  return { status: res.status, body: await res.json() };
-}
-const state = async (bot, code) => (await bot.sb.rpc('room_state', { p_code: code })).data;
 
 const ANSWERS = { de: ['Tomate', 'Apfel', 'Hund', 'Rot', 'Pizza', 'Berlin', 'Fußball', 'Mario'], en: ['Tomato', 'Apple', 'Dog', 'Red', 'Pizza'] };
 

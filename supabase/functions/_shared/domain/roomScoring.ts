@@ -117,7 +117,8 @@ export function scoreQuestion(params: {
     const first = perPlayer[g[0].userId];
     groups.push({
       key,
-      text: g[0].display,
+      // Anzeige: häufigste Schreibweise, bei Gleichstand die mit Großbuchstaben am Anfang
+      text: displayOf(g),
       valid,
       count: g.length,
       players: g.map((a) => a.userId),
@@ -132,6 +133,12 @@ export function scoreQuestion(params: {
   // gültige zuerst, dann nach Anzahl
   groups.sort((a, b) => Number(b.valid) - Number(a.valid) || b.count - a.count || a.text.localeCompare(b.text));
   return { perPlayer, groups, missed };
+}
+
+function displayOf(g: readonly RoomAnswerInput[]): string {
+  const counts = new Map<string, number>();
+  for (const a of g) counts.set(a.display, (counts.get(a.display) ?? 0) + 1);
+  return [...counts].sort((x, y) => y[1] - x[1] || Number(/^\p{Lu}/u.test(y[0])) - Number(/^\p{Lu}/u.test(x[0])) || x[0].localeCompare(y[0]))[0][0];
 }
 
 /** Spieler nach Punkten (Gleichstand: gleicher Platz). */

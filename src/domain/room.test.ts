@@ -122,6 +122,13 @@ describe('Wertung „Global“', () => {
   });
 });
 
+describe('Anzeige der Gruppen', () => {
+  it('nimmt die schönere Schreibweise', () => {
+    const r = scoreQuestion({ mode: 'rare', scoring: 'group', participants: ['a', 'b'], answers: [ans('a', 'rot', true, { display: 'rot' }), ans('b', 'rot', true, { display: 'Rot' })] });
+    expect(r.groups[0].text).toBe('Rot');
+  });
+});
+
 describe('Zwischenstand', () => {
   it('gleiche Punkte = gleicher Platz', () => {
     expect(standings({ a: 300, b: 300, c: 100 })).toEqual([
