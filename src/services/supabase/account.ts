@@ -116,6 +116,12 @@ export async function handleAuthCallback(db: SupabaseClient | null = supabase, h
       return { kind: 'redirecting' };
     }
     writeIntent(null);
+    if (belongsToAccount && !intent) {
+      // Rücksprung landet in einem anderen Tab (z. B. über die Discord-App), der schon angemeldet ist:
+      // die Identität gehört bereits zu einem Konto – nichts zu melden
+      const { data } = await db.auth.getSession();
+      if (data.session?.user && !data.session.user.is_anonymous) return { kind: 'none' };
+    }
     if (belongsToAccount && intent) return { kind: 'error', message: description || errorCode, emailTaken: intent.provider };
     return { kind: 'error', message: description || errorCode };
   }

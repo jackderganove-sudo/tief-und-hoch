@@ -74,6 +74,12 @@ describe('Login: anonymes Konto upgraden statt neu anlegen', () => {
     expect(auth.signInWithOAuth).not.toHaveBeenCalled();
   });
 
+  it('Rücksprung mit „schon verknüpft“ in einem bereits angemeldeten Tab ohne Absicht → kein Fehler', async () => {
+    const { db } = fakeDb({ id: 'existing-account', is_anonymous: false });
+    const url = 'https://x/?error=server_error&error_code=identity_already_exists&error_description=Identity+is+already+linked+to+another+user';
+    expect(await handleAuthCallback(db, url)).toEqual({ kind: 'none' });
+  });
+
   it('ohne anonyme Sitzung → normale Anmeldung', async () => {
     const { db, auth } = fakeDb(null);
     await signInWith('google', db);
