@@ -24,7 +24,7 @@ export default defineConfig({
       // Neue Version nie automatisch aktivieren – die App zeigt einen Hinweis (UpdateToast)
       registerType: 'prompt',
       injectRegister: false,
-      includeAssets: ['apple-touch-icon.png', 'favicon-32.png', 'favicon-64.png', 'robots.txt'],
+      includeAssets: ['apple-touch-icon.png', 'favicon-32.png', 'favicon-64.png'],
       manifest: {
         id: '/',
         name: 'Highs & Lows',
@@ -57,7 +57,7 @@ export default defineConfig({
       workbox: {
         // App-Shell, Code (inkl. Fragen-Chunks), Grafiken, Schriften → offline spielbar
         globPatterns: ['**/*.{js,css,html,png,svg,woff,woff2,webmanifest}'],
-        globIgnores: ['screenshots/**', 'og-image.png', 'google*.html'],
+        globIgnores: ['screenshots/**', 'og-image.png', 'google*.html', 'sitemap.*', 'robots.txt'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         cleanupOutdatedCaches: true,
         // /admin & Co. aus dem Cache – auch der OAuth-Rücksprung (?code=…) landet in der App

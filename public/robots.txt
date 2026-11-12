@@ -5,3 +5,5 @@ Allow: /
 Disallow: /admin
 
 Sitemap: https://playhighsandlows.github.io/sitemap.xml
+
+Sitemap: https://playhighsandlows.github.io/sitemap.txt
