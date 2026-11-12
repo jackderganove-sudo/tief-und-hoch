@@ -13,7 +13,18 @@ export interface WorldFx {
 }
 
 /** Startseite: Schacht im linken, Ballon im rechten Drittel – auch auf breiten Bildschirmen. */
-const homeCamX = (W: number) => BALLOON_X / 2 + Math.max(0, (W - 200) * 0.12);
+/**
+ * Startseite als Querschnitt: Schacht und Ballon auf einer senkrechten Linie in der Mitte.
+ * Diese Verhältnisse (Anteil der Bildschirmhöhe) nutzt auch das Layout in HomeScreen.
+ */
+export const HOME_LAYOUT = {
+  // Hochformat: Titel → Aufstieg-Knopf → Ballon über dem Gerüst | Boden | Forscher → Abstieg-Knopf
+  portrait: { ground: 0.6, balloonTop: 0.32, explorer: 0.67 },
+  // Querformat: Figuren in der Mitte, Knöpfe in einer gemeinsamen Spalte rechts daneben
+  landscape: { ground: 0.64, balloonTop: 0.245, explorer: 0.76 },
+};
+const homeLayout = (W: number, H: number) => (W > H ? HOME_LAYOUT.landscape : HOME_LAYOUT.portrait);
+const BALLOON_H = 74;
 
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
@@ -48,7 +59,8 @@ export function PixelWorld({ view, meters = 0, fx = null }: { view: WorldView; m
       const cw = el.clientWidth;
       const ch = el.clientHeight;
       // ganzzahliger Maßstab: virtuelle Breite ca. 180–360 px
-      const scale = Math.max(2, Math.min(6, Math.floor(Math.min(cw / 180, ch / 200))));
+      // Startseite etwas weiter herausgezoomt, damit Ballon und Höhleneingang übereinander passen
+      const scale = Math.max(2, Math.min(6, Math.floor(Math.min(cw / 180, ch / (view === 'home' ? 300 : 200)))));
       W = Math.ceil(cw / scale);
       H = Math.ceil(ch / scale);
       cv.width = W;
@@ -115,17 +127,20 @@ export function PixelWorld({ view, meters = 0, fx = null }: { view: WorldView; m
 
       const px = shown * PPM;
       const state: ViewState = {
-        camX: view === 'home' ? homeCamX(W) : view === 'rare' ? 0 : BALLOON_X,
+        camX: view === 'common' ? BALLOON_X : 0,
         camY: view === 'rare' ? px : view === 'common' ? -px : 0,
-        anchorY: Math.round(H * (view === 'home' ? 0.55 : view === 'rare' ? 0.7 : 0.86)),
+        anchorY: Math.round(H * (view === 'home' ? homeLayout(W, H).ground : view === 'rare' ? 0.7 : 0.86)),
         time: now / 1000,
-        depth: view === 'rare' ? shown : view === 'home' ? 70 : 0,
-        altitude: view === 'common' ? shown : 0,
+        depth: view === 'rare' ? shown : view === 'home' ? Math.max(30, ((homeLayout(W, H).explorer - homeLayout(W, H).ground) * H) / PPM) : 0,
+        // Startseite: Ballon schwebt im Himmel über dem Gerüst
+        altitude: view === 'common' ? shown : view === 'home' ? Math.max(0, ((homeLayout(W, H).ground - homeLayout(W, H).balloonTop) * H - BALLOON_H) / PPM) : 0,
         explorerMood: view === 'rare' ? mood : 'idle',
         balloonMood: view === 'common' ? mood : 'idle',
         explorerMoving: view === 'rare' && moving,
         balloonRising: view === 'common' && moving && to > from,
         calm,
+        show: { explorer: view !== 'common', balloon: view !== 'rare', cave: view !== 'common' },
+        balloonX: view === 'home' ? 0 : BALLOON_X,
       };
       world.draw(ctx, W, H, state, dt);
     };

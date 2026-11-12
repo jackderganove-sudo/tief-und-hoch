@@ -45,19 +45,19 @@ export function HomeScreen({
       </div>
 
       {/* Titel-Schild oben im Himmel */}
-      <div className="absolute inset-x-0 top-[9%] z-20 flex flex-col items-center px-4">
-        <Panel tone="wood" className="px-2 text-center">
+      <div className="absolute inset-x-0 top-[6.5%] z-20 flex flex-col items-center px-4">
+        <Panel tone="wood" className="max-w-sm px-2 text-center">
           <h1 className="text-4xl font-bold leading-none sm:text-5xl">{t('app.title')}</h1>
           <p className="mt-1 text-sm leading-tight sm:text-base">{t('app.tagline')}</p>
         </Panel>
       </div>
 
-      {/* Querschnitt: Ballon steht rechts auf der Wiese, der Schacht liegt links.
-          Aufstieg links neben dem Ballon im Himmel, Abstieg rechts neben dem Schacht in der Höhle. */}
-      <div className="absolute bottom-[47%] left-0 z-20 w-[60%] max-w-xs pl-3">
+      {/* Querschnitt (Positionen passend zu HOME_LAYOUT in PixelWorld): je Hälfte ein Knopf,
+          gespiegelt um den Horizont – Ballon und Forscher nah am Boden, die Knöpfe nach außen. */}
+      <div className="absolute inset-x-0 top-[21%] z-20 flex justify-center px-6 [@media(min-aspect-ratio:1/1)]:left-[calc(50%+8rem)] [@media(min-aspect-ratio:1/1)]:right-auto [@media(min-aspect-ratio:1/1)]:top-[30%] [@media(min-aspect-ratio:1/1)]:w-80 [@media(min-aspect-ratio:1/1)]:px-0">
         <ModeChoice mode="common" dateKey={dateKey} onPlay={onPlay} />
       </div>
-      <div className="absolute right-0 top-[60%] z-20 w-[60%] max-w-xs pr-3">
+      <div className="absolute inset-x-0 top-[73%] z-20 flex justify-center px-6 [@media(min-aspect-ratio:1/1)]:left-[calc(50%+8rem)] [@media(min-aspect-ratio:1/1)]:right-auto [@media(min-aspect-ratio:1/1)]:top-[71%] [@media(min-aspect-ratio:1/1)]:w-80 [@media(min-aspect-ratio:1/1)]:px-0">
         <ModeChoice mode="rare" dateKey={dateKey} onPlay={onPlay} />
       </div>
 
@@ -106,20 +106,21 @@ function ModeChoice({ mode, dateKey, onPlay }: { mode: Mode; dateKey: string; on
   const meters = pointsToMeters(points);
   const fmt = new Intl.NumberFormat(localeFor(day?.lang ?? currentLang()));
   const action = day?.finished ? t('home.showResult') : day && (day.results.length || day.questionStartedAt) ? t('home.continue') : t('home.play');
+  // Zweite Zeile nur, wenn es etwas zu melden gibt: heutiges Ergebnis oder Serie
   const status = day?.finished
     ? `${rare && meters > 0 ? '−' : ''}${fmt.format(meters)} m · ${points}/${MAX_POINTS}`
     : streak > 0
       ? `🔥 ${t('home.streak', { count: streak })}`
-      : t(`modes.${mode}.tagline`);
+      : null;
 
   return (
-    <motion.div initial={{ opacity: 0, y: rare ? 10 : -10 }} animate={{ opacity: 1, y: 0 }} className="flex w-full flex-col items-stretch gap-1">
-      <PxButton tone={rare ? 'teal' : 'coral'} onClick={() => onPlay(mode)} aria-label={`${t(`modes.${mode}.name`)} – ${action}`} className="w-full text-xl">
+    <motion.div initial={{ opacity: 0, y: rare ? 10 : -10 }} animate={{ opacity: 1, y: 0 }} className="flex w-full max-w-xs flex-col items-stretch gap-1">
+      <PxButton tone={rare ? 'teal' : 'coral'} onClick={() => onPlay(mode)} aria-label={`${t(`modes.${mode}.name`)} – ${action}`} className="w-full text-2xl">
         {rare ? '▼' : '▲'} {t(`modes.${mode}.name`)}
       </PxButton>
       <Panel tone={rare ? 'stone' : 'wood'} className="w-full px-1 text-center text-sm leading-tight [--px:2px]">
-        <span className="font-bold">{action}</span>
-        <span className="block opacity-85">{status}</span>
+        {/* immer genau eine Zeile: Beschreibung – oder, wenn vorhanden, heutiges Ergebnis/Serie */}
+        {status ? <span className="block font-bold">{status}</span> : <span className="block">{t(`modes.${mode}.tagline`)}</span>}
       </Panel>
     </motion.div>
   );

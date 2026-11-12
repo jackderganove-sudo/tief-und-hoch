@@ -24,7 +24,7 @@ const errors = [];
 page.on('pageerror', (e) => errors.push(e.message));
 const shots = [['home', 0]];
 for (const m of [0, 400, 1000, 1700, 2600, 3200, 4200, 4900, 5800, 6800, 7000]) shots.push(['rare', m]);
-for (const m of [0, 300, 800, 1500, 2300, 3100, 3800, 4600, 5300, 6000, 7000]) shots.push(['common', m]);
+for (const m of [0, 100, 300, 800, 1500, 2300, 3100, 3800, 4600, 5300, 6000, 7000]) shots.push(['common', m]);
 for (const [view, m] of shots) {
   await page.goto(`http://localhost:${PORT}/?world=${view}&m=${m}`);
   await sleep(1300);
