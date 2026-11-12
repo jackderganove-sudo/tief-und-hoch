@@ -134,7 +134,7 @@ export function SystemTab() {
         <p className="text-sm leading-snug opacity-85">
           Freigaben gelten sofort für alle Spieler. Dauerhaft ins Repo (Fragen-JSONs) übernimmt sie das Skript – lokal im Projektordner:
         </p>
-        <pre className="mt-2 overflow-x-auto bg-black/40 p-2 text-xs leading-relaxed">
+        <pre className="mt-2 max-w-full overflow-x-auto whitespace-pre-wrap break-all bg-black/40 p-2 text-xs leading-relaxed">
           {`npm run review-ai-answers -- --apply-approved --dry-run
 npm run review-ai-answers -- --apply-approved
 npm run function-data

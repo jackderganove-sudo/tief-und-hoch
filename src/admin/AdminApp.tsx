@@ -174,7 +174,7 @@ function Dashboard({ name, userId, onSignOut }: { name: string; userId: string; 
         </div>
       </nav>
 
-      <main className="mt-2 pb-10">
+      <main className="mt-2 min-w-0 pb-10">
         {tab === 'overview' && <OverviewTab overview={overview} error={overviewError} onRefresh={refreshOverview} onOpenReview={() => setTab('review')} />}
         {tab === 'review' && <ReviewTab onChanged={refreshOverview} />}
         {tab === 'debug' && <DebugTab />}

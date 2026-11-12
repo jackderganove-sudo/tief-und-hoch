@@ -129,9 +129,10 @@ function DebugBadge() {
   return (
     <a
       href={`${import.meta.env.BASE_URL}admin?tab=debug`}
-      className="fixed bottom-3 left-3 z-[100] rounded-full bg-black/80 px-3 py-1.5 font-mono text-xs text-lime-300 shadow-lg"
+      title="Debug-Modus (Sandbox) – zum Admin-Dashboard"
+      className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-3 z-[100] rounded-full bg-black/80 px-2.5 py-1 font-mono text-[0.7rem] text-lime-300 shadow-lg"
     >
-      DEBUG{offset ? ` ${offset > 0 ? '+' : ''}${offset}d` : ''} · Sandbox
+      DEBUG{offset ? ` ${offset > 0 ? '+' : ''}${offset}d` : ''}
     </a>
   );
 }

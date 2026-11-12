@@ -88,7 +88,7 @@ export function Stat({ label, value, hint, color }: { label: string; value: Reac
 
 export function Card({ title, children, className = '', right }: { title: string; children: ReactNode; className?: string; right?: ReactNode }) {
   return (
-    <Panel tone="stone" className={`px-1 ${className}`}>
+    <Panel tone="stone" className={`min-w-0 px-1 ${className}`}>
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-tiny text-xs uppercase tracking-wide opacity-80">{title}</h2>
         {right}
