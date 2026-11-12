@@ -157,10 +157,15 @@ npx supabase db push                       # Migrationen anwenden
 npm run function-data                      # Fragen-Bundle der Funktion (nach Fragen-Änderungen)
 npx supabase functions deploy judge-answer
 npm run review-ai-answers -- --export=packs/ai-review.json   # KI-Antworten sichten/übernehmen
+node scripts/smoke-judge.mjs de-food-001 Mangold Gemüse     # Live-Test der Funktion
 ```
 
-Optionale Function-Secrets: `GEMINI_MODEL` (Standard `gemini-3.8-flash`), `GEMINI_THINKING`
-(`low`), `AI_USER_DAILY_LIMIT` (30), `AI_GLOBAL_DAILY_LIMIT` (1000).
+**Verbrauch:** jede Prüfung steht in `ai_judge_log` (`kind`: model/cache/list/limited/error, `ms`).
+Im Supabase-SQL-Editor z. B.:
+`select kind, count(*), round(avg(ms)) from ai_judge_log where created_at > now() - interval '1 day' group by kind;`
+
+Optionale Function-Secrets: `GEMINI_MODEL` (Standard `gemini-3.5-flash-lite` – `gemini-3.8-flash` war
+im Test oft langsamer als das Zeitlimit), `GEMINI_THINKING` (`minimal`), `AI_USER_DAILY_LIMIT` (30), `AI_GLOBAL_DAILY_LIMIT` (1000).
 
 ## Übungsmodus
 

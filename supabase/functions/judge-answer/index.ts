@@ -23,8 +23,9 @@ import {
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
 
-const MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-3.8-flash';
-const THINKING = Deno.env.get('GEMINI_THINKING') ?? 'low';
+// Flash-Lite mit minimalem Denken: zuverlässig unter 3 s (3.8 Flash lag oft über dem Timeout).
+const MODEL = Deno.env.get('GEMINI_MODEL') ?? 'gemini-3.5-flash-lite';
+const THINKING = Deno.env.get('GEMINI_THINKING') ?? 'minimal';
 const GEMINI_TIMEOUT_MS = 3300;
 /** KI-Anfragen (ohne Cache-Treffer) pro Spieler in 24 Stunden. */
 const USER_LIMIT = Number(Deno.env.get('AI_USER_DAILY_LIMIT') ?? 30);
@@ -74,21 +75,36 @@ function log(userId: string, questionId: string, kind: string, ms?: number) {
   background(admin.from('ai_judge_log').insert({ user_id: userId, question_id: questionId, kind, ms: ms ?? null }));
 }
 
-async function askGemini(question: JudgeQuestion, answer: string) {
+async function askGeminiOnce(question: JudgeQuestion, answer: string, timeoutMs: number) {
   const key = Deno.env.get('GEMINI_API_KEY');
   if (!key) throw new Error('GEMINI_API_KEY fehlt');
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify(geminiRequestBody(question, answer, THINKING)),
-    signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) {
     // Nur Status und Fehlermeldung von Google loggen – nie Header oder Key.
     const detail = await res.text().catch(() => '');
     throw new Error(`Gemini ${res.status}: ${detail.slice(0, 300)}`);
   }
-  return parseModelOutput(extractText(await res.json()), question);
+  const result = parseModelOutput(extractText(await res.json()), question);
+  if (!result) throw new Error('unlesbare KI-Antwort');
+  return result;
+}
+
+/** Ein schneller Fehlschlag (z. B. 503) wird einmal wiederholt – innerhalb desselben Zeitbudgets. */
+async function askGemini(question: JudgeQuestion, answer: string) {
+  const deadline = Date.now() + GEMINI_TIMEOUT_MS;
+  try {
+    return await askGeminiOnce(question, answer, GEMINI_TIMEOUT_MS);
+  } catch (e) {
+    const left = deadline - Date.now();
+    if (left < 1200) throw e;
+    console.warn('judge retry', String(e).slice(0, 200));
+    return await askGeminiOnce(question, answer, left);
+  }
 }
 
 Deno.serve(async (req) => {
@@ -159,7 +175,6 @@ Deno.serve(async (req) => {
   const t0 = Date.now();
   try {
     const result = await askGemini(question, answer);
-    if (!result) throw new Error('unlesbare KI-Antwort');
     log(user.id, questionId, 'model', Date.now() - t0);
     background(
       admin.from('ai_verdicts').upsert(
