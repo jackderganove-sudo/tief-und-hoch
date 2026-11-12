@@ -2,18 +2,20 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MODES } from '../domain/types';
 import { services } from '../services';
-import { getAccountState, refreshProfile, useAccount } from '../services/accountState';
-import { deleteAccount, saveProfile, signInWith, signOut, type Provider } from '../services/supabase/account';
+import { expectLogin, getAccountState, refreshProfile, useAccount } from '../services/accountState';
+import { deleteAccount, EmailLoginError, saveProfile, sendEmailCode, signInWith, signOut, verifyEmailCode, type EmailStep, type Provider } from '../services/supabase/account';
 import { AVATAR_COUNT, avatarSprite } from '../pixel/avatars';
 import { PixelSprite, PxButton } from './px';
 import { Sheet } from './Sheet';
 import { PrivacySheet } from './PrivacySheet';
 
-/** Anmelde-Knöpfe Google/GitHub (anonym → Konto-Upgrade). */
+/** Anmelde-Auswahl: Google, Discord, E-Mail – GitHub kleiner unter „Weitere Optionen“. */
 export function SignInButtons({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState<Provider | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [email, setEmail] = useState(false);
+  const [more, setMore] = useState(false);
   const go = (p: Provider) => {
     setBusy(p);
     setErr(null);
@@ -22,15 +24,158 @@ export function SignInButtons({ compact = false }: { compact?: boolean }) {
       setBusy(null);
     });
   };
+  if (email) return <EmailLogin onBack={() => setEmail(false)} />;
   return (
-    <div className={`grid gap-2 ${compact ? 'grid-cols-2' : ''}`}>
+    <div className={`grid gap-2 ${compact ? (EMAIL_LOGIN_ENABLED ? 'grid-cols-3' : 'grid-cols-2') : ''}`}>
       <PxButton tone="gold" small={compact} disabled={!!busy} className="w-full text-base" onClick={() => go('google')}>
         {compact ? 'Google' : t('account.google')}
       </PxButton>
-      <PxButton tone="stone" small={compact} disabled={!!busy} className="w-full text-base" onClick={() => go('github')}>
-        {compact ? 'GitHub' : t('account.github')}
+      <PxButton tone="violet" small={compact} disabled={!!busy} className="w-full text-base" onClick={() => go('discord')}>
+        {compact ? 'Discord' : t('account.discord')}
       </PxButton>
-      {err && <p className="text-sm text-[#a8372a]">{t('account.loginError', { message: err })}</p>}
+      {EMAIL_LOGIN_ENABLED && (
+        <PxButton tone="wood" small={compact} disabled={!!busy} className="w-full text-base" onClick={() => setEmail(true)}>
+          {compact ? t('account.emailShort') : t('account.email')}
+        </PxButton>
+      )}
+      {!compact &&
+        (more ? (
+          <PxButton tone="stone" small disabled={!!busy} className="w-full text-base" onClick={() => go('github')}>
+            {t('account.github')}
+          </PxButton>
+        ) : (
+          <button type="button" className="justify-self-center text-sm underline decoration-dotted underline-offset-4 opacity-80" onClick={() => setMore(true)}>
+            {t('account.moreOptions')}
+          </button>
+        ))}
+      {err && <p className={`text-sm text-[#a8372a] ${compact ? 'col-span-3' : ''}`}>{t('account.loginError', { message: err })}</p>}
+    </div>
+  );
+}
+
+const RESEND_SECONDS = 60;
+/**
+ * E-Mail-Code-Login erst anbieten, wenn eigenes SMTP + Code-Vorlage eingerichtet sind
+ * (mit dem Standard-Mailversand von Supabase lässt sich die Vorlage nicht ändern – die Mail
+ * enthielte nur einen Link, der im Browser statt in der App aufgeht). Schalter: Repo-Variable.
+ */
+export const EMAIL_LOGIN_ENABLED = import.meta.env.VITE_ENABLE_EMAIL_LOGIN === 'true';
+const PROVIDER_NAMES: Record<string, string> = { google: 'Google', github: 'GitHub', discord: 'Discord', email: 'E-Mail' };
+
+/** E-Mail → 6-stelliger Code → fertig. Kein Passwort, kein Link. */
+export function EmailLogin({ onBack }: { onBack: () => void }) {
+  const { t } = useTranslation();
+  const [address, setAddress] = useState('');
+  const [code, setCode] = useState('');
+  const [step, setStep] = useState<EmailStep | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [wait, setWait] = useState(0);
+  useEffect(() => {
+    if (wait <= 0) return;
+    const id = setTimeout(() => setWait((w) => w - 1), 1000);
+    return () => clearTimeout(id);
+  }, [wait]);
+
+  const explain = (e: unknown) => {
+    const kind = e instanceof EmailLoginError ? e.kind : 'other';
+    setMsg(kind === 'other' ? t('account.loginError', { message: (e as Error)?.message ?? String(e) }) : t(`account.emailErrors.${kind}`));
+  };
+
+  const send = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      setStep(await sendEmailCode(address));
+      setWait(RESEND_SECONDS);
+      setCode('');
+    } catch (e) {
+      explain(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const verify = async () => {
+    if (!step) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      expectLogin();
+      await verifyEmailCode(address, code, step);
+      setMsg(t('account.emailDone'));
+    } catch (e) {
+      explain(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div>
+      {!step ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send();
+          }}
+        >
+          <label className="block">
+            <span className="font-tiny text-xs uppercase opacity-75">{t('account.emailLabel')}</span>
+            <input
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoFocus
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="name@example.com"
+              className="px-field px-field-light mt-1 block w-full bg-transparent px-1 text-lg [--px:2px]"
+            />
+          </label>
+          <PxButton type="submit" tone="coral" disabled={busy || !address.includes('@')} className="mt-2 w-full text-lg">
+            {t('account.sendCode')}
+          </PxButton>
+        </form>
+      ) : (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void verify();
+          }}
+        >
+          <p className="text-sm leading-snug">{t('account.codeSent', { email: address })}</p>
+          <label className="mt-2 block">
+            <span className="font-tiny text-xs uppercase opacity-75">{t('account.codeLabel')}</span>
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              autoComplete="one-time-code"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              autoFocus
+              aria-label={t('account.codeLabel')}
+              className="px-field px-field-light mt-1 block w-full bg-transparent px-1 text-center text-3xl tracking-[0.4em] [--px:2px]"
+            />
+          </label>
+          <PxButton type="submit" tone="coral" disabled={busy || code.length !== 6} className="mt-2 w-full text-lg">
+            {t('account.verifyCode')}
+          </PxButton>
+          <div className="mt-2 flex justify-between text-sm">
+            <button type="button" disabled={busy || wait > 0} className="underline decoration-dotted underline-offset-4 disabled:no-underline disabled:opacity-60" onClick={() => void send()}>
+              {wait > 0 ? t('account.resendIn', { s: wait }) : t('account.resend')}
+            </button>
+            <button type="button" className="underline decoration-dotted underline-offset-4" onClick={() => setStep(null)}>
+              {t('account.otherEmail')}
+            </button>
+          </div>
+        </form>
+      )}
+      {msg && <p className="mt-2 text-sm leading-snug" role="status">{msg}</p>}
+      <button type="button" className="mt-3 text-sm underline decoration-dotted underline-offset-4 opacity-80" onClick={onBack}>
+        ← {t('account.otherMethods')}
+      </button>
     </div>
   );
 }
@@ -53,7 +198,7 @@ export function AccountButton() {
 
 export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useTranslation();
-  const { account, profile, admin } = useAccount();
+  const { account, profile, admin, suggestedName } = useAccount();
   const [privacy, setPrivacy] = useState(false);
   const signedIn = account && !account.anonymous;
   return (
@@ -68,7 +213,7 @@ export function AccountSheet({ open, onClose }: { open: boolean; onClose: () => 
             </div>
           </>
         ) : (
-          <Profile key={account.id} userId={account.id} provider={account.provider} admin={admin} initial={profile} onDeleted={onClose} />
+          <Profile key={account.id} userId={account.id} provider={account.provider} admin={admin} initial={profile} suggested={suggestedName} onDeleted={onClose} />
         )}
         <div className="mt-4 flex justify-between text-sm">
           <button type="button" className="underline decoration-dotted underline-offset-4" onClick={() => setPrivacy(true)}>
@@ -89,16 +234,19 @@ function Profile({
   provider,
   admin,
   initial,
+  suggested,
   onDeleted,
 }: {
   userId: string;
   provider: string | null;
   admin: boolean;
   initial: { display_name: string; avatar: number } | null;
+  suggested: string;
   onDeleted: () => void;
 }) {
   const { t } = useTranslation();
-  const [name, setName] = useState(initial?.display_name ?? '');
+  // ohne Profil: Name aus Discord/Google/GitHub als Vorschlag (änderbar)
+  const [name, setName] = useState(initial?.display_name ?? suggested);
   const [avatar, setAvatar] = useState(initial?.avatar ?? 0);
   const [msg, setMsg] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -124,7 +272,7 @@ function Profile({
         <PixelSprite id={`av-${avatar}`} make={() => avatarSprite(avatar)} w={12} h={12} scale={4} />
         <div className="min-w-0">
           <h2 className="truncate text-2xl font-bold">{initial?.display_name ?? t('account.title')}</h2>
-          {provider && <p className="text-sm opacity-75">{t('account.signedInWith', { provider: provider === 'github' ? 'GitHub' : 'Google' })}</p>}
+          {provider && <p className="text-sm opacity-75">{t('account.signedInWith', { provider: PROVIDER_NAMES[provider] ?? provider })}</p>}
         </div>
       </div>
 

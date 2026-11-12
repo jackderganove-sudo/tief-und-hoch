@@ -176,13 +176,32 @@
     "merged": "Taken over from this device: {{rounds}} daily rounds. Descent streak: {{rare}}, Ascent: {{common}}.",
     "mergedDup": "{{dups}} days existed on both – your account result counts there.",
     "loginError": "Sign-in failed: {{message}}",
-    "privacy": "Privacy"
+    "privacy": "Privacy",
+    "discord": "Sign in with Discord",
+    "email": "Sign in with email",
+    "emailShort": "Email",
+    "moreOptions": "More options",
+    "otherMethods": "Other sign-in options",
+    "emailLabel": "Email address",
+    "sendCode": "Send code",
+    "codeSent": "We sent a 6-digit code to {{email}}. Check your spam folder too.",
+    "codeLabel": "Code",
+    "verifyCode": "Sign in",
+    "resend": "Send code again",
+    "resendIn": "Send again in {{s}} s",
+    "otherEmail": "Different email",
+    "emailDone": "Signed in!",
+    "emailErrors": {
+      "rate_limit": "Too many requests right now – try again in a few minutes or sign in with Google or Discord.",
+      "invalid_email": "That doesn't look like a valid email address.",
+      "invalid_code": "The code is wrong or has expired. Just request a new one."
+    }
   },
   "privacy": {
     "title": "Privacy",
     "body": [
       "Highs & Lows stores as little as possible.",
-      "Without signing in you get an anonymous ID (no email, no name). If you sign in with Google or GitHub we store that account ID and your email address as provided by them.",
+      "Without signing in you get an anonymous ID (no email, no name). If you sign in – with Google, Discord, GitHub or an email code – we store that account ID and your email address. For email sign-in we send you a one-time 6-digit code via our provider Supabase; we use the address for nothing else (no newsletter, no sharing).",
       "We store your answers with question, date and score (for stats and real answer frequencies), your progress and – if you pick one – player name and avatar. Player names are public.",
       "Answers that are not on our list are checked by an AI (Google Gemini). Only the question and your answer are sent – no ID, no name.",
       "All data is stored with Supabase on servers in Frankfurt (EU). The website is served by GitHub Pages.",

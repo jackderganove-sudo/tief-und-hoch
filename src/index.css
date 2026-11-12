@@ -155,6 +155,8 @@
 .px-btn-gold { border-image-source: url('./assets/pixel/frames/btn-gold.png'); color: #3a2416; }
 .px-btn-gold:active:not(:disabled) { border-image-source: url('./assets/pixel/frames/btn-gold-down.png'); }
 .px-btn-teal { border-image-source: url('./assets/pixel/frames/btn-teal.png'); color: #0e2a2c; }
+.px-btn-violet { border-image-source: url('./assets/pixel/frames/btn-violet.png'); color: #ffffff; }
+.px-btn-violet:active:not(:disabled) { border-image-source: url('./assets/pixel/frames/btn-violet-down.png'); }
 .px-btn-teal:active:not(:disabled) { border-image-source: url('./assets/pixel/frames/btn-teal-down.png'); }
 .px-btn-coral { border-image-source: url('./assets/pixel/frames/btn-coral.png'); color: #fff4e0; }
 .px-btn-coral:active:not(:disabled) { border-image-source: url('./assets/pixel/frames/btn-coral-down.png'); }

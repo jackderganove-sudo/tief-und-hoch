@@ -40,6 +40,8 @@ jobs:
           # Öffentliche Supabase-Werte (Repo-Variablen, keine Secrets). Fehlen sie, läuft das Spiel ohne KI-Prüfung.
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          # E-Mail-Code-Login erst mit eigenem SMTP + Code-Vorlage einschalten (Repo-Variable auf 'true')
+          VITE_ENABLE_EMAIL_LOGIN: ${{ vars.VITE_ENABLE_EMAIL_LOGIN }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

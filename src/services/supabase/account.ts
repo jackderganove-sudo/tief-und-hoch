@@ -8,7 +8,7 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 import { supabase } from './client';
 
-export type Provider = 'google' | 'github';
+export type Provider = 'google' | 'github' | 'discord';
 
 export interface Account {
   id: string;
@@ -131,6 +131,88 @@ export async function deleteAccount(db: SupabaseClient | null = supabase): Promi
   const { error } = await db.functions.invoke('delete-account', { body: { confirm: true } });
   if (error) throw new Error(error.message);
   await db.auth.signOut();
+}
+
+// ---------------------------------------------------------------- E-Mail mit Einmal-Code
+
+/**
+ * Anmeldung per E-Mail und 6-stelligem Code (kein Magic Link – Links öffnen sich im
+ * Browser statt in der installierten App, kein Passwort).
+ *
+ * - anonym angemeldet → updateUser({ email }) → Code bestätigt die E-Mail → dasselbe Konto
+ *   wird dauerhaft (Upgrade, gleiche user_id)
+ * - E-Mail gehört schon zu einem Konto (z. B. über Google angelegt) → Code-Anmeldung in
+ *   dieses Konto; Supabase verknüpft Identitäten mit gleicher bestätigter E-Mail selbst,
+ *   der Gerätestand wird zusammengeführt
+ * - ohne Sitzung → Code-Anmeldung (legt bei Bedarf ein Konto an)
+ */
+export type EmailStep = 'link' | 'switch';
+export type EmailError = 'rate_limit' | 'invalid_email' | 'invalid_code' | 'other';
+
+export class EmailLoginError extends Error {
+  constructor(
+    readonly kind: EmailError,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+function emailError(e: { status?: number; code?: string; message?: string } | null): EmailLoginError {
+  const code = e?.code ?? '';
+  const msg = e?.message ?? 'unbekannter Fehler';
+  if (e?.status === 429 || /rate_limit|over_email_send_rate_limit|too many/i.test(code + msg)) return new EmailLoginError('rate_limit', msg);
+  if (/otp_expired|invalid.*(otp|token)|token.*(invalid|expired)/i.test(code + msg)) return new EmailLoginError('invalid_code', msg);
+  if (/email_address_invalid|validation_failed|invalid.*email/i.test(code + msg)) return new EmailLoginError('invalid_email', msg);
+  return new EmailLoginError('other', msg);
+}
+
+const isEmailTaken = (e: { code?: string; message?: string } | null) =>
+  !!e && /email_exists|already been registered|already registered|user_already_exists/i.test(`${e.code ?? ''} ${e.message ?? ''}`);
+
+/** Code an die E-Mail senden. Liefert, wie er nachher bestätigt werden muss. */
+export async function sendEmailCode(email: string, db: SupabaseClient | null = supabase): Promise<EmailStep> {
+  if (!db) throw new EmailLoginError('other', 'Supabase ist nicht konfiguriert');
+  const address = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(address)) throw new EmailLoginError('invalid_email', 'ungültige E-Mail');
+  const { data } = await db.auth.getSession();
+  if (data.session?.user?.is_anonymous) {
+    const { error } = await db.auth.updateUser({ email: address });
+    if (!error) return 'link';
+    if (!isEmailTaken(error)) throw emailError(error);
+    // E-Mail gehört schon zu einem Konto → dort anmelden (Gerät wird zusammengeführt)
+  }
+  const { error } = await db.auth.signInWithOtp({ email: address, options: { shouldCreateUser: true } });
+  if (error) throw emailError(error);
+  return 'switch';
+}
+
+/** Code bestätigen. upgraded = anonymes Konto übernommen, switched = in bestehendes/neues Konto gewechselt. */
+export async function verifyEmailCode(email: string, code: string, step: EmailStep, db: SupabaseClient | null = supabase): Promise<'upgraded' | 'switched'> {
+  if (!db) throw new EmailLoginError('other', 'Supabase ist nicht konfiguriert');
+  const token = code.replace(/\D/g, '');
+  if (token.length !== 6) throw new EmailLoginError('invalid_code', 'Der Code hat 6 Ziffern');
+  const { error } = await db.auth.verifyOtp({ email: email.trim().toLowerCase(), token, type: step === 'link' ? 'email_change' : 'email' });
+  if (error) throw emailError(error);
+  return step === 'link' ? 'upgraded' : 'switched';
+}
+
+/** Spielername-Vorschlag aus dem Anbieter-Profil (Discord/Google/GitHub), passend zu den Namensregeln. */
+export function suggestedName(user: Pick<User, 'user_metadata' | 'email'> | null | undefined): string {
+  const m = (user?.user_metadata ?? {}) as Record<string, unknown>;
+  const candidates = [m.custom_claims && (m.custom_claims as Record<string, unknown>).global_name, m.full_name, m.name, m.user_name, m.preferred_username, user?.email?.split('@')[0]];
+  // erster Kandidat, der nach dem Säubern die Namensregeln erfüllt (≥ 3 Zeichen)
+  for (const raw of candidates) {
+    if (typeof raw !== 'string') continue;
+    const clean = raw
+      .replace(/[^A-Za-z0-9ÄÖÜäöüß ._-]/g, '')
+      .replace(/\s+/g, ' ')
+      .replace(/^[ ._-]+|[ ._-]+$/g, '')
+      .slice(0, 20)
+      .replace(/[ ._-]+$/g, '');
+    if (clean.length >= 3) return clean;
+  }
+  return '';
 }
 
 // ---------------------------------------------------------------- Profil

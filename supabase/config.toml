@@ -432,3 +432,20 @@ verify_jwt = false
 
 [functions.delete-account]
 verify_jwt = false
+
+# E-Mail-Login per 6-stelligem Code (kein Magic Link). Gleiche Vorlage für alle drei Fälle.
+[auth.email]
+otp_length = 6
+otp_expiry = 600
+
+[auth.email.template.magic_link]
+subject = "Dein Code für Highs & Lows · Your code"
+content_path = "./supabase/templates/otp-code.html"
+
+[auth.email.template.confirmation]
+subject = "Dein Code für Highs & Lows · Your code"
+content_path = "./supabase/templates/otp-code.html"
+
+[auth.email.template.email_change]
+subject = "Dein Code für Highs & Lows · Your code"
+content_path = "./supabase/templates/otp-code.html"

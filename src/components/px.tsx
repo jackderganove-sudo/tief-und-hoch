@@ -31,7 +31,7 @@ export function Panel({ tone, className = '', children, ...rest }: { tone: Panel
   );
 }
 
-export type ButtonTone = 'gold' | 'teal' | 'coral' | 'wood' | 'stone';
+export type ButtonTone = 'gold' | 'teal' | 'coral' | 'wood' | 'stone' | 'violet';
 
 export function PxButton({ tone, small = false, className = '', children, ...rest }: { tone: ButtonTone; small?: boolean } & ButtonHTMLAttributes<HTMLButtonElement>) {
   return (

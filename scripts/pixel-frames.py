@@ -88,6 +88,7 @@ for nm, face, hi, lip, shade in [
     ('coral', '#e2603a', '#f7a07c', '#8e2f22', '#c44c30'),
     ('wood', '#b9803f', '#e0aa66', '#5e3a1c', '#9c6a32'),
     ('stone', '#5c5274', '#8a7eaa', '#241e33', '#4a4060'),
+    ('violet', '#6b6fe8', '#a9acff', '#2c2f8a', '#5458c8'),
 ]:
     button('btn-' + nm, '#1b1424', face, hi, lip, shade)
     button('btn-' + nm + '-down', '#1b1424', face, hi, lip, shade, pressed=True)

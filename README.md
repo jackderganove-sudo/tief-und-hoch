@@ -231,7 +231,12 @@ auf iPhone/iPad geht es über „Teilen → Zum Home-Bildschirm“ (Hinweis im H
 Spielen geht immer anonym (Supabase Anonymous Sign-In). Anmelden ist nur ein Angebot:
 Profil-Knopf oben auf der Startseite bzw. ein wegklickbarer Hinweis nach der ersten fertigen Tagesrunde.
 
-- **Anbieter:** Google und GitHub (Supabase OAuth), kein E-Mail/Passwort.
+- **Anbieter:** Google, Discord, E-Mail-Code; GitHub unter „Weitere Optionen“ (Supabase OAuth). Kein Passwort.
+- **E-Mail:** 6-stelliger Einmal-Code (kein Magic Link). Anonym → `updateUser({email})` + Code
+  (`email_change`) = Upgrade; E-Mail existiert schon (z. B. über Google) → Code-Anmeldung dort
+  (Supabase verknüpft gleiche bestätigte E-Mails). Vorlage: `supabase/templates/otp-code.html`.
+  Braucht eigenes SMTP (Supabase erlaubt Vorlagen sonst nicht) – bis dahin ist der Knopf per
+  Repo-Variable `VITE_ENABLE_EMAIL_LOGIN` ausgeschaltet.
 - **Upgrade statt Neuanlage:** anonym angemeldet → `linkIdentity` → gleiche `user_id`, alle Antworten,
   Serie und Statistik bleiben (Supabase „Manual linking“ muss an sein).
 - **Zweites Gerät:** Gehört die Identität schon zu einem Konto, wird dort angemeldet und der Gerätestand

@@ -176,13 +176,32 @@
     "merged": "Von diesem Gerät übernommen: {{rounds}} Tagesrunden. Serie Abstieg: {{rare}}, Aufstieg: {{common}}.",
     "mergedDup": "{{dups}} Tage waren auf beiden – dort zählt das Ergebnis aus deinem Konto.",
     "loginError": "Anmeldung fehlgeschlagen: {{message}}",
-    "privacy": "Datenschutz"
+    "privacy": "Datenschutz",
+    "discord": "Mit Discord anmelden",
+    "email": "Mit E-Mail anmelden",
+    "emailShort": "E-Mail",
+    "moreOptions": "Weitere Optionen",
+    "otherMethods": "Andere Anmeldung",
+    "emailLabel": "E-Mail-Adresse",
+    "sendCode": "Code senden",
+    "codeSent": "Wir haben dir einen 6-stelligen Code an {{email}} geschickt. Schau auch im Spam-Ordner nach.",
+    "codeLabel": "Code",
+    "verifyCode": "Anmelden",
+    "resend": "Code erneut senden",
+    "resendIn": "Erneut senden in {{s}} s",
+    "otherEmail": "Andere E-Mail",
+    "emailDone": "Angemeldet!",
+    "emailErrors": {
+      "rate_limit": "Gerade zu viele Anfragen – versuch es in ein paar Minuten oder melde dich mit Google oder Discord an.",
+      "invalid_email": "Das sieht nicht nach einer gültigen E-Mail-Adresse aus.",
+      "invalid_code": "Der Code stimmt nicht oder ist abgelaufen. Fordere einfach einen neuen an."
+    }
   },
   "privacy": {
     "title": "Datenschutz",
     "body": [
       "Highs & Lows speichert so wenig wie möglich.",
-      "Ohne Anmeldung bekommst du eine anonyme Kennung (keine E-Mail, kein Name). Mit Anmeldung über Google oder GitHub speichern wir die Kennung dieses Kontos und deine E-Mail-Adresse, wie der Anbieter sie übermittelt.",
+      "Ohne Anmeldung bekommst du eine anonyme Kennung (keine E-Mail, kein Name). Meldest du dich an – mit Google, Discord, GitHub oder per E-Mail-Code –, speichern wir die Kennung dieses Kontos und deine E-Mail-Adresse. Beim E-Mail-Login schicken wir dir über unseren Anbieter Supabase einen einmaligen 6-stelligen Code; die Adresse nutzen wir für nichts anderes (kein Newsletter, keine Weitergabe).",
       "Gespeichert werden deine Antworten mit Frage, Datum und Wertung (für Statistik und echte Häufigkeiten), dein Spielstand und – falls du einen wählst – Spielername und Avatar. Spielernamen sind öffentlich sichtbar.",
       "Antworten, die nicht in unserer Liste stehen, prüft eine KI (Google Gemini). Dabei wird nur die Frage und deine Antwort übertragen – keine Kennung, kein Name.",
       "Alle Daten liegen bei Supabase auf Servern in Frankfurt (EU). Die Website wird von GitHub Pages ausgeliefert.",

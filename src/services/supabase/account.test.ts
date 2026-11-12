@@ -74,3 +74,54 @@ describe('Login: anonymes Konto upgraden statt neu anlegen', () => {
     expect(toAccount({ id: 'b', is_anonymous: false, app_metadata: { provider: 'github' }, email: 'x@y.z' } as never)).toMatchObject({ provider: 'github', email: 'x@y.z' });
   });
 });
+
+describe('E-Mail-Login per 6-stelligem Code (gemockt)', async () => {
+  const { sendEmailCode, verifyEmailCode, EmailLoginError, suggestedName } = await import('./account');
+  function otpDb(user: { id: string; is_anonymous: boolean } | null, opts: { updateError?: object; otpError?: object; verifyError?: object } = {}) {
+    const auth = {
+      getSession: vi.fn(async () => ({ data: { session: user ? { user } : null } })),
+      updateUser: vi.fn(async () => ({ error: opts.updateError ?? null })),
+      signInWithOtp: vi.fn(async () => ({ error: opts.otpError ?? null })),
+      verifyOtp: vi.fn(async () => ({ error: opts.verifyError ?? null })),
+    };
+    return { db: { auth } as unknown as SupabaseClient, auth };
+  }
+
+  it('anonym → updateUser(E-Mail), Bestätigung als email_change (Upgrade, gleiche user_id)', async () => {
+    const { db, auth } = otpDb({ id: 'anon', is_anonymous: true });
+    expect(await sendEmailCode(' Spieler@Example.com ', db)).toBe('link');
+    expect(auth.updateUser).toHaveBeenCalledWith({ email: 'spieler@example.com' });
+    expect(auth.signInWithOtp).not.toHaveBeenCalled();
+    expect(await verifyEmailCode('spieler@example.com', '123 456', 'link', db)).toBe('upgraded');
+    expect(auth.verifyOtp).toHaveBeenCalledWith({ email: 'spieler@example.com', token: '123456', type: 'email_change' });
+  });
+
+  it('E-Mail gehört schon zu einem Konto (z. B. über Google) → Code-Anmeldung dort, kein zweites Konto', async () => {
+    const { db, auth } = otpDb({ id: 'anon', is_anonymous: true }, { updateError: { code: 'email_exists', message: 'A user with this email address has already been registered' } });
+    expect(await sendEmailCode('jack@example.com', db)).toBe('switch');
+    expect(auth.signInWithOtp).toHaveBeenCalledWith(expect.objectContaining({ email: 'jack@example.com' }));
+    expect(await verifyEmailCode('jack@example.com', '654321', 'switch', db)).toBe('switched');
+    expect(auth.verifyOtp).toHaveBeenCalledWith(expect.objectContaining({ type: 'email' }));
+  });
+
+  it('ohne Sitzung → normale Code-Anmeldung', async () => {
+    const { db, auth } = otpDb(null);
+    expect(await sendEmailCode('neu@example.com', db)).toBe('switch');
+    expect(auth.updateUser).not.toHaveBeenCalled();
+  });
+
+  it('verständliche Fehler: Limit, falscher Code, ungültige Adresse', async () => {
+    const limited = otpDb(null, { otpError: { status: 429, code: 'over_email_send_rate_limit', message: 'email rate limit exceeded' } });
+    await expect(sendEmailCode('a@b.de', limited.db)).rejects.toMatchObject({ kind: 'rate_limit' });
+    const wrong = otpDb(null, { verifyError: { status: 403, code: 'otp_expired', message: 'Token has expired or is invalid' } });
+    await expect(verifyEmailCode('a@b.de', '111111', 'switch', wrong.db)).rejects.toMatchObject({ kind: 'invalid_code' });
+    await expect(verifyEmailCode('a@b.de', '12', 'switch', wrong.db)).rejects.toBeInstanceOf(EmailLoginError);
+    await expect(sendEmailCode('kein-at-zeichen', otpDb(null).db)).rejects.toMatchObject({ kind: 'invalid_email' });
+  });
+
+  it('Spielername-Vorschlag aus Discord/Google, passend zu den Namensregeln', () => {
+    expect(suggestedName({ user_metadata: { custom_claims: { global_name: 'Höhlen Jack 🎈' }, full_name: 'jack#1234' }, email: undefined } as never)).toBe('Höhlen Jack');
+    expect(suggestedName({ user_metadata: { full_name: 'Jo' }, email: 'johanna.m@example.com' } as never)).toBe('johanna.m');
+    expect(suggestedName({ user_metadata: {}, email: undefined } as never)).toBe('');
+  });
+});

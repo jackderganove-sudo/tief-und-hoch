@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import i18n from 'i18next';
 import type { MergeSummary } from '../domain/progressSync';
 import { supabase } from './supabase/client';
-import { handleAuthCallback, isAdmin, loadProfile, toAccount, type Account, type Profile } from './supabase/account';
+import { handleAuthCallback, isAdmin, loadProfile, suggestedName, toAccount, type Account, type Profile } from './supabase/account';
 import { ProgressSync } from './supabase/ProgressSync';
 import type { ProgressRepository } from './ProgressRepository';
 
@@ -18,9 +18,16 @@ export interface AccountState {
   /** Nach dem Login auf einem weiteren Gerät: was übernommen wurde (einmal anzeigen) */
   merged: MergeSummary | null;
   error: string | null;
+  /** Vorschlag für den Spielernamen aus dem Anbieter-Profil (z. B. Discord-Name) */
+  suggestedName: string;
 }
 
-let state: AccountState = { ready: false, account: null, profile: null, admin: false, merged: null, error: null };
+let state: AccountState = { ready: false, account: null, profile: null, admin: false, merged: null, error: null, suggestedName: '' };
+/** Nächste Anmeldung kommt aus dem E-Mail-Code-Login → Zusammenführung anzeigen */
+let expectingLogin = false;
+export function expectLogin() {
+  expectingLogin = true;
+}
 const listeners = new Set<() => void>();
 const set = (patch: Partial<AccountState>) => {
   state = { ...state, ...patch };
@@ -64,9 +71,14 @@ export function startAccount(repo: ProgressRepository) {
   });
 
   let lastUser: string | null = null;
-  const onSession = async (user: Parameters<typeof toAccount>[0], afterCallback: boolean) => {
+  const onSession = async (user: Parameters<typeof toAccount>[0], afterCallbackIn: boolean) => {
+    let afterCallback = afterCallbackIn;
     const account = toAccount(user);
-    set({ account });
+    set({ account, suggestedName: suggestedName(user) });
+    if (expectingLogin && account && !account.anonymous) {
+      expectingLogin = false;
+      afterCallback = true;
+    }
     if (account?.id !== lastUser) {
       lastUser = account?.id ?? null;
       const summary = await sync.attach(account?.id ?? null);
