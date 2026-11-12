@@ -63,6 +63,17 @@ describe('Login: anonymes Konto upgraden statt neu anlegen', () => {
     expect(await handleAuthCallback(after, 'https://x/')).toEqual({ kind: 'switched' });
   });
 
+  it('auch der Wechsel scheitert an der E-Mail (beim Anbieter unbestätigt) → verständlicher Hinweis statt Schleife', async () => {
+    const { db: before } = fakeDb({ id: 'anon-5', is_anonymous: true });
+    await signInWith('discord', before);
+    const { db: mid } = fakeDb({ id: 'anon-5', is_anonymous: true });
+    const err = 'https://x/?error=server_error&error_code=email_exists&error_description=A+user+with+this+email+address+has+already+been+registered';
+    expect(await handleAuthCallback(mid, err)).toEqual({ kind: 'redirecting' });
+    const { db: again, auth } = fakeDb({ id: 'anon-5', is_anonymous: true });
+    expect(await handleAuthCallback(again, err)).toMatchObject({ kind: 'error', emailTaken: 'discord' });
+    expect(auth.signInWithOAuth).not.toHaveBeenCalled();
+  });
+
   it('ohne anonyme Sitzung → normale Anmeldung', async () => {
     const { db, auth } = fakeDb(null);
     await signInWith('google', db);

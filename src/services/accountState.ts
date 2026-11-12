@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import i18n from 'i18next';
 import type { MergeSummary } from '../domain/progressSync';
 import { supabase } from './supabase/client';
-import { handleAuthCallback, isAdmin, loadProfile, suggestedName, toAccount, type Account, type Profile } from './supabase/account';
+import { handleAuthCallback, isAdmin, loadProfile, suggestedName, toAccount, type Account, type Profile, type Provider } from './supabase/account';
 import { ProgressSync } from './supabase/ProgressSync';
 import type { ProgressRepository } from './ProgressRepository';
 
@@ -18,11 +18,13 @@ export interface AccountState {
   /** Nach dem Login auf einem weiteren Gerät: was übernommen wurde (einmal anzeigen) */
   merged: MergeSummary | null;
   error: string | null;
+  /** Anmeldung scheiterte, weil die (unbestätigte) Anbieter-E-Mail schon ein Konto hat */
+  errorEmailTaken: Provider | null;
   /** Vorschlag für den Spielernamen aus dem Anbieter-Profil (z. B. Discord-Name) */
   suggestedName: string;
 }
 
-let state: AccountState = { ready: false, account: null, profile: null, admin: false, merged: null, error: null, suggestedName: '' };
+let state: AccountState = { ready: false, account: null, profile: null, admin: false, merged: null, error: null, errorEmailTaken: null, suggestedName: '' };
 /** Nächste Anmeldung kommt aus dem E-Mail-Code-Login → Zusammenführung anzeigen */
 let expectingLogin = false;
 export function expectLogin() {
@@ -93,7 +95,7 @@ export function startAccount(repo: ProgressRepository) {
     // erst den Rücksprung vom Anbieter auswerten (Upgrade / Wechsel / Fehler)
     const cb = await handleAuthCallback(db);
     if (cb.kind === 'redirecting') return;
-    if (cb.kind === 'error') set({ error: cb.message });
+    if (cb.kind === 'error') set({ error: cb.message, errorEmailTaken: cb.emailTaken ?? null });
     const { data } = await db.auth.getSession();
     await onSession(data.session?.user, cb.kind === 'switched' || cb.kind === 'upgraded');
   })();

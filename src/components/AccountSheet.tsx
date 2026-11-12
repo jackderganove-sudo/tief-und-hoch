@@ -10,6 +10,8 @@ import { Sheet } from './Sheet';
 import { PrivacySheet } from './PrivacySheet';
 
 /** Anmelde-Auswahl: Google, Discord, E-Mail – GitHub kleiner unter „Weitere Optionen“. */
+const PROVIDER_LABEL = { google: 'Google', discord: 'Discord', github: 'GitHub' } as const;
+
 export function SignInButtons({ compact = false }: { compact?: boolean }) {
   const { t } = useTranslation();
   const [busy, setBusy] = useState<Provider | null>(null);
@@ -443,7 +445,11 @@ export function AccountNotice() {
             {merged.duplicateDays > 0 && <p className="opacity-80">{t('account.mergedDup', { dups: merged.duplicateDays })}</p>}
           </>
         ) : (
-          <p>{t('account.loginError', { message: getAccountState().error })}</p>
+          <p>
+            {getAccountState().errorEmailTaken
+              ? t('account.emailTakenUnverified', { provider: PROVIDER_LABEL[getAccountState().errorEmailTaken!] })
+              : t('account.loginError', { message: getAccountState().error })}
+          </p>
         )}
         <button type="button" className="mt-1 underline decoration-dotted underline-offset-4" onClick={() => setClosed(true)}>
           OK

@@ -176,6 +176,7 @@
     "merged": "Taken over from this device: {{rounds}} daily rounds. Descent streak: {{rare}}, Ascent: {{common}}.",
     "mergedDup": "{{dups}} days existed on both – your account result counts there.",
     "loginError": "Sign-in failed: {{message}}",
+    "emailTakenUnverified": "The email of your {{provider}} account already belongs to a Highs & Lows account but isn't verified at {{provider}}. Sign in the way you did before (Google, GitHub or email code) – or verify the email at {{provider}} and try again.",
     "privacy": "Privacy",
     "discord": "Sign in with Discord",
     "email": "Sign in with email",

@@ -176,6 +176,7 @@
     "merged": "Von diesem Gerät übernommen: {{rounds}} Tagesrunden. Serie Abstieg: {{rare}}, Aufstieg: {{common}}.",
     "mergedDup": "{{dups}} Tage waren auf beiden – dort zählt das Ergebnis aus deinem Konto.",
     "loginError": "Anmeldung fehlgeschlagen: {{message}}",
+    "emailTakenUnverified": "Die E-Mail deines {{provider}}-Kontos gehört schon zu einem Highs-&-Lows-Konto, ist bei {{provider}} aber nicht bestätigt. Melde dich mit deinem bisherigen Weg (Google, GitHub oder E-Mail-Code) an – oder bestätige die E-Mail bei {{provider}} und versuch es noch einmal.",
     "privacy": "Datenschutz",
     "discord": "Mit Discord anmelden",
     "email": "Mit E-Mail anmelden",

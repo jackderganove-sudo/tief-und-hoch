@@ -86,7 +86,9 @@ export type CallbackResult =
   | { kind: 'switched' }
   /** Verknüpfen ging nicht, weil die Identität schon ein Konto hat → wir leiten zum Login weiter */
   | { kind: 'redirecting' }
-  | { kind: 'error'; message: string };
+  /** emailTaken: die E-Mail des Anbieters gehört schon einem Konto, ist beim Anbieter aber nicht
+   *  bestätigt – Supabase verknüpft dann nicht automatisch */
+  | { kind: 'error'; message: string; emailTaken?: Provider };
 
 /**
  * Nach dem Rücksprung vom Anbieter auswerten (beim App-Start aufrufen, nachdem
@@ -114,7 +116,8 @@ export async function handleAuthCallback(db: SupabaseClient | null = supabase, h
       return { kind: 'redirecting' };
     }
     writeIntent(null);
-    return { kind: 'error', message: params.get('error_description') ?? errorCode };
+    if (belongsToAccount && intent) return { kind: 'error', message: description || errorCode, emailTaken: intent.provider };
+    return { kind: 'error', message: description || errorCode };
   }
   if (!intent) return { kind: 'none' };
   const { data } = await db.auth.getSession();
