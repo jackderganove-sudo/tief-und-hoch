@@ -53,7 +53,7 @@ def panel(name, outline, ring, hi, sh, grain, inner, fill, fill_hi, nail=True, f
 # Holzrahmen mit Pergament (Himmel/Startseite)
 panel('wood', '#2a1810', '#a26c33', '#d7a45a', '#6e4423', '#8a5a2e', '#5a3a20', '#f3e2bb', '#e2cb98')
 # Steinrahmen mit dunklem, leicht durchscheinendem Inneren (Höhle)
-panel('stone', '#0e0a16', '#4a4060', '#7a6e94', '#2a2438', '#5c5274', '#120c1c', '#1d1729', '#151020', fill_alpha=232)
+panel('stone', '#0e0a16', '#4a4060', '#7a6e94', '#2a2438', '#5c5274', '#120c1c', '#1d1729', '#151020')
 
 def button(name, outline, face, hi, lip, shade, pressed=False):
     W, H = 16, 18

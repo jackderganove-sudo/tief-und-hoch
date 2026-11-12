@@ -40,15 +40,15 @@ export function TierReveal({
 
   const ai = result.source === 'ai';
 
-  // KI-Badge direkt hinter der gewerteten (bzw. abgelehnten) Antwort; Erklärung nur als Tooltip
-  const badge = ai && !result.unchecked && !isApprovedResult(question, result) ? <AiBadge mode={mode} /> : null;
+  // KI-Badge nur bei von der KI akzeptierten Antworten, direkt hinter der Antwort; Erklärung als Tooltip
+  const badge = ai && result.matched && !isApprovedResult(question, result) ? <AiBadge mode={mode} /> : null;
 
   let detail: React.ReactNode;
   if (result.matched) detail = <>{t('game.countedAs', { answer: result.matched })}{badge}</>;
   else if (result.timedOut && !result.input.trim()) detail = t('game.timeUp');
   else if (!result.input.trim()) detail = t('game.empty');
   else if (result.unchecked) detail = `„${result.input}“ – ${t(result.unchecked === 'limited' ? 'game.uncheckedLimit' : 'game.unchecked')}`;
-  else if (ai) detail = <>„{result.input}“{badge} – {t('game.aiRejected')}</>;
+  else if (ai) detail = `„${result.input}“ – ${t('game.aiRejected')}`;
   else detail = `„${result.input}“ – ${t('game.invalid')}`;
 
 

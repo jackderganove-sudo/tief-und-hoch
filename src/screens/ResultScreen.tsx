@@ -123,7 +123,7 @@ export function ResultScreen({
                       </p>
                       <p className="flex items-center text-lg">
                         <span className="truncate">{r.matched ?? (r.input.trim() ? `„${r.input}“` : '—')}</span>
-                        {r.source === 'ai' && !r.unchecked && !isApprovedResult(q, r) && (
+                        {r.source === 'ai' && r.matched && !isApprovedResult(q, r) && (
                           <AiBadge mode={mode} />
                         )}
                       </p>

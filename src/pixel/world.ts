@@ -812,7 +812,10 @@ export class World {
       }
 
       // --- Leuchtendes im Fels neben dem Schacht: die Zone ist auch außerhalb der Lampe erkennbar
-      if (r >= 2 && r < LAKE_ROW) this.sideEmitters(ctx, zone, r, ox, y, W);
+      if (r >= 2 && r < LAKE_ROW) {
+        if (zone === 'lava') this.lavaRock(ctx, r, ox, y, W, v);
+        else this.sideEmitters(ctx, zone, r, ox, y, W);
+      }
 
       // --- Sims mit allem, was darauf wächst oder daran hängt
       if (ledge && r < LAKE_ROW) {
@@ -967,23 +970,23 @@ export class World {
       }
     } else if (zone === 'lava') {
       // glühende Adern in der Rückwand
-      if (hash(r, 41) < 0.55) {
+      if (hash(r, 41) < 0.3) {
         const x = px(0, 42);
         ctx.fillStyle = '#c9541e';
         for (let i = 0; i < 7; i++) ctx.fillRect(x + ((i * 3) % 5) - 2, y + i * 2, 1, 2);
         ctx.fillStyle = '#ffd27a';
         ctx.fillRect(x, y + 6, 1, 2);
-        this.lights.push([x, y + 7, 12, '#ff7a2b']);
+        this.lights.push([x, y + 7, 7 + Math.floor(hash(r, 43) * 7), hash(r, 44) < 0.5 ? '#ff7a2b' : '#ffb347']);
       }
     }
   }
 
-  /** Selbstleuchtendes im Fels links/rechts vom Schacht (Kristalle, Pilze, Lavarisse). */
+  /** Selbstleuchtendes im Fels links/rechts vom Schacht (Flechten, Kristalle, Pilze; Lava: lavaRock). */
   private sideEmitters(ctx: CanvasRenderingContext2D, zone: Zone, r: number, ox: number, y: number, W: number) {
-    if (zone === 'earth') return;
+    if (zone === 'earth' || zone === 'lava') return;
     for (const side of [-1, 1]) {
       const h = hash(r * 2 + (side > 0 ? 1 : 0), 51);
-      if (h > (zone === 'lava' ? 0.4 : zone === 'rock' ? 0.22 : 0.32)) continue;
+      if (h > (zone === 'rock' ? 0.22 : 0.32)) continue;
       // irgendwo im sichtbaren Fels, mit Abstand zur Schachtwand
       const span = Math.max(8, W / 2 - HW - 20);
       const dist = HW + 14 + Math.floor(hash(r, 52 + side) * span);
@@ -1001,17 +1004,84 @@ export class World {
         const s = this.crystals[k * 2 + 1];
         ctx.drawImage(s, x - 6, y + 2);
         this.lights.push([x, y + 8, 16, CRYSTAL_COLORS[k][1]]);
-      } else if (zone === 'shroom') {
+      } else {
         const k = Math.floor(h * 97) % 3;
         const s = this.shrooms[k * 2 + 1];
         ctx.drawImage(s, x - 5, y + 4);
         this.lights.push([x, y + 8, 14, ['#63f0d0', '#b8f05a', '#f08ae6'][k]]);
-      } else {
-        ctx.fillStyle = '#ff8a2b';
-        for (let i = 0; i < 6; i++) ctx.fillRect(x + ((i * 5) % 7) - 3, y + i * 2 + 2, 1, 2);
+      }
+    }
+  }
+
+  /**
+   * Lava-Zone im Fels neben dem Schacht – bewusst unregelmäßig: wenige Lavaströme über
+   * mehrere Zeilen, verzweigte Risse und kleine Glutnester, mit unterschiedlicher Größe
+   * und Helligkeit (kein gleichmäßiges Raster aus Lichtkreisen).
+   */
+  private lavaRock(ctx: CanvasRenderingContext2D, r: number, ox: number, y: number, W: number, v: ViewState) {
+    const span = Math.max(8, W / 2 - HW - 16);
+    const glow = ['#ff7a2b', '#ffb347', '#e2541e', '#ff9a3c'];
+    for (const side of [-1, 1]) {
+      const s = side > 0 ? 1 : 0;
+      // 1) Lavastrom: gehört zu einem Block aus 5 Zeilen, läuft durch dessen Zeilen 1–3
+      const block = Math.floor(r / 5);
+      const inBlock = r % 5;
+      if (hash(block * 2 + s, 91) < 0.38 && inBlock >= 1 && inBlock <= 3) {
+        const x = ox + side * (HW + 12 + Math.floor(hash(block, 92 + s) * span));
+        const wob = (yy: number) => Math.round(Math.sin((r * T + yy) * 0.18 + block) * 2);
+        for (let yy = 0; yy < T; yy++) {
+          const xx = x + wob(yy);
+          ctx.fillStyle = '#7a2416';
+          ctx.fillRect(xx - 2, y + yy, 5, 1);
+          ctx.fillStyle = '#e2541e';
+          ctx.fillRect(xx - 1, y + yy, 3, 1);
+          ctx.fillStyle = '#ffb347';
+          ctx.fillRect(xx, y + yy, 1, 1);
+        }
+        // helle Brocken, die den Strom hinunterfließen
+        if (!v.calm) {
+          const t = mod(v.time * 14 + hash(block, 93) * 40, T * 3);
+          const yy = Math.floor(t) - (inBlock - 1) * T;
+          if (yy >= 0 && yy < T) {
+            ctx.fillStyle = '#fff1b0';
+            ctx.fillRect(x + wob(yy), y + yy, 1, 2);
+          }
+        }
+        if (inBlock === 2) this.lights.push([x, y + 8, 14 + Math.floor(hash(block, 94 + s) * 10), glow[block % 4]]);
+        if (inBlock === 3) {
+          // kleine Lache am Ende
+          ctx.fillStyle = '#e2541e';
+          ctx.fillRect(x - 4, y + T - 3, 9, 2);
+          ctx.fillStyle = '#ffd27a';
+          ctx.fillRect(x - 2, y + T - 3, 4, 1);
+        }
+        continue;
+      }
+      const h = hash(r * 2 + s, 95);
+      if (h > 0.2) continue;
+      const x = ox + side * (HW + 10 + Math.floor(hash(r, 96 + s) * span));
+      const yy = y + Math.floor(hash(r, 98 + s) * (T - 6));
+      if (h < 0.12) {
+        // 2) verzweigter Riss, unterschiedlich lang
+        const len = 4 + Math.floor(hash(r, 99) * 6);
+        ctx.fillStyle = '#c9541e';
+        let cx = x;
+        for (let i = 0; i < len; i++) {
+          cx += hash(r * 13 + i, 100) < 0.5 ? -1 : 1;
+          ctx.fillRect(cx, yy + i, 1, 1);
+          if (i === 2) ctx.fillRect(cx + 1, yy + i, 2, 1);
+        }
         ctx.fillStyle = '#ffd27a';
-        ctx.fillRect(x, y + 7, 1, 3);
-        this.lights.push([x, y + 8, 16, '#ff7a2b']);
+        ctx.fillRect(x, yy + 1, 1, 2);
+        if (hash(r, 101) < 0.6) this.lights.push([x, yy + 3, 7 + Math.floor(hash(r, 102) * 6), glow[r % 4]]);
+      } else {
+        // 3) Glutnest: kleiner, heller Fleck, flackert leicht
+        const flick = v.calm ? 0 : Math.floor(v.time * 3 + r) % 3 === 0 ? 1 : 0;
+        ctx.fillStyle = '#e2541e';
+        ctx.fillRect(x - 1, yy, 3, 2);
+        ctx.fillStyle = flick ? '#fff1b0' : '#ffb347';
+        ctx.fillRect(x, yy, 1, 1);
+        this.lights.push([x, yy + 1, 5 + Math.floor(hash(r, 103) * 5), glow[(r + 1) % 4]]);
       }
     }
   }
