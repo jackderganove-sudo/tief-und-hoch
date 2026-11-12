@@ -52,9 +52,9 @@ export function QuestionCard({
         <p className="mt-3 font-tiny text-xs uppercase opacity-75">
           <span aria-hidden>{TOPIC_EMOJI[question.topic]}</span> {t(`topics.${question.topic}`)}
         </p>
-        <h1 className="mt-1 text-[1.6rem] font-bold leading-[1.1] sm:text-3xl">{question.prompt}</h1>
+        <h1 className="mt-1 text-[1.6rem] font-bold leading-[1.1] sm:text-3xl [@media(max-height:520px)]:text-[1.35rem]">{question.prompt}</h1>
         <form
-          className="mt-4 flex gap-2"
+          className="mt-4 flex gap-2 [@media(max-height:520px)]:mt-2"
           onSubmit={(e) => {
             e.preventDefault();
             if (input.trim()) send(input);
@@ -70,6 +70,11 @@ export function QuestionCard({
             enterKeyHint="send"
             maxLength={60}
             readOnly={sending}
+            // iOS verschiebt nur den sichtbaren Ausschnitt – Feld nach dem Öffnen der Tastatur sicher ins Bild holen
+            onFocus={(e) => {
+              const el = e.currentTarget;
+              window.setTimeout(() => el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 300);
+            }}
             placeholder={t('game.placeholder')}
             aria-label={t('game.placeholder')}
             className={`${theme.field} min-w-0 flex-1 bg-transparent px-1 text-xl placeholder:opacity-50`}

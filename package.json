@@ -24,7 +24,8 @@
     "i18next": "^27.1.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "react-i18next": "^18.0.1"
+    "react-i18next": "^18.0.1",
+    "workbox-window": "^7.4.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.5",
@@ -38,6 +39,7 @@
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.1.0",
     "zod": "^4.6.7"
   }

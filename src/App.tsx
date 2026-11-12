@@ -10,6 +10,7 @@ import { HomeScreen } from './screens/HomeScreen';
 import { GameScreen } from './screens/GameScreen';
 import { ResultScreen } from './screens/ResultScreen';
 import { PracticeScreen } from './screens/PracticeScreen';
+import { UpdateToast } from './pwa/UpdateToast';
 
 // Nur im Dev-Server oder mit VITE_ENABLE_DEBUG=true geladen; sonst fällt der Import komplett weg.
 const DebugPanel = import.meta.env.DEV || __DEBUG_BUILD__ ? lazy(() => import('./debug/DebugPanel')) : null;
@@ -76,6 +77,8 @@ export default function App() {
           onOtherMode={() => open(screen.mode === 'rare' ? 'common' : 'rare')}
         />
       )}
+      {/* Update-Hinweis nie während einer Runde (Tagesspiel oder Übung) */}
+      <UpdateToast hidden={screen.name === 'game' || screen.name === 'practice'} />
       {DebugPanel && debugEnabled && (
         <Suspense fallback={null}>
           <DebugPanel

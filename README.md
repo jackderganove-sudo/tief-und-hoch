@@ -194,6 +194,19 @@ npm run review-ai-answers -- --apply-approved             # Freigaben → Fragen
 npm run test:rls                                          # RLS-Tests gegen das Projekt (mit Rollback)
 ```
 
+## Als App installieren (PWA)
+
+Manifest + Service Worker über `vite-plugin-pwa`: Chrome/Android bietet „App installieren“ an,
+auf iPhone/iPad geht es über „Teilen → Zum Home-Bildschirm“ (Hinweis im Hilfe-Menü „?“).
+
+- **Offline:** App-Shell, Code inkl. Fragen, Grafiken und Schriften liegen im Cache – die
+  Tagesrunde startet auch ohne Netz. Supabase (KI-Prüfung, Datenbank, Login) wird nie gecacht;
+  offline zeigt die KI-Prüfung „Konnte nicht geprüft werden“.
+- **Updates:** neue Version → kleiner Hinweis „Neue Version – Neu laden“, nie während einer Runde,
+  nie automatisch.
+- **Icons:** `python3 scripts/make-icons.py [--preview]` zeichnet das Pixel-Icon (32er-Raster,
+  nur ganzzahlig vergrößert) nach `public/icons/`, `public/apple-touch-icon.png`, `public/favicon-*.png`.
+
 ## Übungsmodus
 
 Startseite → „∞ Übung“: Abstieg oder Aufstieg wählen, Themen per Checkbox („Alle Themen“

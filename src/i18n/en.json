@@ -125,5 +125,16 @@
     "again": "Again",
     "noQuestions": "There are no questions for this selection.",
     "gaugeHint": "The gauge shows your average, projected over 7 questions."
+  },
+  "pwa": {
+    "updateReady": "New version",
+    "reload": "Reload",
+    "dismiss": "Later",
+    "installTitle": "Install as an app",
+    "installButton": "Install app",
+    "installText": "Highs & Lows then starts like a normal app – even offline.",
+    "iosStep1": "Tap “Share” at the bottom",
+    "iosStep2": "Choose “Add to Home Screen”",
+    "iosStep1Pad": "Tap “Share” at the top"
   }
 }

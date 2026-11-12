@@ -87,7 +87,7 @@ export function ResultScreen({
         <PixelWorld view={mode} meters={meters} />
       </div>
 
-      <div className="relative z-10 mx-auto max-w-xl px-3 pb-10 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <div className="relative z-10 mx-auto max-w-xl px-3 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]">
         <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
           <Panel tone={theme.panel} className="px-1 text-center">
             <p className="font-tiny text-xs uppercase opacity-75">{t('result.title', { mode: t(`modes.${mode}.name`) })}</p>

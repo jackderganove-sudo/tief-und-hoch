@@ -125,5 +125,16 @@
     "again": "Nochmal",
     "noQuestions": "Für diese Auswahl gibt es keine Fragen.",
     "gaugeHint": "Der Höhenmesser zeigt deinen Schnitt, hochgerechnet auf 7 Fragen."
+  },
+  "pwa": {
+    "updateReady": "Neue Version",
+    "reload": "Neu laden",
+    "dismiss": "Später",
+    "installTitle": "Als App installieren",
+    "installButton": "App installieren",
+    "installText": "Dann startet Highs & Lows wie eine normale App – auch offline.",
+    "iosStep1": "Unten auf „Teilen“ tippen",
+    "iosStep2": "„Zum Home-Bildschirm“ wählen",
+    "iosStep1Pad": "Oben auf „Teilen“ tippen"
   }
 }

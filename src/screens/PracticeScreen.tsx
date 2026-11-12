@@ -109,7 +109,7 @@ function PracticeSetup({
       <div className="fixed inset-0">
         <PixelWorld view={setup.mode} meters={setup.mode === 'rare' ? 2600 : 1800} />
       </div>
-      <div className="relative z-10 mx-auto max-w-xl px-3 pb-8 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <div className="relative z-10 mx-auto max-w-xl px-3 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]">
         <PxButton tone={theme.secondary} small onClick={onExit} aria-label={t('game.back')} className="text-base">
           ← {t('game.back')}
         </PxButton>

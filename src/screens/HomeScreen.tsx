@@ -9,6 +9,7 @@ import { LanguageToggle } from '../components/LanguageToggle';
 import { Panel, PxButton } from '../components/px';
 import { useCountdown } from '../game/useBerlinDay';
 import { currentLang, localeFor } from '../i18n';
+import { InstallHint } from '../pwa/InstallHint';
 
 /**
  * Startseite: Querschnitt der Welt – oben Himmel mit Ballon, unten der
@@ -70,10 +71,10 @@ export function HomeScreen({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 z-40 grid place-items-center bg-[#0e0a16]/70 p-5"
+            className="absolute inset-0 z-40 grid place-items-center bg-[#0e0a16]/70 px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]"
             onClick={() => setShowRules(false)}
           >
-            <motion.div initial={{ y: 12 }} animate={{ y: 0 }} className="max-w-sm">
+            <motion.div initial={{ y: 12 }} animate={{ y: 0 }} className="max-h-full max-w-sm overflow-y-auto">
               <Panel tone="wood" className="px-1">
                 <h2 className="text-3xl font-bold">{t('home.rules')}</h2>
                 <p className="mt-2 text-lg leading-snug">{t('home.rulesText')}</p>
@@ -86,6 +87,7 @@ export function HomeScreen({
                 <p className="mt-1 text-lg leading-snug">
                   ∞ <b>{t('practice.name')}</b>: {t('practice.intro')}
                 </p>
+                <InstallHint />
               </Panel>
             </motion.div>
           </motion.div>

@@ -52,7 +52,7 @@ export function PlayShell({
     <div className="relative h-dvh w-full overflow-hidden">
       <PixelWorld view={mode} meters={meters} fx={fx} />
 
-      <div className="relative z-20 mx-auto flex h-full max-w-xl flex-col overflow-y-auto px-3 pb-6 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <div className="relative z-20 mx-auto flex h-full max-w-xl flex-col overflow-y-auto px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))]">
         <header className="flex items-stretch gap-2">
           <PxButton tone={theme.secondary} small onClick={onBack} aria-label={backLabel} className="shrink-0 text-base">
             ←
@@ -66,8 +66,9 @@ export function PlayShell({
             {new Intl.NumberFormat(locale).format(meters)} m
           </Panel>
         </header>
-        {strip && <div className="mt-2">{strip}</div>}
-        <div className="mt-3">{children}</div>
+        {/* Bei sehr niedriger Höhe (Bildschirmtastatur offen) Fortschritt ausblenden, damit das Eingabefeld sichtbar bleibt */}
+        {strip && <div className="mt-2 [@media(max-height:520px)]:hidden">{strip}</div>}
+        <div className="mt-3 [@media(max-height:520px)]:mt-2">{children}</div>
       </div>
     </div>
   );
