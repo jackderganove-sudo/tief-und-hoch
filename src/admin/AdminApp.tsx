@@ -18,7 +18,7 @@ export default function AdminApp() {
 
   useEffect(() => {
     document.title = 'Highs & Lows – Admin';
-    setThemeColor('#17121f');
+    setThemeColor('#16121f');
     if (!adminDb) return;
     void adminDb.auth.getSession().then(({ data }) => setSession(data.session));
     const { data } = adminDb.auth.onAuthStateChange((_e, s) => setSession(s));

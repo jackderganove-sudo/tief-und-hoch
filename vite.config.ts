@@ -36,8 +36,9 @@ export default defineConfig({
         scope: '/',
         display: 'standalone',
         orientation: 'portrait',
-        theme_color: '#2fbdff',
-        background_color: '#2fbdff',
+        // neutral dunkel: färbt u. a. die untere Android-Leiste, wenn sie nicht transparent ist
+        theme_color: '#16121f',
+        background_color: '#16121f',
         categories: ['games', 'education'],
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },

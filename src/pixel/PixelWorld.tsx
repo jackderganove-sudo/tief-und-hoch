@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { sampleTopColor, setThemeColor } from '../pwa/themeColor';
+import { setThemeColor } from '../pwa/themeColor';
+import { systemBarColor } from './barColors';
 import type { TierId } from '../domain/types';
 import { loadImages } from './assets';
 import { BALLOON_X, PPM, World, type ViewState } from './world';
@@ -149,11 +150,10 @@ export function PixelWorld({ view, meters = 0, fx = null }: { view: WorldView; m
         balloonX: view === 'home' ? 0 : BALLOON_X,
       };
       world.draw(ctx, W, H, state, dt);
-      // Systemleisten in der Farbe der Szene (Himmel bzw. aktuelle Höhlenzone)
-      if (now - lastTheme > 400) {
+      // Systemleisten: feste Farbe je Ort (Himmel nach Höhe, Höhle nach Zone)
+      if (now - lastTheme > 300) {
         lastTheme = now;
-        const c = sampleTopColor(ctx, W);
-        if (c) setThemeColor(c);
+        setThemeColor(systemBarColor(view, pos));
       }
     };
 
