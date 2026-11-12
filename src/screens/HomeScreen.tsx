@@ -45,7 +45,7 @@ export function HomeScreen({
       </div>
 
       {/* Titel-Schild oben im Himmel */}
-      <div className="absolute inset-x-0 top-[6.5%] z-20 flex flex-col items-center px-4">
+      <div className="absolute inset-x-0 top-[calc(max(0.75rem,env(safe-area-inset-top))+3.25rem)] z-20 flex flex-col items-center px-4 [@media(min-aspect-ratio:1/1)]:top-[6.5%]">
         <Panel tone="wood" className="max-w-sm px-2 text-center">
           <h1 className="text-4xl font-bold leading-none sm:text-5xl">{t('app.title')}</h1>
           <p className="mt-1 text-sm leading-tight sm:text-base">{t('app.tagline')}</p>

@@ -32,6 +32,8 @@ const FALLBACK_MODEL = Deno.env.get('GEMINI_FALLBACK_MODEL') ?? 'gemini-3.5-flas
 const FALLBACK_THINKING = Deno.env.get('GEMINI_FALLBACK_THINKING') ?? 'minimal';
 /** Das Spiel wartet 6 s; so lange wartet die Funktion auf die KI, bevor sie dem Spieler antwortet. */
 const GEMINI_TIMEOUT_MS = 4700;
+/** Spätestens so lange nach Eingang der Anfrage antwortet die Funktion dem Spieler (Netz-Puffer bis 6 s). */
+const RESPOND_WITHIN_MS = 5300;
 /** Danach prüft sie im Hintergrund weiter und speichert das Urteil, sobald es da ist. */
 const BACKGROUND_TIMEOUT_MS = 25_000;
 /** Ist das Hauptmodell bis dahin nicht fertig, startet das Ersatzmodell parallel. */
@@ -352,6 +354,7 @@ async function recheckBatch(limit: number): Promise<Response> {
 }
 
 async function handle(req: Request): Promise<Response> {
+  const reqStart = Date.now();
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
 
   let body: { question_id?: unknown; answer?: unknown; recheck?: unknown; mode?: unknown; limit?: unknown };
@@ -399,12 +402,25 @@ async function handle(req: Request): Promise<Response> {
     return json(verdict({ status: 'valid', list_answer: listed, canonical_text: listed }));
   }
 
+  // Freigaben, Cache und Limits gleichzeitig abfragen (spart Zeit vor der KI)
+  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const [approvedRes, hitRes, mine, all] = await Promise.all([
+    admin.from('approved_answers').select('text, aliases, base_score, merged_into').eq('question_id', questionId),
+    isAdmin
+      ? Promise.resolve({ data: null })
+      : admin
+          .from('ai_verdicts')
+          .select('valid, list_answer, canonical_text, estimated_base_score, reason')
+          .eq('question_id', questionId)
+          .eq('normalized_answer', key)
+          .neq('review_status', 'unchecked')
+          .maybeSingle(),
+    isAdmin ? Promise.resolve({ count: 0 }) : admin.from('ai_judge_log').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('kind', 'model').gte('created_at', since),
+    isAdmin ? Promise.resolve({ count: 0 }) : admin.from('ai_judge_log').select('id', { count: 'exact', head: true }).eq('kind', 'model').gte('created_at', since),
+  ]);
+
   // Von mir freigegeben (auch Schreibweisen/Aliase) → wie eine Listen-Antwort
-  const { data: approvedRows } = await admin
-    .from('approved_answers')
-    .select('text, aliases, base_score, merged_into')
-    .eq('question_id', questionId);
-  const approved = findApproved(approvedRows ?? [], answer);
+  const approved = findApproved(approvedRes.data ?? [], answer);
   if (approved) {
     log(user.id, questionId, { kind: 'list' });
     const merged = findListAnswer(question, approved.merged_into);
@@ -420,43 +436,32 @@ async function handle(req: Request): Promise<Response> {
   }
 
   // Cache (abgelehnte Urteile stehen hier mit valid = false; „unchecked“ ist KEIN Treffer)
-  if (!isAdmin) {
-    const { data: hit } = await admin
-      .from('ai_verdicts')
-      .select('valid, list_answer, canonical_text, estimated_base_score, reason, review_status')
-      .eq('question_id', questionId)
-      .eq('normalized_answer', key)
-      .neq('review_status', 'unchecked')
-      .maybeSingle();
-    if (hit) {
-      log(user.id, questionId, { kind: 'cache' });
-      return json(
-        verdict({
-          status: hit.valid ? 'valid' : 'invalid',
-          list_answer: hit.list_answer,
-          canonical_text: hit.canonical_text,
-          estimated_base_score: hit.estimated_base_score,
-          reason: hit.reason,
-          cached: true,
-        }),
-      );
-    }
+  const hit = hitRes.data;
+  if (hit) {
+    log(user.id, questionId, { kind: 'cache' });
+    return json(
+      verdict({
+        status: hit.valid ? 'valid' : 'invalid',
+        list_answer: hit.list_answer,
+        canonical_text: hit.canonical_text,
+        estimated_base_score: hit.estimated_base_score,
+        reason: hit.reason,
+        cached: true,
+      }),
+    );
+  }
 
-    // Rate-Limit: pro Spieler und insgesamt, jeweils über die letzten 24 Stunden
-    const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-    const [mine, all] = await Promise.all([
-      admin.from('ai_judge_log').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('kind', 'model').gte('created_at', since),
-      admin.from('ai_judge_log').select('id', { count: 'exact', head: true }).eq('kind', 'model').gte('created_at', since),
-    ]);
-    if ((mine.count ?? 0) >= USER_LIMIT || (all.count ?? 0) >= GLOBAL_LIMIT) {
-      log(user.id, questionId, { kind: 'limited' });
-      storeUnchecked(questionId, key, 'limited');
-      return json(verdict({ status: 'limited' }));
-    }
+  // Rate-Limit: pro Spieler und insgesamt, jeweils über die letzten 24 Stunden
+  if (!isAdmin && ((mine.count ?? 0) >= USER_LIMIT || (all.count ?? 0) >= GLOBAL_LIMIT)) {
+    log(user.id, questionId, { kind: 'limited' });
+    storeUnchecked(questionId, key, 'limited');
+    return json(verdict({ status: 'limited' }));
   }
 
   // Admin-Nachprüfung: länger warten (kein Spieler-Timer)
-  return json(await judgeAndStore(user.id, questionId, question, answer, key, isAdmin ? 20_000 : GEMINI_TIMEOUT_MS));
+  // Spieler: Antwort spätestens RESPOND_WITHIN_MS nach Eingang (danach prüft der Hintergrund weiter)
+  const waitMs = isAdmin ? 20_000 : Math.max(1500, RESPOND_WITHIN_MS - (Date.now() - reqStart));
+  return json(await judgeAndStore(user.id, questionId, question, answer, key, waitMs));
 }
 
 Deno.serve(async (req) => {
