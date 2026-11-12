@@ -7,7 +7,7 @@
  * ganzzahlig und ohne Glättung hochskaliert wird. Alle Positionen werden gerundet.
  */
 import type { Images } from './assets';
-import { crystalCluster, fossil, pebbles, roots, rng, shroomCluster, vine, worm } from './decor';
+import { cobweb, crystalCluster, fossil, pebbles, roots, rng, shroomPatch, vine, worm } from './decor';
 import {
   balloonSprite,
   batSprites,
@@ -823,6 +823,9 @@ export class World {
         }
       }
 
+      // --- Hintergrund-Fels neben dem Schacht: dunkler, eigene Struktur (Deko hängt nicht vor „nichts“)
+      if (r >= 1) this.backRock(ctx, zone, r, ox, y, W);
+
       // --- Leuchtendes im Fels neben dem Schacht: die Zone ist auch außerhalb der Lampe erkennbar
       if (r >= 2 && r < LAKE_ROW) {
         if (zone === 'lava') this.lavaRock(ctx, r, ox, y, W, v);
@@ -843,6 +846,30 @@ export class World {
           }
           const mid = lx(0) + (side < 0 ? (len * T) / 2 : T - (len * T) / 2);
           if (zone === 'rock') {
+            // kleine Tropfsteine und eine Pfütze auf dem Sims
+            const [rd, rm, rl] = ROCK_TONES.rock;
+            for (let i = 0; i < 3; i++) {
+              const sx = lx(0) + 3 + Math.floor(hash(k * 3 + i, 261) * (len * T - 6));
+              const sh = 2 + Math.floor(hash(k * 3 + i, 262) * 4);
+              for (let j = 0; j < sh; j++) {
+                ctx.fillStyle = j === sh - 1 ? rl : rm;
+                ctx.fillRect(sx - (j < sh - 2 ? 1 : 0), y - j, j < sh - 2 ? 3 : 1, 1);
+              }
+              ctx.fillStyle = rd;
+              ctx.fillRect(sx - 1, y, 3, 1);
+            }
+            if (hash(k, 263) < 0.6) {
+              const pw = 6 + Math.floor(hash(k, 264) * 6);
+              const px0 = side < 0 ? lx(0) + len * T - pw - 4 : lx(0) + 4;
+              ctx.fillStyle = '#2a4a6a';
+              ctx.fillRect(px0, y + 1, pw, 1);
+              ctx.fillStyle = '#5a8ab8';
+              ctx.fillRect(px0 + 1, y + 1, Math.max(1, pw - 4), 1);
+              if (!v.calm && Math.floor(v.time * 1.5 + k) % 4 === 0) {
+                ctx.fillStyle = '#cfe8ff';
+                ctx.fillRect(px0 + 2, y + 1, 1, 1);
+              }
+            }
             if (hash(k, 74) < 0.7) {
               ctx.drawImage(this.stalactite, Math.round(mid - 19), y + T + 4);
               // Tropfen fällt von der Spitze
@@ -861,9 +888,9 @@ export class World {
             this.embedLip(ctx, Math.round(mid - s.width / 2), y, s.width, 'crystal', k);
             this.lights.push([Math.round(mid), y - 10, 15, CRYSTAL_COLORS[k % 3][1]]);
           } else if (zone === 'shroom') {
-            const s = shroomCluster(k * 7 + 3, 2, k % 3);
-            ctx.drawImage(s, Math.round(mid - s.width / 2), y - s.height + 3);
-            this.embedLip(ctx, Math.round(mid - s.width / 2), y, s.width, 'shroom', k);
+            // Pilzgruppe auf Moospolster, Fuß im Sims
+            const s = shroomPatch(k * 7 + 3, k % 3);
+            ctx.drawImage(s, Math.round(mid - s.width / 2), y - s.height + 4);
             if (len > 1) {
               // Pflanzen stehen auf dem Sims (Fuß auf der Oberkante)
               const plant = this.img[len >= 3 && hash(k, 76) < 0.5 ? 'warped/plant-big' : 'warped/plant-small'];
@@ -871,7 +898,7 @@ export class World {
               const px0 = side < 0 ? lx(0) : lx(0) + T - plant.width;
               ctx.drawImage(plant, px0, y - plant.height + 3);
             }
-            this.lights.push([Math.round(mid), y - 8, 13, ['#63f0d0', '#b8f05a', '#f08ae6'][k % 3]]);
+            this.softGlow(Math.round(mid), y - 6, 22, ['#63f0d0', '#b8f05a', '#f08ae6'][k % 3], k);
           } else {
             ctx.fillStyle = '#ffd27a';
             ctx.fillRect(Math.round(mid) - 6, y + 2, 12, 1);
@@ -892,11 +919,10 @@ export class World {
           const s = this.wallSprite('cr', r, size, k, left);
           this.wallGrowth(ctx, s, left, ox, y, zone, r);
           this.lights.push([left ? ox - HW + s.width - 2 : ox + HW - s.width + 2, y + 7, 9 + size * 3, CRYSTAL_COLORS[k][1]]);
-        } else if (zone === 'shroom' && h < 0.36) {
-          const size = (hash(r, 84) < 0.35 ? 1 : 0) as 0 | 1;
-          const s = this.wallSprite('sh', r, size, k, left);
-          this.wallGrowth(ctx, s, left, ox, y, zone, r);
-          this.lights.push([left ? ox - HW + s.width - 2 : ox + HW - s.width + 2, y + 7, 8 + size * 2, ['#63f0d0', '#b8f05a', '#f08ae6'][k]]);
+        } else if (zone === 'shroom' && h < 0.4) {
+          const s = this.wallSprite('sp', r, 0, k, left);
+          this.wallGrowth(ctx, s, left, ox, y - 4, zone, r);
+          this.softGlow(left ? ox - HW + 8 : ox + HW - 8, y + 8, s.height, ['#63f0d0', '#b8f05a', '#f08ae6'][k], r, true);
         } else if ((zone === 'rock' || zone === 'crystal' || zone === 'shroom') && h > 0.8) {
           // Felsnase an der Wand (gezeichnet, keine Kachel mit dunklem Grund)
           this.outcrop(ctx, left, ox, y + 3, zone, r);
@@ -969,6 +995,20 @@ export class World {
       const x = px(5, 14);
       for (let i = 0; i < 9; i++) ctx.fillRect(x + Math.round(Math.sin(i * 1.3 + r) * 1.5), y + i * 2, 1, 2);
     }
+    if (zone === 'rock') {
+      // Schichtband quer über die Rückwand
+      if (hash(r, 19) < 0.55) {
+        const by = y + Math.floor(hash(r, 20) * T);
+        ctx.fillStyle = hash(r, 21) < 0.5 ? '#3a3350' : '#524a6a';
+        for (let x = ox - HW; x < ox + HW; x += 1) ctx.fillRect(x, by + Math.round(Math.sin((x - ox) * 0.12 + r) * 1.2), 1, 1);
+      }
+      // Spinnennetz in einer Wandecke
+      if (hash(r, 22) < 0.12) {
+        const left = hash(r, 23) < 0.5;
+        const web = cobweb(r, left ? 1 : -1);
+        ctx.drawImage(web, left ? ox - HW : ox + HW - web.width, y);
+      }
+    }
     if (zone === 'rock' && hash(r, 15) < 0.6 && !v.calm && Math.floor(v.time * 2 + hash(r, 16) * 8) % 5 === 0) {
       ctx.fillStyle = '#9fd8ff';
       ctx.fillRect(px(6, 17), py(6, 18), 1, 1);
@@ -989,8 +1029,12 @@ export class World {
       const x = ox + side * dist;
       const seed = r * 2 + (side > 0 ? 1 : 0);
       if (zone === 'earth' || zone === 'rock') {
-        // Fossilien und Steine im Gestein, in der Erde auch Wurzeln und Würmer (ohne Leuchten)
+        // Fossilien, Steine und Erzadern im Gestein, in der Erde auch Wurzeln und Würmer (ohne Leuchten)
         const pick = hash(seed, 53);
+        if (zone === 'rock' && pick > 0.55) {
+          this.oreVein(ctx, x - 4, y + 2, seed);
+          continue;
+        }
         const s =
           pick < 0.3 ? fossil(seed) : pick < 0.65 ? pebbles(seed, ROCK_TONES[zone]) : zone === 'earth' ? (pick < 0.85 ? worm(seed) : roots(seed, 12)) : fossil(seed + 1);
         ctx.drawImage(s, Math.round(x - s.width / 2), y + 4);
@@ -1002,14 +1046,81 @@ export class World {
         this.embedLip(ctx, Math.round(x - s.width / 2), y + 15, s.width, 'crystal', seed);
         this.lights.push([x, y + 9, 11, CRYSTAL_COLORS[k][1]]);
       } else {
+        // Pilzgruppe auf Moospolster, direkt am Fels (kein Kasten)
         const k = Math.floor(h * 97) % 3;
-        const s = shroomCluster(seed * 5 + 2, hash(seed, 54) < 0.3 ? 1 : 0, k);
-        this.niche(ctx, x, y + 15, s.width + 4, 'shroom', seed);
-        ctx.drawImage(s, Math.round(x - s.width / 2), y + 16 - s.height);
-        this.embedLip(ctx, Math.round(x - s.width / 2), y + 15, s.width, 'shroom', seed);
-        this.lights.push([x, y + 9, 10, ['#63f0d0', '#b8f05a', '#f08ae6'][k]]);
+        const s = shroomPatch(seed * 5 + 2, k);
+        ctx.drawImage(s, Math.round(x - s.width / 2), y + 18 - s.height);
+        this.softGlow(x, y + 8, s.width, ['#63f0d0', '#b8f05a', '#f08ae6'][k], seed);
       }
     }
+  }
+
+  /**
+   * Weicher Schein statt Leuchtscheibe: mehrere kleine, schwache Lichter entlang
+   * einer Fläche (Polster/Gruppe) – wirkt wie Licht, das auf die Wand fällt.
+   */
+  private softGlow(cx: number, cy: number, extent: number, color: string, seed: number, vertical = false) {
+    const n = 3;
+    for (let i = 0; i < n; i++) {
+      const off = ((i + 0.5) / n - 0.5) * extent;
+      const jitter = (hash(seed + i, 231) - 0.5) * 4;
+      this.lights.push([Math.round(vertical ? cx + jitter : cx + off), Math.round(vertical ? cy + off : cy + jitter), 6 + Math.floor(hash(seed + i, 232) * 4), color]);
+    }
+  }
+
+  /** Eigene Felsstruktur im Hintergrund neben dem Schacht: dunkler, mit Schichten und Rissen. */
+  private backRock(ctx: CanvasRenderingContext2D, zone: Zone, r: number, ox: number, y: number, W: number) {
+    const [dark, mid] = ROCK_TONES[zone];
+    const edgeL = ox - HW - T;
+    const edgeR = ox + HW + T;
+    ctx.fillStyle = 'rgba(6,4,12,0.38)';
+    ctx.fillRect(0, y, Math.max(0, edgeL), T);
+    ctx.fillRect(edgeR, y, Math.max(0, W - edgeR), T);
+    // Schichtfugen (leicht wellig) und Risse
+    for (const [x0, x1] of [
+      [0, edgeL],
+      [edgeR, W],
+    ]) {
+      if (x1 - x0 < 4) continue;
+      // nur ab und zu eine Schichtfuge, unterbrochen und gegen die Wand hin auslaufend
+      if (hash(r, 242 + x0) < 0.4) {
+        const by = y + Math.floor(hash(r, 241 + x0) * T);
+        ctx.fillStyle = lerpColor(dark, mid, 0.6);
+        for (let x = x0; x < x1; x += 2) {
+          if (hash(x + r * 31, 246) < 0.3) continue;
+          ctx.fillRect(x, by + Math.round(Math.sin((x - ox) * 0.09 + r) * 1.5 + Math.sin((x - ox) * 0.023) * 3), 2, 1);
+        }
+      }
+      if (hash(r, 243 + x0) < 0.5) {
+        let cx = x0 + Math.floor(hash(r, 244 + x0) * (x1 - x0));
+        ctx.fillStyle = dark;
+        for (let i = 0; i < T; i++) {
+          cx += hash(r * 7 + i, 245) < 0.5 ? -1 : 1;
+          ctx.fillRect(cx, y + i, 1, 1);
+        }
+      }
+    }
+  }
+
+  /** Steinzone: Erzader im Fels (Gold/Kupfer/Eisen) mit Glanzpunkt. */
+  private oreVein(ctx: CanvasRenderingContext2D, x: number, y: number, seed: number) {
+    const ores: [string, string][] = [
+      ['#c8a040', '#ffe08a'],
+      ['#b86a3a', '#f0a070'],
+      ['#8a4a4a', '#d08080'],
+      ['#7a8aa8', '#d0e0ff'],
+    ];
+    const [c, glint] = ores[Math.floor(hash(seed, 251) * ores.length)];
+    let cx = x;
+    let cy = y;
+    for (let i = 0; i < 10; i++) {
+      cx += hash(seed * 3 + i, 252) < 0.5 ? 1 : -1;
+      cy += hash(seed * 5 + i, 253) < 0.6 ? 1 : 0;
+      ctx.fillStyle = c;
+      ctx.fillRect(cx, cy, hash(seed + i, 254) < 0.3 ? 2 : 1, 1);
+    }
+    ctx.fillStyle = glint;
+    ctx.fillRect(x + 1, y + 2, 1, 1);
   }
 
   /** Unregelmäßige Gesteinskante vor dem Fuß eines Objekts – es wirkt eingewachsen statt aufgelegt. */
@@ -1049,11 +1160,11 @@ export class World {
 
   /** Gedrehte Wand-Variante (Kristall/Pilz wächst zur Schachtmitte), gecacht. */
   private wallCache = new Map<string, Sprite>();
-  private wallSprite(kind: 'cr' | 'sh', seed: number, size: 0 | 1, palette: number, left: boolean): Sprite {
+  private wallSprite(kind: 'cr' | 'sp', seed: number, size: 0 | 1, palette: number, left: boolean): Sprite {
     const key = `${kind}-${seed}-${size}-${palette}-${left}`;
     let s = this.wallCache.get(key);
     if (!s) {
-      const up = kind === 'cr' ? crystalCluster(seed * 11 + 4, size, palette) : shroomCluster(seed * 11 + 6, size, palette);
+      const up = kind === 'cr' ? crystalCluster(seed * 11 + 4, size, palette) : shroomPatch(seed * 11 + 6, palette);
       this.wallCache.set(key, (s = rotate90(up, left ? 1 : -1)));
     }
     return s;

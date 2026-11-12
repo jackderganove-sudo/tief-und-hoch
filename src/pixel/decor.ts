@@ -252,3 +252,83 @@ export function vine(seed: number, len: number): Sprite {
     return c;
   });
 }
+
+// ---------------------------------------------------------------- Pilzgrotte
+
+/**
+ * Pilzgruppe auf einem Moospolster: 3–7 Pilze unterschiedlicher Größe, Polster mit
+ * Lichtkante, Myzel-Fäden darunter. Fuß unten; für Wände drehen.
+ */
+export function shroomPatch(seed: number, palette: number): Sprite {
+  return cached(`sp-${seed}-${palette}`, () => {
+    const r = rng(seed * 29 + palette * 3 + 1);
+    const W = 22 + Math.floor(r() * 8);
+    const H = 20;
+    const [c, ctx] = canvas(W, H);
+    const col = SHROOM_COLORS[palette % SHROOM_COLORS.length].map((x) => tint(x, (r() - 0.5) * 0.18));
+    // Myzel: feine helle Fäden unter dem Polster
+    for (let f = 0; f < 4; f++) {
+      let x = 3 + r() * (W - 6);
+      for (let y = H - 4; y < H; y++) {
+        x += (r() - 0.5) * 1.6;
+        px(ctx, x, y, f % 2 ? '#a8d8c8' : '#7fb8a8');
+      }
+    }
+    // Moospolster: flacher Hügel mit Lichtkante oben
+    const moss = ['#0f3a32', '#1f6f5a', '#2f9f7a', '#6fd8a8'];
+    for (let x = 0; x < W; x++) {
+      const t = (x - W / 2) / (W / 2);
+      const h = Math.max(1, Math.round((1 - t * t) * 5 + (r() - 0.5) * 1.5));
+      const top = H - 4 - h;
+      px(ctx, x, top, moss[3]);
+      px(ctx, x, top + 1, moss[2], 1, Math.max(1, h - 2));
+      px(ctx, x, top + h - 1, moss[1], 1, 2);
+      px(ctx, x, H - 3, moss[0]);
+    }
+    // Pilze: größere hinten, kleine vorne
+    const n = 3 + Math.floor(r() * 5);
+    const shrooms = Array.from({ length: n }, () => ({ x: 2 + r() * (W - 4), s: r() })).sort((a, b) => b.s - a.s);
+    for (const m of shrooms) {
+      const cw = 3 + Math.round(m.s * 6);
+      const stem = 2 + Math.round(m.s * 6);
+      const capH = Math.max(2, Math.round(cw * 0.45));
+      const t = (m.x - W / 2) / (W / 2);
+      const ground = H - 4 - Math.max(1, Math.round((1 - t * t) * 5)) + 1;
+      const top = ground - stem - capH;
+      px(ctx, m.x - 0.5, top + capH, '#d8efe6', 1, stem);
+      if (cw > 4) px(ctx, m.x + 0.5, top + capH, '#8aa69c', 1, stem);
+      for (let y = 0; y < capH; y++) {
+        const half = Math.sqrt(1 - ((capH - y) / (capH + 0.5)) ** 2) * (cw / 2);
+        for (let x = Math.round(m.x - half); x <= Math.round(m.x + half); x++) {
+          const rel = (x - m.x) / Math.max(1, half);
+          px(ctx, x, top + y, y === 0 || rel < -0.3 ? col[1] : rel > 0.45 ? tint(col[2], -0.25) : col[2]);
+        }
+      }
+      px(ctx, m.x - cw / 2 + 1, top + capH, tint(col[2], -0.45), cw - 1, 1);
+      px(ctx, m.x - cw * 0.2, top + 1, col[0]);
+    }
+    return c;
+  });
+}
+
+// ---------------------------------------------------------------- Steinzone
+
+/** Spinnennetz für eine Ecke (oben an der Wand): dir 1 = Netz nach rechts, -1 = nach links. */
+export function cobweb(seed: number, dir: 1 | -1): Sprite {
+  return cached(`cw-${seed}-${dir}`, () => {
+    const r = rng(seed * 37 + 2);
+    const S = 10 + Math.floor(r() * 6);
+    const [c, ctx] = canvas(S, S);
+    ctx.globalAlpha = 0.55;
+    const ox = dir > 0 ? 0 : S - 1;
+    // Speichen
+    for (const a of [0.15, 0.5, 0.85]) {
+      for (let i = 0; i < S; i++) px(ctx, ox + dir * i * Math.cos(a * 1.4), i * Math.sin(a * 1.4) * 0.9, '#d8d8e8');
+    }
+    // Querfäden
+    for (const rad of [S * 0.35, S * 0.65, S * 0.9]) {
+      for (let a = 0.1; a < 1.45; a += 0.08) px(ctx, ox + dir * rad * Math.cos(a), rad * Math.sin(a) * 0.9, '#c0c0d4');
+    }
+    return c;
+  });
+}
