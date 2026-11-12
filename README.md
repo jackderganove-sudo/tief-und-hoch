@@ -271,6 +271,48 @@ Fragen künftiger Tage können aber vorkommen. Die Themenauswahl (`TopicPicker`,
 `TopicSelection`, `QuestionRepository.getQuestions`) ist eigenständig gebaut und für den
 Freunde-Modus wiederverwendbar.
 
+## Freunde-Modus (Live-Räume)
+
+Ein Gastgeber erstellt einen Raum (6-stelliger Code ohne verwechselbare Zeichen), Freunde treten per
+Code, Link (`?room=CODE`) oder QR-Code bei – auch ohne Konto (Name ist Pflicht, gleicher Namensfilter
+wie im Profil, im Raum eindeutig). 2–30 Spieler beantworten gleichzeitig dieselbe Frage.
+
+**Ablauf (serverseitig):** `lobby → countdown → question → scoring → reveal → … → finished`.
+Die Edge Function `room` steuert alles (Serverzeit, eine Abgabe pro Frage, nur in der Fragephase);
+Clients stoßen bei Timer-Ende nur an (`tick`), der Server entscheidet per Versionsvergleich.
+Fragen und Antwortlisten liegen in der Tabelle `questions` (für Clients gesperrt); Clients lesen nur
+`room_state()`: während der Frage den Fragetext, Antworten/Punkte erst in der Auflösung.
+Raum-Runden schreiben nie in `submissions` → kein Einfluss auf Tagesergebnis, Serien, Seltenheit.
+
+**Wertung „Gruppe“** (k = Spieler mit derselben Antwort, N = gültige Antworten, f = (k−1)/(N−1)·100):
+- Abstieg: nur du = 100, sonst Medaille aus f über die Abstiegs-Schwellen (k ≥ 2 höchstens 85).
+- Aufstieg: größte Gruppe (k ≥ 2) = 100, sonst Medaille aus f über die Aufstiegs-Schwellen.
+- 2 Spieler, Abstieg: verschiedene Antworten je 60 (sonst wäre jede Zweier-Runde ein Diamant).
+
+**Robustheit:** Realtime-Ankündigungen (ohne Inhalt) + Herzschlag alle 15 s + Wiederverbinden mit
+Backoff; beim Zurückkommen (sichtbar/online) wird der Zustand neu geholt. Verpasste Frage = 0.
+Gastgeber 45 s nicht erreichbar → Rolle geht an den am längsten Anwesenden. Später Beitretende
+spielen ab der nächsten Frage. Räume verfallen nach 2 h Inaktivität (pg_cron), höchstens
+10 neue Räume pro Spieler und Stunde.
+
+**Supabase Free Tier – was realistisch geht** (Stand der Limits: 200 gleichzeitige Realtime-
+Verbindungen, 100 Realtime-Nachrichten/s, 2 Mio. Nachrichten/Monat, 500 000 Function-Aufrufe/Monat):
+- Jeder Spieler hält 1 Realtime-Verbindung → höchstens ~200 Spieler gleichzeitig, z. B.
+  **6 volle 30er-Räume oder ~40 Räume à 5 Spieler**.
+- Nachrichten pro Frage ≈ N·(N+4) (Häkchen + Zustandswechsel an alle) → 30 Spieler ≈ 1 000,
+  ein 20-Fragen-Spiel ≈ 20 000; 5 Spieler, 7 Fragen ≈ 300. Spitzen beim Antworten: ein 30er-Raum
+  ≈ 40 Nachrichten/s → **2–3 große Räume gleichzeitig** bleiben unter 100/s.
+- Monatlich: ~100 große oder viele tausend kleine Spiele.
+
+```bash
+npm run questions-db                    # Fragen/Antwortlisten in die DB (nach Fragen-Änderungen)
+npx supabase functions deploy room      # Raum-Logik (nach npm run function-data)
+node scripts/room-smoke.mjs 3           # komplette Runde mit 3 Bots
+node scripts/room-scenarios.mjs         # Wertungen (Gruppe/Global, eigene Fragen, Korrektur)
+node scripts/room-robust.mjs            # Nachzügler, Reload, Gastgeber-Übergabe
+node scripts/room-load.mjs 30           # Lasttest: 30 Bots durch eine komplette Runde
+```
+
 ## Aufbau
 
 ```
