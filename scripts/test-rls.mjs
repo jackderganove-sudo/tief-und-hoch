@@ -47,6 +47,11 @@ const checks = [
   ['submissions lesen', await api('submissions?select=id&limit=1')],
   ['approved_answers schreiben', await api('approved_answers', { method: 'POST', body: JSON.stringify({ question_id: 'de-food-001', text: 'x', base_score: 1 }) })],
   ['approve_verdict aufrufen', await api('rpc/approve_verdict', { method: 'POST', body: JSON.stringify({ p_verdict: '00000000-0000-4000-8000-0000000000e1', p_text: 'x' }) })],
+  ['admin_overview aufrufen', await api('rpc/admin_overview', { method: 'POST', body: '{}' })],
+  ['admin_players aufrufen', await api('rpc/admin_players', { method: 'POST', body: '{}' })],
+  ['admin_set_ban aufrufen', await api('rpc/admin_set_ban', { method: 'POST', body: JSON.stringify({ p_user: '00000000-0000-4000-8000-00000000c001', p_banned: true }) })],
+  ['admin_log lesen', await api('admin_log?select=id&limit=1')],
+  ['player_bans lesen', await api('player_bans?select=user_id&limit=1')],
 ];
 let bad = 0;
 for (const [name, r] of checks) {
