@@ -1,9 +1,19 @@
 @import 'tailwindcss';
 
+/* Ziffern aus „Jersey 10“ (OFL): eindeutig unterscheidbar (5/S/8, 2/Z, 6/b), gleicher kräftiger
+   Pixel-Stil. Gilt per unicode-range NUR für 0–9; alle übrigen Zeichen bleiben Pixelify Sans. */
+@font-face {
+  font-family: 'HL Digits';
+  src: url('../node_modules/@fontsource/jersey-10/files/jersey-10-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0030-0039;
+  font-display: swap;
+  size-adjust: 118%;
+}
+
 @theme {
-  --font-display: 'Pixelify Sans', ui-monospace, monospace;
-  --font-sans: 'Pixelify Sans', ui-monospace, monospace;
-  --font-tiny: 'Silkscreen', ui-monospace, monospace;
+  --font-display: 'HL Digits', 'Pixelify Sans', ui-monospace, monospace;
+  --font-sans: 'HL Digits', 'Pixelify Sans', ui-monospace, monospace;
+  --font-tiny: 'HL Digits', 'Silkscreen', ui-monospace, monospace;
 
   /* Höhle */
   --color-cave-950: #07060b;

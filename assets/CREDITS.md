@@ -24,8 +24,9 @@ CC0 verlangt keine Namensnennung – wir nennen den Autor trotzdem gern.
 | --- | --- | --- | --- |
 | Pixelify Sans | Stefie Justprince | https://fonts.google.com/specimen/Pixelify+Sans | SIL OFL 1.1 |
 | Silkscreen | Jason Kottke | https://fonts.google.com/specimen/Silkscreen | SIL OFL 1.1 |
+| Jersey 10 (nur Ziffern 0–9) | Sarah Cadigan-Fried | https://fonts.google.com/specimen/Jersey+10 | SIL OFL 1.1 |
 
-Eingebunden über die npm-Pakete `@fontsource/pixelify-sans` und `@fontsource/silkscreen`.
+Eingebunden über die npm-Pakete `@fontsource/pixelify-sans`, `@fontsource/silkscreen` und `@fontsource/jersey-10`.
 
 ## Eigene Grafiken
 
