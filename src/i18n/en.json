@@ -135,6 +135,8 @@
     "installText": "Highs & Lows then starts like a normal app – even offline.",
     "iosStep1": "Tap “Share” at the bottom",
     "iosStep2": "Choose “Add to Home Screen”",
-    "iosStep1Pad": "Tap “Share” at the top"
+    "iosStep1Pad": "Tap “Share” at the top",
+    "fullscreen": "⛶ Fullscreen",
+    "exitFullscreen": "Exit fullscreen"
   }
 }

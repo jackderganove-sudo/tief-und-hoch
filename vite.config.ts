@@ -34,6 +34,8 @@ export default defineConfig({
         dir: 'ltr',
         start_url: '/',
         scope: '/',
+        // Android: immersiv ohne Status- und Gestenleiste; sonst (z. B. iOS) standalone
+        display_override: ['fullscreen', 'standalone'],
         display: 'standalone',
         orientation: 'portrait',
         // neutral dunkel: färbt u. a. die untere Android-Leiste, wenn sie nicht transparent ist

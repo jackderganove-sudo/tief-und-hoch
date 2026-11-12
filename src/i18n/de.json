@@ -135,6 +135,8 @@
     "installText": "Dann startet Highs & Lows wie eine normale App – auch offline.",
     "iosStep1": "Unten auf „Teilen“ tippen",
     "iosStep2": "„Zum Home-Bildschirm“ wählen",
-    "iosStep1Pad": "Oben auf „Teilen“ tippen"
+    "iosStep1Pad": "Oben auf „Teilen“ tippen",
+    "fullscreen": "⛶ Vollbild",
+    "exitFullscreen": "Vollbild beenden"
   }
 }

@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { PxButton } from '../components/px';
-import { useInstall } from './install';
+import { useEffect, useState } from 'react';
+import { canOfferFullscreen, useInstall } from './install';
 
 /** Pixel-Icon „Teilen“ (Kasten mit Pfeil nach oben), wie in Safari. */
 function ShareIcon() {
@@ -33,10 +34,36 @@ function DownArrow() {
  * Abschnitt im Hilfe-Menü: Android/Chrome → Knopf „App installieren“,
  * iPhone/iPad → Anleitung „Teilen → Zum Home-Bildschirm“, installiert → nichts.
  */
+/** Vollbild im normalen Browser (Android/Desktop) über die Fullscreen-API. */
+export function FullscreenToggle() {
+  const { t } = useTranslation();
+  const [full, setFull] = useState(() => !!document.fullscreenElement);
+  useEffect(() => {
+    const on = () => setFull(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', on);
+    return () => document.removeEventListener('fullscreenchange', on);
+  }, []);
+  if (!canOfferFullscreen()) return null;
+  return (
+    <PxButton
+      tone="wood"
+      small
+      className="mt-3 w-full text-base"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (document.fullscreenElement) void document.exitFullscreen();
+        else void document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+      }}
+    >
+      {full ? t('pwa.exitFullscreen') : t('pwa.fullscreen')}
+    </PxButton>
+  );
+}
+
 export function InstallHint() {
   const { t } = useTranslation();
   const install = useInstall();
-  if (install.kind === 'none') return null;
+  if (install.kind === 'none') return <FullscreenToggle />;
   return (
     <section className="mt-4 border-t-2 border-dashed border-current/25 pt-3">
       <h3 className="text-xl font-bold">{t('pwa.installTitle')}</h3>
@@ -55,6 +82,7 @@ export function InstallHint() {
           </li>
         </ol>
       )}
+      <FullscreenToggle />
     </section>
   );
 }

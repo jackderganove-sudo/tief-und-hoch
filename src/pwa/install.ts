@@ -35,6 +35,11 @@ export function isStandalone(): boolean {
   );
 }
 
+/** Vollbild per Fullscreen-API anbieten? Nur im Browser auf Android/Desktop, nicht auf iOS. */
+export function canOfferFullscreen(): boolean {
+  return !isIOS() && (!!document.fullscreenElement || !isStandalone()) && typeof document.documentElement.requestFullscreen === 'function';
+}
+
 export function isIOS(): boolean {
   const ua = navigator.userAgent;
   // iPadOS meldet sich als Mac – erkennbar am Touchscreen
