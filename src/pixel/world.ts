@@ -283,7 +283,7 @@ export class World {
 
   // ---------------------------------------------------------------- Effekte
 
-  burst(kind: string, x: number, y: number, power = 1) {
+  burst(kind: string, x: number, y: number, power = 1, calm = false) {
     const sets: Record<string, { colors: string[]; n: number; speed: number; gravity: number; life: number; size: number }> = {
       moss: { colors: ['#7ec850', '#4e9a3a', '#b8e86a'], n: 10, speed: 22, gravity: 40, life: 1.1, size: 1 },
       stone: { colors: ['#9a8fa8', '#6d6478', '#c8bfd2'], n: 12, speed: 30, gravity: 90, life: 0.9, size: 2 },
@@ -299,6 +299,16 @@ export class World {
       stars: { colors: ['#fff6c2', '#8be9fd', '#ff9bd0', '#b8f05a', '#ffffff'], n: 0, speed: 0, gravity: 0, life: 0, size: 0 },
     };
     const set = sets[kind] ?? sets.invalid;
+    if (calm) {
+      // Reduzierte Bewegung: ruhiges Funkeln an Ort und Stelle, das nur ausblendet.
+      const n = Math.max(6, Math.round(Math.min(set.n || 24, 24) * power));
+      for (let i = 0; i < n; i++) {
+        const a = hash(i, 3) * Math.PI * 2;
+        const r = 6 + hash(i, 4) * 18;
+        this.particles.push({ x: x + Math.cos(a) * r, y: y + Math.sin(a) * r * 0.7, vx: 0, vy: 0, life: 0, max: 1.2, color: set.colors[i % set.colors.length], size: 1, gravity: 0, glow: kind !== 'invalid' && kind !== 'stone' });
+      }
+      return;
+    }
     if (kind === 'stars') {
       // Feuerwerk: drei Raketen-Explosionen rund um den Ballon
       for (let b = 0; b < 4; b++) {

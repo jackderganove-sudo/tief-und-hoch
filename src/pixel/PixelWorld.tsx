@@ -75,8 +75,9 @@ export function PixelWorld({ view, meters = 0, fx = null }: { view: WorldView; m
     const fire = (f: WorldFx, now: number) => {
       if (!world) return;
       const power = 0.5 + f.points / 100;
-      if (view === 'rare') world.burst(f.tier, 0, shown * PPM, power);
-      else world.burst(f.tier, BALLOON_X, -shown * PPM - 40, power);
+      const calm = reduce.matches;
+      if (view === 'rare') world.burst(f.tier, 0, shown * PPM, power, calm);
+      else world.burst(f.tier, BALLOON_X, -shown * PPM - 40, power, calm);
       mood = f.points >= 100 ? 'cheer' : f.points === 0 ? 'flinch' : 'idle';
       moodUntil = now + (mood === 'cheer' ? 2600 : 900);
     };

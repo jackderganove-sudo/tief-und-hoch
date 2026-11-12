@@ -14,6 +14,8 @@ const OUT = 'screenshots';
 const args = process.argv.slice(2);
 const only = args.find((a) => a.startsWith('--only='))?.slice(7);
 const quick = args.includes('--quick');
+// --reduced: prefers-reduced-motion emulieren, Dateien bekommen das Präfix "reduced-"
+const reduced = args.includes('--reduced');
 const VIEWPORTS = [
   { name: 'mobile', width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true },
   { name: 'desktop', width: 1440, height: 900, deviceScaleFactor: 1 },
@@ -77,8 +79,9 @@ const browser = await chromium.launch();
 const problems = [];
 try {
   for (const vp of VIEWPORTS) {
-    const { name, ...opts } = vp;
-    const ctx = await browser.newContext({ ...opts, viewport: { width: vp.width, height: vp.height }, locale: 'de-DE' });
+    const { name: vpName, ...opts } = vp;
+    const name = reduced ? `reduced-${vpName}` : vpName;
+    const ctx = await browser.newContext({ ...opts, viewport: { width: vp.width, height: vp.height }, locale: 'de-DE', reducedMotion: reduced ? 'reduce' : 'no-preference' });
     await ctx.addInitScript(() => localStorage.setItem('tuh:v1:lang', 'de'));
     const page = await ctx.newPage();
     page.on('pageerror', (e) => problems.push(`${name}: ${e.message}`));
@@ -88,12 +91,12 @@ try {
     await page.screenshot({ path: `${OUT}/${name}-start.png` });
 
     // Abstieg: seltene Antworten (Ende der Liste), eine falsche
-    const doneRare = await playMode(page, vp, 'rare', [0.97, 0.5, null, 0.9, 0.99, 0.2, 0.95]);
+    const doneRare = await playMode(page, { ...vp, name }, 'rare', [0.97, 0.5, null, 0.9, 0.99, 0.2, 0.95]);
     if (doneRare) await page.getByRole('button', { name: /Startseite/ }).click();
     else await page.goto(BASE);
     await sleep(800);
     // Aufstieg: häufige Antworten (Anfang der Liste)
-    const doneCommon = await playMode(page, vp, 'common', [0, 0.05, null, 0, 0.3, 0, 0]);
+    const doneCommon = await playMode(page, { ...vp, name }, 'common', [0, 0.05, null, 0, 0.3, 0, 0]);
     if (doneCommon) {
       await page.getByRole('button', { name: /Startseite/ }).click();
       await sleep(800);
