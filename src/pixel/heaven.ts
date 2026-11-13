@@ -7,8 +7,8 @@
  * Koordinaten wie in world.ts: y = Bildschirm über at(m, f) (Höhe in Metern, Parallax f).
  */
 import type { Images } from './assets';
-import { crystalCluster } from './decor';
-import { canvas, rampMap, recolor, type Sprite } from './sprites';
+import { crystalCluster, rng } from './decor';
+import { canvas, flipX, fromRows, planeSprite, rampMap, recolor, type Sprite } from './sprites';
 import { DECK_M, GATE_M, HEAVEN_M } from './zones';
 
 const hash = (a: number, b = 0) => {
@@ -75,6 +75,11 @@ export class HeavenRenderer {
   private planets: HTMLImageElement;
   private rainbow = new Map<number, Sprite>();
   private shards: Sprite[];
+  private isles: Sprite[];
+  private islesFar: Sprite[];
+  private nacre: Sprite[];
+  private fan: Sprite;
+  private halo: Sprite;
 
   constructor(img: Images) {
     const gold = rampMap(GOLD);
@@ -99,6 +104,20 @@ export class HeavenRenderer {
     this.spaceFlip = flipY(img['space/background']);
     this.starsFlip = flipY(img['space/stars']);
     this.shards = [0, 1, 2].map((k) => crystalCluster(500 + k * 17, 1, k));
+    this.isles = [crystalIsland(1, 62), crystalIsland(2, 84), crystalIsland(3, 46), crystalIsland(4, 70)];
+    // ferne Ebene: kleiner und im Himmelsblau verdunstet
+    this.islesFar = [crystalIsland(5, 40, '#cfe0ff'), crystalIsland(6, 54, '#cfe0ff'), crystalIsland(7, 34, '#cfe0ff'), crystalIsland(8, 46, '#cfe0ff')];
+    // Perlmuttwolken: pastellweiß, am oberen Saum schillernd in Spektralfarben
+    const pearl = ['#ffffff', '#f2f0ff', '#dcdcfa', '#c2c8f0', '#a8b2e6'];
+    this.nacre = [41, 42, 43].map((sd, i) =>
+      cloudBank(sd, 240, 30 + i * 4, pearl, 'top', true, (x, y, d) => {
+        if (d > 5) return null;
+        const k = Math.floor(((x * 0.5 + y * 2 + d * 3) % 36) / 6);
+        return d < 1 ? '#ffffff' : mix(pearl[1], SPECTRUM[k], 0.4 - d * 0.05);
+      }),
+    );
+    this.fan = prismFanSprite();
+    this.halo = haloSprite(48);
   }
 
   /** Hinter dem Ballon. */
@@ -150,13 +169,24 @@ export class HeavenRenderer {
       const x0 = Math.round(W * (0.1 + i * 0.22) + (calm ? 0 : Math.sin(time * 0.2 + i) * 8));
       const w = 10 + (i % 3) * 6;
       ctx.globalAlpha = s * (0.06 + 0.03 * Math.sin(time * 0.5 + i));
-      ctx.fillStyle = '#ffe8a8';
-      for (let y = 0; y < bottom; y += 2) {
-        const sx = x0 + Math.round(y * 0.35);
-        ctx.fillRect(sx, y, w, 2);
-      }
+      // ein vorgezeichneter schräger Streifen statt ~200 fillRects je Strahl
+      const ray = this.raySprite(w);
+      const h = Math.min(bottom, ray.height);
+      if (h > 0) ctx.drawImage(ray, 0, 0, ray.width, h, x0, 0, ray.width, h);
     }
     ctx.restore();
+  }
+
+  private rays_ = new Map<number, Sprite>();
+  private raySprite(w: number): Sprite {
+    let r = this.rays_.get(w);
+    if (r) return r;
+    const H = 1024;
+    const [c, x] = canvas(w + Math.round(H * 0.35) + 1, H);
+    x.fillStyle = '#ffe8a8';
+    for (let y = 0; y < H; y += 2) x.fillRect(Math.round(y * 0.35), y, w, 2);
+    this.rays_.set(w, (r = c));
+    return r;
   }
 
   /** Schwebende Wolkeninseln mit Tempel, Säulen und Regenbogenbrücken. */
@@ -367,25 +397,73 @@ export class HeavenRenderer {
     }
   }
 
-  /** Kristallwolken (7.000–9.000 m): schwebende Kristalle in Wolkenfetzen, funkeln. */
+  /**
+   * Kristallwolken (7.000–9.000 m): Halo mit Nebensonnen, schillernde Perlmuttwolken,
+   * schwebende Kristallinseln mit Spektralfächern, großer Lichtfächer, funkelnde Splitter.
+   */
   private crystals(f: SkyFrame) {
     if (f.camM < GATE_M - 300 || f.camM > GATE_M + 2600) return;
-    const { ctx, W, time, calm } = f;
-    for (let i = 0; i < 16; i++) {
-      const m = GATE_M + 150 + i * 120 + hash(i, 121) * 80;
-      const par = i % 3 === 0 ? 0.6 : 0.85;
-      const y = f.at(m, par) + (calm ? 0 : Math.round(Math.sin(time * 0.8 + i) * 3));
-      if (y < -30 || y > f.bottom) continue;
-      const side = i % 2 ? 1 : -1;
-      const x = Math.round(f.balloonX + side * (36 + hash(i, 122) * (W / 2 - 40)) - 8);
-      const shard = this.shards[i % 3];
-      ctx.globalAlpha = par < 0.7 ? 0.6 : 1;
-      ctx.drawImage(shard, x, y);
-      if (!calm && Math.sin(time * 3 + i * 2) > 0.85) {
+    const { ctx, W, time, calm, bottom } = f;
+    // über dem Tor einblenden, vor dem Polarlicht ausblenden
+    const vis = clamp((f.camM - (GATE_M - 100)) / 350) * clamp((GATE_M + 2050 - f.camM) / 450);
+    if (vis <= 0) return;
+    ctx.globalAlpha = vis;
+    // 22°-Halo hoch oben (sehr fern, fast fest)
+    const hy = f.at(GATE_M + 1300, 0.18) - this.halo.height / 2;
+    if (hy < bottom && hy + this.halo.height > 0) ctx.drawImage(this.halo, Math.round(W * 0.3 - this.halo.width / 2 - f.camX * 0.02), hy);
+    // Perlmuttwolken: Bänke mit Regenbogensaum
+    for (let i = 0; i < this.nacre.length; i++) {
+      const [m, par] = [
+        [GATE_M + 350, 0.45],
+        [GATE_M + 1000, 0.6],
+        [GATE_M + 1650, 0.5],
+      ][i];
+      const s = this.nacre[i];
+      const y = f.at(m, par);
+      if (y > bottom || y + s.height < 0) continue;
+      const off = mod(Math.round(-f.camX * par * 0.5 + (calm ? 0 : time * (1.5 + i))), s.width);
+      for (let x = off - s.width; x < W; x += s.width) ctx.drawImage(s, x, y);
+    }
+    // Lichtfächer: Strahl bricht sich an einem Kristall (zwei Stück, pulsieren leicht)
+    for (let i = 0; i < 2; i++) {
+      const y = f.at(GATE_M + 500 + i * 800, 0.7);
+      if (y > bottom || y + this.fan.height < 0) continue;
+      const x = i ? Math.round(f.balloonX + 10) : Math.round(f.balloonX - 150);
+      ctx.globalAlpha = vis * (calm ? 0.8 : 0.65 + 0.3 * Math.sin(time * 0.7 + i * 2));
+      ctx.drawImage(this.fan, x, y);
+      ctx.globalAlpha = vis;
+      ctx.drawImage(this.shards[i], x + 38, y + 24);
+    }
+    // schwebende Kristallinseln in zwei Ebenen, links/rechts vom Ballon
+    for (let j = 0; j < 9; j++) {
+      const li = j % 2;
+      const par = li ? 0.85 : 0.55;
+      const m = GATE_M + 280 + j * 205 + hash(j, 131) * 60;
+      const isl = (li ? this.isles : this.islesFar)[j % this.isles.length];
+      const bob = calm ? 0 : Math.round(Math.sin(time * 0.5 + j) * 2);
+      const y = f.at(m, par) + bob;
+      if (y > bottom || y + isl.height < 0) continue;
+      const side = (j >> 1) % 2 ? 1 : -1;
+      const gap = 30 + Math.round(hash(j, 132) * 40);
+      const x = Math.round(side > 0 ? f.balloonX + gap : f.balloonX - gap - (isl.width - 34)) + (calm ? 0 : Math.round(Math.sin(time * 0.12 + j) * 5));
+      ctx.drawImage(isl, x, y);
+      if (!calm && Math.sin(time * 2.6 + j * 1.7) > 0.7) {
+        // Funkeln auf einer Kristallspitze
+        const sx = x + Math.round(isl.width * (0.25 + hash(j, 133) * 0.35));
+        const sy = y + Math.round(isl.height * 0.2);
         ctx.fillStyle = '#ffffff';
-        ctx.fillRect(x + 4, y + 2, 1, 3);
-        ctx.fillRect(x + 3, y + 3, 3, 1);
+        ctx.fillRect(sx, sy - 2, 1, 5);
+        ctx.fillRect(sx - 2, sy, 5, 1);
       }
+    }
+    // kleine Splitter dazwischen
+    for (let i = 0; i < 10; i++) {
+      const m = GATE_M + 150 + i * 190 + hash(i, 121) * 80;
+      const par = i % 3 === 0 ? 0.6 : 0.9;
+      const y = f.at(m, par) + (calm ? 0 : Math.round(Math.sin(time * 0.8 + i) * 3));
+      if (y < -30 || y > bottom) continue;
+      const x = Math.round(mod(hash(i, 122) * W + (calm ? 0 : time * (3 + (i % 4))), W + 20) - 10);
+      ctx.drawImage(this.shards[i % 3], x, y);
     }
     ctx.globalAlpha = 1;
   }
@@ -462,5 +540,742 @@ export class HeavenRenderer {
       else ctx.drawImage(this.planets, (i % 6) * 32, 0, 32, 32, x, y, 32, 32);
     }
     ctx.globalAlpha = 1;
+  }
+}
+
+// ================================================================ Pixel-Generatoren (nur beim Laden)
+
+type RGBA = [number, number, number, number];
+const rgbaCache = new Map<string, RGBA>();
+function rgba(h: string): RGBA {
+  let c = rgbaCache.get(h);
+  if (!c) {
+    const n = parseInt(h.slice(1, 7), 16);
+    rgbaCache.set(h, (c = [n >> 16, (n >> 8) & 255, n & 255, 255]));
+  }
+  return c;
+}
+/** Zwei Hex-Farben mischen → Hex. */
+function mix(a: string, b: string, t: number): string {
+  const x = rgba(a);
+  const y = rgba(b);
+  return '#' + [0, 1, 2].map((i) => Math.round(x[i] + (y[i] - x[i]) * t).toString(16).padStart(2, '0')).join('');
+}
+const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
+const bayer = (x: number, y: number) => BAYER[(y & 3) * 4 + (x & 3)];
+const SPECTRUM = ['#ff6a6a', '#ffb347', '#ffe28a', '#7ec850', '#5ab8ff', '#a87aff'];
+
+/** Kleiner Pixelpuffer: Pixel setzen (mit Deckkraft), am Ende ein Sprite – keine fillRect-Flut beim Laden. */
+class Px {
+  d: Uint8ClampedArray;
+  constructor(
+    public w: number,
+    public h: number,
+  ) {
+    this.d = new Uint8ClampedArray(w * h * 4);
+  }
+  set(x: number, y: number, c: string, a = 1) {
+    x = Math.round(x);
+    y = Math.round(y);
+    if (x < 0 || y < 0 || x >= this.w || y >= this.h || a <= 0) return;
+    const [r, g, b] = rgba(c);
+    const d = this.d;
+    const i = (y * this.w + x) * 4;
+    const al = Math.min(1, a);
+    const da = d[i + 3] / 255;
+    const oa = al + da * (1 - al);
+    d[i] = (r * al + d[i] * da * (1 - al)) / oa;
+    d[i + 1] = (g * al + d[i + 1] * da * (1 - al)) / oa;
+    d[i + 2] = (b * al + d[i + 2] * da * (1 - al)) / oa;
+    d[i + 3] = oa * 255;
+  }
+  sprite(): Sprite {
+    const [c, x] = canvas(this.w, this.h);
+    const im = x.createImageData(this.w, this.h);
+    im.data.set(this.d);
+    x.putImageData(im, 0, 0);
+    return c;
+  }
+}
+
+/**
+ * Haufenwolke (Cumulus) aus überlappenden Pixelkreisen: Licht von links oben,
+ * Falten zwischen den Ballen, flache schattige Unterseite, Bayer-Dithering an den Tonstufen.
+ * pal: [Glanz, hell, mittel, Schatten, Unterseite]
+ */
+function cumulus(seed: number, w: number, pal: string[], tower = 0.5): Sprite {
+  const r = rng(seed);
+  const h = Math.round(w * (0.42 + tower * 0.3));
+  const blobs: [number, number, number][] = [];
+  const n = 3 + Math.floor(w / 18);
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.5) / n;
+    const rad = w * (0.08 + 0.05 * Math.sin(Math.PI * t)) * (0.8 + r() * 0.4);
+    blobs.push([rad + (w - 2 * rad) * t + (r() - 0.5) * 4, h - 4 - rad * 0.75, rad]);
+  }
+  const m = 2 + Math.floor(w / 30);
+  for (let i = 0; i < m; i++) {
+    const t = (i + 0.5 + (r() - 0.5) * 0.5) / m;
+    const dome = Math.sin(Math.PI * (0.15 + t * 0.7));
+    const rad = w * (0.1 + 0.08 * dome) * (0.85 + r() * 0.3);
+    const cy = Math.max(rad + 1, h - 6 - rad - dome * (h - 8 - 2 * rad) * (0.55 + 0.45 * r()));
+    blobs.push([w * (0.12 + t * 0.76), cy, rad]);
+  }
+  blobs.sort((a, b) => a[1] - b[1]); // höhere Ballen hinten, tiefere davor
+  const left = Math.min(...blobs.map((b) => b[0] - b[2]));
+  const right = Math.max(...blobs.map((b) => b[0] + b[2]));
+  const px = new Px(w, h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let k = -1;
+      let behind = false;
+      for (let i = 0; i < blobs.length; i++) {
+        const [bx, by, br] = blobs[i];
+        if ((x - bx) ** 2 + (y - by) ** 2 <= br * br) {
+          if (k >= 0) behind = true;
+          k = i;
+        }
+      }
+      const flat = y >= h - 4 && x > left + 3 && x < right - 3;
+      if (k < 0 && !flat) continue;
+      const th = (bayer(x, y) - 0.5) * 0.16;
+      let tone: number;
+      if (k >= 0) {
+        const [bx, by, br] = blobs[k];
+        const nx = (x - bx) / br;
+        const ny = (y - by) / br;
+        let l = -(nx * 0.55 + ny * 0.85) - (y / h) * 0.45 + th;
+        // Falte: Rand eines vorderen Ballens, der einen hinteren überdeckt
+        if (behind && nx * nx + ny * ny > 0.8 && ny < 0.3) l -= 0.45;
+        tone = l > 0.62 ? 0 : l > 0.18 ? 1 : l > -0.28 ? 2 : 3;
+      } else tone = 3;
+      if (y >= h - 2) tone = 4;
+      else if (y >= h - 4) tone = Math.max(tone, 3);
+      px.set(x, y, pal[tone]);
+    }
+  }
+  return px.sprite();
+}
+
+/**
+ * Wolkenbank (kachelbar in der Breite w, Vielfaches von 12): oben oder unten aufgebauscht.
+ * lit = 'top' → Sonne von oben (Rand oben hell), 'bottom' → Abendsonne von unten.
+ * pal: [Lichtrand, hell, mittel, Schatten, tief]
+ */
+function cloudBank(seed: number, w: number, h: number, pal: string[], lit: 'top' | 'bottom', fadeBottom: boolean, shade?: (x: number, y: number, d: number) => string | null): Sprite {
+  const r = rng(seed);
+  const nb = w / 12;
+  const bumps = Array.from({ length: nb }, () => 2 + r() * 6);
+  const ph = [r() * 6, r() * 6, r() * 6];
+  const T = Math.PI * 2;
+  const wave = (x: number, k: number) =>
+    Math.sin((T * x * 1) / w + ph[0]) * 3 * k + Math.sin((T * x * 3) / w + ph[1]) * 2 * k + Math.sin((T * x * 7) / w + ph[2]);
+  const bump = (x: number, s: number) => {
+    const b = Math.floor(x / 12) % nb;
+    const u = (x % 12) / 12;
+    return Math.sqrt(Math.max(0, 1 - (2 * u - 1) ** 2)) * bumps[(b + s) % nb];
+  };
+  const px = new Px(w, h);
+  for (let x = 0; x < w; x++) {
+    const top = Math.round(h * 0.3 + wave(x, 1) - (lit === 'top' ? bump(x, 0) : bump(x, 0) * 0.4));
+    const bot = Math.round(h - 2 - (lit === 'bottom' ? 3 - bump(x + 6, 3) * 0.5 + wave(x + 40, 0.3) : 0));
+    for (let y = Math.max(0, top); y <= Math.min(h - 1, bot); y++) {
+      const d = y - top;
+      const e = bot - y;
+      const th = bayer(x, y);
+      if (fadeBottom && e < 5 && th > e / 5) continue;
+      const custom = shade?.(x, y, d);
+      if (custom) {
+        px.set(x, y, custom);
+        continue;
+      }
+      const thick = bot - top + 1;
+      let tone: number;
+      if (lit === 'top') {
+        tone = d < 1 ? 0 : d < 3 ? 1 : d / thick < 0.45 + (th - 0.5) * 0.2 ? 2 : d / thick < 0.8 + (th - 0.5) * 0.2 ? 3 : 4;
+        // Falte zwischen zwei Bauschen
+        if (d < 5 && x % 12 < 1) tone = Math.max(tone, 2);
+      } else {
+        tone = e < 1 ? 0 : e < 3 ? 1 : e / thick < 0.4 + (th - 0.5) * 0.2 ? 2 : e / thick < 0.75 + (th - 0.5) * 0.2 ? 3 : 4;
+        if (d < 1) tone = Math.min(tone, 3);
+      }
+      // Schlieren: waagerechte, etwas dunklere Streifen
+      if (tone > 0 && tone < 4 && hash(y, seed) < 0.22 && hash(Math.floor(x / 9), y + seed) < 0.5) tone++;
+      px.set(x, y, pal[tone]);
+    }
+  }
+  return px.sprite();
+}
+
+/**
+ * Ferne Bergkette (kachelbar, 256 px): hintere und vordere Gipfel mit Schnee,
+ * Sonnen- und Schattenseite, unten im Dunst aufgelöst.
+ * pal: [Schnee, Schnee-Schatten, Fels hell, Fels Schatten, ferne Kette, ferne Kette Schatten, Dunst]
+ */
+function mountainStrip(seed: number, pal: string[]): Sprite {
+  const W = 256;
+  const H = 96;
+  const r = rng(seed);
+  type Peak = { x: number; top: number; sl: number };
+  const mk = (n: number, t0: number, t1: number): Peak[] =>
+    Array.from({ length: n }, (_, i) => ({ x: ((i + 0.2 + r() * 0.6) * W) / n, top: t0 + r() * (t1 - t0), sl: 0.5 + r() * 0.5 }));
+  const back = mk(7, 6, 30);
+  const front = mk(4, 28, 50);
+  const ridge = (pk: Peak[], x: number): [number, Peak, number] => {
+    let best = 1e9;
+    let bp = pk[0];
+    let bdx = 0;
+    for (const p of pk) {
+      let dx = x - p.x;
+      dx -= Math.round(dx / W) * W;
+      const y = p.top + Math.abs(dx) * p.sl;
+      if (y < best) [best, bp, bdx] = [y, p, dx];
+    }
+    return [best + Math.round(Math.sin((Math.PI * 2 * x * 9) / W) * 1.2 + Math.sin((Math.PI * 2 * x * 23) / W) * 0.8), bp, bdx];
+  };
+  const px = new Px(W, H);
+  for (let x = 0; x < W; x++) {
+    const [fy, fp, fdx] = ridge(front, x);
+    const [by, bp, bdx] = ridge(back, x);
+    for (let y = Math.max(0, Math.min(fy, by)); y < H; y++) {
+      const isFront = y >= fy;
+      const [p, dx] = isFront ? [fp, fdx] : [bp, bdx];
+      const depth = y - p.top;
+      const shadow = dx > depth * 0.3 - 1 + (hash(y, x) < 0.15 ? 1 : 0);
+      const snowLine = (isFront ? 9 : 7) + Math.round(Math.sin(x * 1.7) * 1.5 + hash(x >> 1, seed) * 2);
+      let c: string;
+      if (depth < snowLine && p.top < (isFront ? 42 : 26)) c = shadow ? pal[1] : pal[0];
+      else if (isFront) c = shadow ? pal[3] : pal[2];
+      else c = shadow ? pal[5] : pal[4];
+      if (!isFront) c = mix(c, pal[6], 0.3);
+      // Dunst nach unten: Bayer-gestuft in die Dunstfarbe
+      const t = clamp((y - 46) / (H - 52));
+      const lvl = Math.floor(t * 2 + bayer(x, y) * 0.999);
+      if (lvl >= 2) c = pal[6];
+      else if (lvl === 1) c = mix(c, pal[6], 0.55);
+      px.set(x, y, c);
+    }
+  }
+  return px.sprite();
+}
+
+/** Gänse in V-Formation, Flügelschlag je Vogel versetzt. */
+function flockSprite(n: number, frame: number, color: string, spread: number): Sprite {
+  const arms = Math.ceil((n - 1) / 2);
+  const w = arms * spread + 7;
+  const h = arms * 6 + 6;
+  const px = new Px(w, h);
+  const up = ['k...k', '.kkk.', '..k..'];
+  const down = ['.....', '.kkk.', 'k.k.k'];
+  for (let i = 0; i < n; i++) {
+    const k = Math.ceil(i / 2);
+    const side = i % 2 ? -1 : 1;
+    const bx = w - 6 - k * spread;
+    const by = Math.round(h / 2 - 1 + side * k * 3);
+    const rows = (frame + i) % 2 ? up : down;
+    rows.forEach((row, yy) => {
+      for (let xx = 0; xx < 5; xx++) if (row[xx] === 'k') px.set(bx + xx, by + yy - 1, color);
+    });
+  }
+  return px.sprite();
+}
+
+/** Lockerer Schwarm kleiner Vögel (Stare). */
+function swarmSprite(seed: number, frame: number, color: string): Sprite {
+  const r = rng(seed);
+  const px = new Px(36, 16);
+  for (let i = 0; i < 16; i++) {
+    const a = r() * Math.PI * 2;
+    const d = Math.sqrt(r());
+    const x = 18 + Math.cos(a) * d * 16;
+    const y = 8 + Math.sin(a) * d * 6;
+    px.set(x, y, color);
+    if ((frame + i) % 2) {
+      px.set(x - 1, y - 1, color);
+      px.set(x + 1, y - 1, color);
+    } else {
+      px.set(x - 1, y, color);
+      px.set(x + 1, y, color);
+    }
+  }
+  return px.sprite();
+}
+
+/** Kondensstreifen: zwei Triebwerkslinien am Flugzeug, nach hinten breiter und blasser. */
+function contrailSprite(len: number, thick: number): Sprite {
+  const h = thick + 4;
+  const px = new Px(len, h);
+  const mid = Math.floor(h / 2);
+  for (let x = 0; x < len; x++) {
+    const t = x / len; // 0 = Ende, 1 = am Flugzeug
+    const a = 0.12 + 0.7 * t ** 1.4;
+    if (t > 0.88) {
+      px.set(x, mid - 1, '#ffffff', a);
+      px.set(x, mid + 1, '#ffffff', a);
+      continue;
+    }
+    const half = Math.round((1 - t) * (thick / 2)) + (hash(x >> 2, 3) < 0.4 ? 1 : 0);
+    for (let y = mid - half; y <= mid + half; y++) {
+      const edge = Math.abs(y - mid) === half && half > 0;
+      if (edge && bayer(x, y) > 0.5) continue;
+      px.set(x, y, '#ffffff', a * (edge ? 0.6 : 1));
+    }
+  }
+  return px.sprite();
+}
+
+/** Windlinie mit Schnörkel am Ende. */
+function windLineSprite(len: number, up: boolean): Sprite {
+  const px = new Px(len + 8, 9);
+  const y0 = up ? 7 : 1;
+  for (let x = 0; x < len; x++) px.set(x, y0, '#ffffff', 0.15 + 0.6 * (x / len));
+  for (let i = 0; i <= 12; i++) {
+    const a = (i / 12) * Math.PI * 1.6;
+    const s = up ? -1 : 1;
+    px.set(len + Math.sin(a) * 3, y0 + s * (3 - Math.cos(a) * 3), '#ffffff', 0.75);
+  }
+  return px.sprite();
+}
+
+/** Federwolke (Cirrus): dünne Fasern, an den Enden ausgefranst, mit kleinem Haken. */
+function cirrusSprite(seed: number, w: number): Sprite {
+  const r = rng(seed);
+  const px = new Px(w, 10);
+  for (let s = 0; s < 5; s++) {
+    const y = 2 + Math.round(s * 1.4);
+    const x0 = Math.round(r() * w * 0.3);
+    const x1 = Math.round(w * (0.6 + r() * 0.4)) - 2;
+    for (let x = x0; x < x1; x++) {
+      const t = (x - x0) / (x1 - x0);
+      const a = Math.sin(Math.PI * t) * (s === 1 || s === 2 ? 0.9 : 0.55);
+      if (a < 0.25 && bayer(x, y) > a * 3) continue;
+      px.set(x, y + (t > 0.9 ? 1 : 0), s === 1 ? '#ffffff' : '#e4f0ff', a + 0.1);
+    }
+  }
+  return px.sprite();
+}
+
+/** Kristall (Prisma) mit drei Flächen und Spitze, leicht regenbogenschillernd. */
+function prism(px: Px, x0: number, base: number, w: number, h: number, pal: string[], tilt: number) {
+  const tip = Math.max(3, Math.round(w * 0.9));
+  for (let y = 0; y < h; y++) {
+    const yy = base - y;
+    const half = y > h - tip ? (w / 2) * ((h - y) / tip) : w / 2;
+    const cx = x0 + tilt * (y / h) * 3;
+    for (let x = Math.round(cx - half); x <= Math.round(cx + half); x++) {
+      const u = (x - (cx - half)) / (2 * half + 0.001);
+      let c = u < 0.3 ? pal[3] : u < 0.62 ? pal[2] : pal[1];
+      if (x === Math.round(cx - half) || x === Math.round(cx + half)) c = pal[0];
+      // Regenbogenschimmer: schräges Band über die Flächen
+      const band = (x * 2 + yy * 3) % 40;
+      if (band < 6 && u > 0.05 && u < 0.95) c = mix(c, SPECTRUM[band], 0.35);
+      px.set(x, yy, c);
+    }
+  }
+}
+
+const CRY_PALS = [
+  ['#2a3a7a', '#4a7ad0', '#9ad8ff', '#eafcff'],
+  ['#5a2a7a', '#b06ad0', '#f0b0ff', '#fff0ff'],
+  ['#2a5a6a', '#3aa0a8', '#9af0e0', '#f0fff8'],
+  ['#3a3a8a', '#7a7ae0', '#c8c0ff', '#f6f2ff'],
+];
+
+/** Schwebende Kristallinsel: Wolkenpolster, Kristalle obenauf, facettierter Kristallkegel darunter, Lichtbrechung. */
+function crystalIsland(seed: number, w: number, haze?: string): Sprite {
+  const r = rng(seed);
+  const pad = 34;
+  const h = Math.round(w * 0.88);
+  const px = new Px(w + pad, h + 16);
+  const y0 = Math.round(h * 0.46);
+  // Kristalle obenauf (hinter dem Wolkenpolster)
+  const n = 3 + Math.floor(w / 22);
+  const spires: [number, number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    const t = (i + 0.5) / n;
+    const cw = 4 + Math.round(r() * (w / 12));
+    const ch = Math.round((8 + r() * (y0 - 10)) * (0.5 + 0.5 * Math.sin(Math.PI * t)));
+    const x = Math.round(w * (0.15 + 0.7 * t) + (r() - 0.5) * 6);
+    spires.push([x, ch, cw]);
+    prism(px, x, y0 + 3, cw, ch, CRY_PALS[(seed + i) % 4], (r() - 0.5) * 2);
+  }
+  // Kegel unten: Facetten, links hell, rechts dunkel
+  const cone = h - y0;
+  const facets = 5 + Math.floor(w / 20);
+  for (let y = 0; y < cone; y++) {
+    const t = y / cone;
+    const half = (w / 2 - 3) * (1 - t ** 1.15) + (hash(y >> 2, seed) - 0.5) * 2;
+    for (let x = Math.round(w / 2 - half); x <= Math.round(w / 2 + half); x++) {
+      const u = (x - (w / 2 - half)) / (2 * half + 0.001);
+      const f = Math.floor((u + t * 0.15) * facets);
+      const p = CRY_PALS[(seed + f) % 4];
+      let c = u < 0.35 ? p[2] : u < 0.7 ? p[1] : p[0];
+      if (f % 2) c = mix(c, '#1a2050', 0.18);
+      // Facettenkanten hell
+      if (Math.abs(((u + t * 0.15) * facets) % 1) < 0.08) c = mix(c, '#ffffff', 0.5);
+      const band = (x * 3 - y * 2 + 400) % 52;
+      if (band < 6) c = mix(c, SPECTRUM[band], 0.3);
+      px.set(x, y0 + 2 + y, c);
+    }
+  }
+  // Wolkenpolster obenauf
+  const bumps = 2 + Math.floor(w / 14);
+  for (let i = 0; i < bumps; i++) {
+    const cx = 4 + ((w - 8) * (i + 0.5)) / bumps;
+    const rad = 4 + r() * (w / 16);
+    for (let y = -rad; y <= 3; y++)
+      for (let x = -rad; x <= rad; x++) {
+        if (x * x + y * y > rad * rad && y < 0) continue;
+        const l = -(x / rad) * 0.5 - (y / rad) * 0.8 + (bayer(x + 64, y + 64) - 0.5) * 0.2;
+        px.set(cx + x, y0 + 2 + y, l > 0.55 ? '#ffffff' : l > 0.05 ? '#eef0ff' : l > -0.4 ? '#d4d6fa' : '#b4b6ea');
+      }
+  }
+  // Lichtbrechung: Spektralfächer aus dem höchsten Kristall nach rechts unten
+  const top = spires.reduce((a, b) => (b[1] > a[1] ? b : a));
+  const sx = top[0] + 2;
+  const sy = y0 + 3 - Math.round(top[1] * 0.55);
+  for (let k = 0; k < SPECTRUM.length; k++) {
+    const ang = 0.35 + k * 0.07;
+    const len = pad + w - sx - 4;
+    for (let d = 3; d < len; d++) {
+      const a = 0.55 * (1 - d / len);
+      px.set(sx + Math.cos(ang) * d, sy + Math.sin(ang) * d, SPECTRUM[k], a);
+      px.set(sx + Math.cos(ang) * d, sy + 1 + Math.sin(ang) * d, SPECTRUM[k], a * 0.6);
+    }
+  }
+  px.set(sx, sy, '#ffffff');
+  if (haze) {
+    const d = px.d;
+    const [hr, hg, hb] = rgba(haze);
+    for (let i = 0; i < d.length; i += 4) {
+      d[i] += (hr - d[i]) * 0.45;
+      d[i + 1] += (hg - d[i + 1]) * 0.45;
+      d[i + 2] += (hb - d[i + 2]) * 0.45;
+    }
+  }
+  return px.sprite();
+}
+
+/** Großer Lichtfächer: weißer Strahl von links oben, im Prisma in sechs Farben aufgefächert. */
+function prismFanSprite(): Sprite {
+  const W = 150;
+  const H = 96;
+  const px = new Px(W, H);
+  const hx = 44;
+  const hy = 30;
+  for (let d = 0; d < 52; d++) {
+    const a = 0.08 + 0.4 * (d / 52);
+    for (let o = -1; o <= 1; o++) px.set(hx - d * 0.82, hy - d * 0.55 + o, '#ffffff', o ? a * 0.5 : a);
+  }
+  for (let k = 0; k < SPECTRUM.length; k++) {
+    const ang = 0.28 + k * 0.085;
+    for (let d = 2; d < 115; d++) {
+      const a = 0.45 * (1 - d / 115) ** 0.8;
+      for (let o = 0; o < 2 + Math.floor(d / 40); o++) px.set(hx + Math.cos(ang) * d, hy + Math.sin(ang) * d + o, SPECTRUM[k], a);
+    }
+  }
+  return px.sprite();
+}
+
+/** 22°-Halo um eine helle Sonne: dünner Regenbogenring (innen rot), dazu zwei Nebensonnen. */
+function haloSprite(R: number): Sprite {
+  const S = R * 2 + 30;
+  const px = new Px(S, S);
+  const c = S / 2;
+  for (let y = 0; y < S; y++)
+    for (let x = 0; x < S; x++) {
+      const d = Math.hypot(x - c, y - c);
+      const k = Math.floor(d - R + 1);
+      if (k >= 0 && k < 5) px.set(x, y, SPECTRUM[Math.min(5, k + (k > 2 ? 1 : 0))], 0.28);
+      if (d < 7) px.set(x, y, d < 4 ? '#ffffff' : '#fff6d0', d < 4 ? 1 : 0.7);
+      else if (d < 14 && bayer(x, y) < 0.5 * (1 - (d - 7) / 7)) px.set(x, y, '#ffffff', 0.5);
+    }
+  for (const s of [-1, 1]) {
+    const x = c + s * (R + 2);
+    for (let k = 0; k < 4; k++) px.set(x + s * k, c, SPECTRUM[k], 0.6);
+    px.set(x, c - 1, '#ffffff', 0.6);
+    px.set(x, c + 1, '#ffffff', 0.6);
+  }
+  return px.sprite();
+}
+
+// ================================================================ Mittlerer Himmel (Wolken, Höhenwind, Abendrot)
+
+/** Abendrot-Wolken erst, wenn sich der Himmel färbt (sonst hängen sie im Blau). */
+const duskVis = (m: number) => clamp((m - 3350) / 350);
+
+type Drifter = { alt: number; f: number; x: number; speed: number; s: Sprite; side?: number; dusk?: boolean };
+
+const DAY = ['#ffffff', '#eef7ff', '#cfe6fa', '#a6c8ee', '#86addf'];
+const SUNSET_PUFF = ['#fff0c0', '#ffc89a', '#f59a9a', '#c8709e', '#8a5296'];
+const DUSK_PUFF = ['#f6c0c8', '#d692b8', '#a26eae', '#704e98', '#47397c'];
+
+/**
+ * Zwischen Wiese und Sternen (≈1.100–4.800 m): Haufenwolken in vier Parallax-Ebenen,
+ * ferne Berggipfel tief unten mit ziehenden Wolkenschatten, Wolkenmeer, Vogelschwärme,
+ * Flugzeuge mit Kondensstreifen, Federwolken und Windlinien im Höhenwind,
+ * mehrfarbige Wolkenbänke im Abendrot. Alles beim Laden vorgezeichnet; pro Bild nur Blits.
+ */
+export class MidSkyRenderer {
+  private cum: Drifter[] = [];
+  private cirrus: Drifter[] = [];
+  private mtn: Sprite[];
+  private mtnShade: Sprite[];
+  private sea: Sprite[];
+  private banks: { alt: number; f: number; s: Sprite; speed: number }[] = [];
+  private winds: Sprite[];
+  private flocks: { alt: number; f: number; x: number; speed: number; frames: Sprite[] }[] = [];
+  private plane: Sprite;
+  private trail: Sprite;
+  private trailFar: Sprite;
+  private oldTrail: Sprite;
+  private planeFar: Sprite;
+
+  constructor() {
+    const haze = (p: string[], sky: string, t: number) => p.map((c) => mix(c, sky, t));
+    // Haufenwolken: fern (dunstig), mittel, nah, ganz vorne (seitlich vom Ballon)
+    const layers: [number, number, number, number, number, number][] = [
+      // [f, Anzahl, Breite min, Breite max, alt min, alt max]
+      [0.32, 9, 44, 80, 1100, 3300],
+      [0.55, 9, 64, 110, 1150, 2900],
+      [0.82, 8, 80, 130, 1250, 2700],
+      [1.25, 5, 110, 160, 1350, 2600],
+    ];
+    layers.forEach(([f, n, w0, w1, a0, a1], li) => {
+      for (let i = 0; i < n; i++) {
+        const seed = 700 + li * 31 + i;
+        const alt = a0 + ((i + hash(i, li * 5 + 1) * 0.8) / n) * (a1 - a0);
+        // Farbe: unten hellblauer Dunst, im Höhenwind tiefer blau
+        const sky = alt > 2500 ? '#3f7ee8' : '#8ec8f8';
+        const pal = li === 0 ? haze(DAY, sky, 0.42) : li === 1 ? haze(DAY, sky, 0.18) : DAY;
+        const w = Math.round(w0 + hash(i, li * 5 + 2) * (w1 - w0));
+        this.cum.push({
+          alt,
+          f,
+          x: hash(i, li * 5 + 3) * 600,
+          speed: 1.5 + hash(i, li * 5 + 4) * 3 + (alt > 2500 ? 6 : 0),
+          s: cumulus(seed, w, pal, 0.3 + hash(i, li) * 0.6),
+          side: li === 3 ? (i % 2 ? 1 : -1) : undefined,
+        });
+      }
+    });
+    // Abendrot: rosa-goldene Ballen, oben violett
+    for (let i = 0; i < 10; i++) {
+      const high = i >= 6;
+      const f = [0.55, 0.85, 1.2][i % 3];
+      this.cum.push({
+        alt: high ? 4450 + hash(i, 61) * 300 : 3750 + hash(i, 61) * 650,
+        f,
+        x: hash(i, 62) * 600,
+        speed: 2 + hash(i, 63) * 3,
+        s: cumulus(800 + i, Math.round(50 + hash(i, 64) * 60), high ? DUSK_PUFF : SUNSET_PUFF, 0.3),
+        side: f > 1 ? (i % 2 ? 1 : -1) : undefined,
+        dusk: true,
+      });
+    }
+
+    const mDay = ['#eef4ff', '#aebfee', '#7593dc', '#5570c0', '#8aa6e6', '#6c88d0', '#6d97ea'];
+    const mDusk = ['#ffd6b8', '#d896b8', '#a072b0', '#6e4c94', '#b884b8', '#8a62a6', '#c47fc4'];
+    this.mtn = [mountainStrip(11, mDay), mountainStrip(11, mDusk)];
+    const dark = (p: string[]) => p.map((c) => mix(c, '#1c2468', 0.2));
+    this.mtnShade = [mountainStrip(11, dark(mDay)), mountainStrip(11, dark(mDusk))];
+    this.sea = [
+      cloudBank(21, 240, 40, ['#ffffff', '#f0f7ff', '#d2e6fa', '#acc8ee', '#8eb2e6'], 'top', false),
+      cloudBank(21, 240, 40, ['#fff0c8', '#ffc8a0', '#f0a0a8', '#c87aaa', '#a066a8'], 'top', false),
+    ];
+    // Wolkenbänke im Abendrot: unten von oben beleuchtet (gold/rosa), oben von unten (rosa/violett)
+    const bankDefs: [number, number, string[], 'top' | 'bottom', number][] = [
+      [3820, 0.5, ['#fff2b8', '#ffd08a', '#ffa28a', '#e0768e', '#b0588e'], 'top', 34],
+      [4020, 0.72, ['#ffe6a8', '#ffb48a', '#f2868e', '#c46494', '#8e4c8e'], 'top', 30],
+      [4300, 0.55, ['#ffe0a0', '#ffa888', '#e07a9a', '#a8609e', '#704a8e'], 'bottom', 38],
+      [4500, 0.78, ['#ffc0a0', '#f08a9e', '#b868a8', '#7c5098', '#4e3c80'], 'bottom', 32],
+      [4700, 0.62, ['#e89ab8', '#b878b0', '#80589e', '#523f86', '#33306a'], 'bottom', 30],
+    ];
+    bankDefs.forEach(([alt, f, pal, lit, h], i) => this.banks.push({ alt, f, s: cloudBank(31 + i, 240, h, pal, lit, true), speed: 1 + i * 0.6 }));
+    for (let i = 0; i < 12; i++)
+      this.cirrus.push({ alt: 2450 + hash(i, 71) * 1350, f: [0.45, 0.7, 1.05][i % 3], x: hash(i, 72) * 600, speed: 14 + hash(i, 73) * 16, s: cirrusSprite(900 + i, Math.round(50 + hash(i, 74) * 60)) });
+    this.winds = [windLineSprite(34, false), windLineSprite(52, true), windLineSprite(70, false), windLineSprite(44, true)];
+    const flockDefs: [number, number, number, string][] = [
+      // [Höhe, f, Vögel (0 = Schwarm), Farbe]
+      [1350, 0.85, 7, '#3a3352'],
+      [1650, 0.6, 0, '#5a6a9a'],
+      [1950, 0.9, 9, '#3a3352'],
+      [2300, 0.55, 5, '#5a72a8'],
+      [2650, 0.8, 0, '#3a4470'],
+      [3000, 0.65, 7, '#3c4c88'],
+    ];
+    flockDefs.forEach(([alt, f, n, col], i) => {
+      const frames = [0, 1].map((fr) => (n ? flockSprite(n, fr, col, 7) : swarmSprite(40 + i, fr, col)));
+      const dir = i % 2 ? -1 : 1;
+      this.flocks.push({ alt, f, x: hash(i, 81) * 500, speed: (7 + hash(i, 82) * 6) * dir, frames: dir > 0 ? frames : frames.map((s) => flipX(s)) });
+    });
+    this.plane = planeSprite();
+    this.trail = contrailSprite(150, 5);
+    this.trailFar = flipX(contrailSprite(90, 2)); // fliegt nach links
+    this.oldTrail = (() => {
+      // alter, schon zerfaserter Streifen schräg über den Himmel
+      const px = new Px(200, 40);
+      for (let x = 0; x < 200; x++) {
+        const y = 34 - x * 0.15 + Math.sin(x * 0.06) * 2;
+        for (let o = -2; o <= 2; o++) if (bayer(x, Math.round(y + o)) < 0.75 - Math.abs(o) * 0.25) px.set(x, y + o, '#ffffff', 0.35 * Math.sin((Math.PI * x) / 200));
+      }
+      return px.sprite();
+    })();
+    this.planeFar = fromRows(['.ww..', 'wwwww', '..w..'], { w: '#e8eef8' });
+  }
+
+  private drift(f: SkyFrame, d: { x: number; speed: number; f: number }, w: number): number {
+    const span = f.W + w + 60;
+    return Math.round(mod(d.x + (f.calm ? 0 : f.time * d.speed) - f.camX * d.f, span) - w - 30);
+  }
+
+  /** Fernste Ebenen: Berge tief unten mit Wolkenschatten, Wolkenmeer, ferne Wolkenbänke. */
+  far(f: SkyFrame, anchorY: number) {
+    const { ctx, W, camM, bottom } = f;
+    if (camM < 900 || camM > 5200) return;
+    // Berge: sinken beim Steigen langsam ab (sehr fern), erst hinter dem Wolkenband, dann darüber
+    const vis = clamp((camM - 1300) / 400) * clamp((4700 - camM) / 500);
+    const mtY = Math.round(anchorY - 72 + (camM - 1500) * 0.035);
+    if (vis > 0 && mtY < bottom) {
+      const dusk = clamp((camM - 3300) / 700);
+      const off = mod(Math.round(-f.camX * 0.05 + (f.calm ? 0 : f.time * 0.4)), 256);
+      for (let k = 0; k < 2; k++) {
+        const a = vis * (k ? dusk : 1);
+        if (a <= 0) continue;
+        ctx.globalAlpha = a;
+        for (let x = off - 256; x < W; x += 256) ctx.drawImage(this.mtn[k], x, mtY);
+        // Wolkenschatten ziehen über die Hänge (Ausschnitte der abgedunkelten Fassung, grob elliptisch)
+        for (let i = 0; i < 3; i++) {
+          const cx = mod(hash(i, 51) * 400 + (f.calm ? 0 : f.time * (5 + i * 2)), W + 120) - 60;
+          const cw = 34 + Math.round(hash(i, 52) * 30);
+          // Ellipse aus 4-px-Streifen, nach unten etwas breiter (Schatten fällt schräg auf die Hänge)
+          for (let q = 0; q < 9; q++) {
+            const u = (q + 0.5) / 9;
+            const dw = Math.round(cw * Math.sqrt(1 - (2 * u - 1) ** 2) * (0.8 + u * 0.4));
+            const dy = 12 + q * 4;
+            const dh = 4;
+            const x0 = Math.round(cx + (u - 0.5) * 10 - dw / 2);
+            for (let tx = off - 256; tx < W; tx += 256) {
+              const a0 = Math.max(x0, tx);
+              const a1 = Math.min(x0 + dw, tx + 256);
+              if (a1 > a0) ctx.drawImage(this.mtnShade[k], a0 - tx, dy, a1 - a0, dh, a0, mtY + dy, a1 - a0, dh);
+            }
+          }
+        }
+      }
+      ctx.globalAlpha = 1;
+      // Wolkenmeer vor dem Bergfuß, darunter Dunst bis zum Bildrand
+      const seaY = mtY + 60;
+      if (seaY < bottom) {
+        const so = mod(Math.round(-f.camX * 0.08 + (f.calm ? 0 : f.time * 1.2)), 240);
+        for (let k = 0; k < 2; k++) {
+          const a = vis * (k ? dusk : 1);
+          if (a <= 0) continue;
+          ctx.globalAlpha = a;
+          for (let x = so - 240; x < W; x += 240) ctx.drawImage(this.sea[k], x, seaY);
+          ctx.fillStyle = k ? '#a066a8' : '#8eb2e6';
+          if (seaY + 40 < bottom) ctx.fillRect(0, seaY + 40, W, bottom - seaY - 40);
+        }
+        ctx.globalAlpha = 1;
+      }
+    }
+    // alter Kondensstreifen ganz fern
+    const oy = f.at(3350, 0.3);
+    if (oy > -40 && oy < bottom) ctx.drawImage(this.oldTrail, Math.round(W * 0.5 - 100 - f.camX * 0.05), oy);
+    this.drawBanks(f, false);
+  }
+
+  private drawBanks(f: SkyFrame, near: boolean) {
+    const { ctx, W, bottom } = f;
+    const a = duskVis(f.camM);
+    if (a <= 0) return;
+    ctx.globalAlpha = a;
+    for (const b of this.banks) {
+      if (b.f > 0.7 !== near) continue;
+      const y = f.at(b.alt, b.f);
+      if (y > bottom || y + b.s.height < 0) continue;
+      const off = mod(Math.round(-f.camX * b.f * 0.5 + (f.calm ? 0 : f.time * b.speed)), 240);
+      for (let x = off - 240; x < W; x += 240) ctx.drawImage(b.s, x, y);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  private drawCum(f: SkyFrame, front: boolean) {
+    const { ctx, bottom } = f;
+    const dv = duskVis(f.camM);
+    for (const c of this.cum) {
+      if (c.f > 1 !== front || (c.dusk ? dv <= 0 : dv >= 1)) continue;
+      const y = f.at(c.alt, c.f) - c.s.height;
+      if (y > bottom || y + c.s.height < 0) continue;
+      let x: number;
+      if (c.side) {
+        // ganz vorne: seitlich am Ballon vorbei, nie davor
+        const sway = f.calm ? 0 : Math.sin(f.time * 0.1 + c.alt) * 8;
+        x = Math.round(c.side > 0 ? f.balloonX + 34 + sway + hash(c.alt, 1) * 20 : f.balloonX - 34 - c.s.width - sway - hash(c.alt, 1) * 20);
+      } else x = this.drift(f, c, c.s.width);
+      // Tageswolken lösen sich im Abendrot auf, Abendwolken kommen dazu
+      const a = c.dusk ? dv : 1 - dv;
+      if (a <= 0) continue;
+      ctx.globalAlpha = a;
+      ctx.drawImage(c.s, x, y);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  /** Hinter dem Ballon: Wolken, Federwolken, Vögel, Flugzeuge, Windlinien, nahe Wolkenbänke. */
+  mid(f: SkyFrame) {
+    const { ctx, W, camM, bottom, time, calm } = f;
+    if (camM < 900 || camM > 5200) return;
+    this.drawCum(f, false);
+    for (const c of this.cirrus) {
+      if (c.f > 1) continue;
+      const y = f.at(c.alt, c.f);
+      if (y < -12 || y > bottom) continue;
+      ctx.drawImage(c.s, this.drift(f, c, c.s.width), y);
+    }
+    // Flugzeuge: eines nah mit breitem Streifen nach rechts, eines fern nach links
+    const planeY = f.at(3100, 0.55);
+    if (planeY > -10 && planeY < bottom) {
+      const px = Math.round(mod(calm ? 120 : time * 16, W + 200) - 40);
+      ctx.drawImage(this.trail, px - this.trail.width + 2, planeY + 3 - Math.floor(this.trail.height / 2) + 1);
+      ctx.drawImage(this.plane, px, planeY);
+    }
+    const farY = f.at(2750, 0.4);
+    if (farY > -10 && farY < bottom) {
+      const px = Math.round(W + 100 - mod(calm ? 80 : time * 9 + 70, W + 200));
+      ctx.drawImage(this.trailFar, px + 4, farY - 2);
+      ctx.drawImage(this.planeFar, px, farY - 1);
+    }
+    for (const fl of this.flocks) {
+      const y = f.at(fl.alt, fl.f) + (calm ? 0 : Math.round(Math.sin(time * 0.8 + fl.alt) * 3));
+      const s = fl.frames[calm ? 0 : Math.floor(time * 4 + fl.alt) % 2];
+      if (y < -20 || y > bottom) continue;
+      ctx.drawImage(s, this.drift(f, fl, s.width), y);
+    }
+    // Windlinien im Höhenwind
+    const wv = clamp((camM - 2350) / 300) * clamp((3950 - camM) / 300);
+    if (wv > 0 && !calm) {
+      ctx.globalAlpha = wv;
+      for (let i = 0; i < 9; i++) {
+        const s = this.winds[i % 4];
+        const y = Math.round(hash(i, 91) * (bottom - 20)) + Math.round(Math.sin(time * 1.3 + i) * 3);
+        const x = Math.round(mod(hash(i, 92) * 500 + time * (70 + i * 9), W + s.width + 120) - s.width - 60);
+        ctx.drawImage(s, x, y);
+      }
+      ctx.globalAlpha = 1;
+    }
+    this.drawBanks(f, true);
+  }
+
+  /** Vor dem Ballon: große nahe Haufenwolken seitlich, nahe Federwolken. */
+  front(f: SkyFrame) {
+    if (f.camM < 900 || f.camM > 5200) return;
+    this.drawCum(f, true);
+    for (const c of this.cirrus) {
+      if (c.f <= 1) continue;
+      const y = f.at(c.alt, c.f);
+      if (y < -12 || y > f.bottom) continue;
+      f.ctx.drawImage(c.s, this.drift(f, c, c.s.width), y);
+    }
   }
 }

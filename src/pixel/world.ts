@@ -10,7 +10,7 @@ import type { Images } from './assets';
 import { caveZoneAt, HELL_M, LAVAFALL, type CaveZone } from './zones';
 import { HELL_DARK, HellRenderer } from './hell';
 import { DEEP_DARK } from './deep';
-import { HeavenRenderer, type SkyFrame } from './heaven';
+import { HeavenRenderer, MidSkyRenderer, type SkyFrame } from './heaven';
 import { cobweb, crystalCluster, fossil, pebbles, roots, rng, shroomPatch, vine, worm } from './decor';
 import {
   balloonSprite,
@@ -25,7 +25,6 @@ import {
   lerpColor,
   lightMask,
   moonSprite,
-  planeSprite,
   rampMap,
   recolor,
   satelliteSprite,
@@ -234,7 +233,6 @@ export class World {
   private birds = birdSprites();
   private sun = sunSprite();
   private moon = moonSprite();
-  private plane = planeSprite();
   private satellite = satelliteSprite();
   private eagleFlip: Sprite;
   private masks = new Map<number, Sprite>();
@@ -255,6 +253,7 @@ export class World {
   private stalactite: Sprite;
   private hell: HellRenderer;
   private heaven: HeavenRenderer;
+  private midSky = new MidSkyRenderer();
 
   constructor(images: Images, ctx: CanvasRenderingContext2D) {
     this.img = images;
@@ -324,36 +323,9 @@ export class World {
     SKY_STOPS[1][1] = sample(images['woods/bg-clouds'], 2, 206);
     SKY_STOPS[2][1] = sample(images['woods/bg-clouds'], 2, 1);
 
-    // Wolken: feste Liste, Lage nach Metern. Hinter dem Ballon f < 1, davor f > 1.
-    const sunset: [string, string, string] = ['#ffd9c2', '#ffab9a', '#d9708f'];
-    const dusk: [string, string, string] = ['#c79bd8', '#8e62b0', '#5a3f86'];
-    for (let i = 0; i < 30; i++) {
-      const f = [0.6, 0.85, 1.25][i % 3];
-      this.clouds.push({ alt: 1200 + hash(i, 1) * 1250, x: hash(i, 2) * 600, f, speed: 2 + hash(i, 3) * 5, sprite: cloudSprite(i + 1, Math.round(26 + hash(i, 4) * 44 * f)) });
-    }
+    // Schönwetterwolken über dem Wald; ab ≈1.100 m übernimmt MidSkyRenderer (heaven.ts)
     for (let i = 0; i < 6; i++) {
-      // vereinzelte Schönwetterwolken über dem Wald
       this.clouds.push({ alt: 450 + hash(i, 5) * 650, x: hash(i, 6) * 600, f: 0.7, speed: 3, sprite: cloudSprite(60 + i, 24 + Math.round(hash(i, 7) * 16)) });
-    }
-    for (let i = 0; i < 12; i++) {
-      // Höhenwind: lange, flache Schleierwolken, die schnell ziehen
-      const [c, cx] = canvas(40 + Math.round(hash(i, 11) * 50), 3);
-      cx.fillStyle = '#e6f3ff';
-      cx.fillRect(4, 0, c.width - 12, 1);
-      cx.fillRect(0, 1, c.width, 1);
-      cx.fillStyle = '#bcdcf7';
-      cx.fillRect(8, 2, c.width - 14, 1);
-      this.clouds.push({ alt: 2550 + hash(i, 12) * 1100, x: hash(i, 13) * 600, f: [0.7, 1.1][i % 2], speed: 18 + hash(i, 14) * 14, sprite: c });
-    }
-    for (let i = 0; i < 16; i++) {
-      const high = i > 9;
-      this.clouds.push({
-        alt: high ? 4500 + hash(i, 21) * 300 : 3800 + hash(i, 21) * 700,
-        x: hash(i, 22) * 600,
-        f: [0.6, 0.9, 1.2][i % 3],
-        speed: 2 + hash(i, 23) * 4,
-        sprite: cloudSprite(100 + i, Math.round(30 + hash(i, 24) * 50), high ? dusk : sunset),
-      });
     }
     for (let i = 0; i < 220; i++) this.stars.push([hash(i, 31), 4500 + hash(i, 32) * 1300, hash(i, 33)]);
 
@@ -511,7 +483,11 @@ export class World {
 
     // Wolken vor dem Ballon
     this.drawClouds(ctx, W, H, v, groundY, true);
-    if (groundY > 0 && v.show.balloon) this.heaven.front(this.skyFrame(ctx, W, H, v, ox, groundY));
+    if (groundY > 0 && v.show.balloon) {
+      const sky = this.skyFrame(ctx, W, H, v, ox, groundY);
+      this.midSky.front(sky);
+      this.heaven.front(sky);
+    }
 
     this.ambient(v, W, H, dt);
     this.updateParticles(dt);
@@ -706,24 +682,14 @@ export class World {
       const off = mod(Math.round(-v.camX * 0.1), 384);
       for (let x = off - 384; x < W; x += 384) ctx.drawImage(back, x, backY);
     }
+    // ferne Berggipfel tief unten, Wolkenmeer, ferne Abendrot-Bänke (vor dem Wolkenband, damit die Gipfel daraus auftauchen)
+    const sky = this.skyFrame(ctx, W, H, v, ox, groundY);
+    this.midSky.far(sky, v.anchorY);
     const strip = this.img['woods/bg-clouds'];
     const stripY = at(2150, 0.4);
     if (stripY < bottom && stripY + 208 > 0) {
       const off = mod(Math.round(-v.camX * 0.15 + (v.calm ? 0 : v.time * 1.5)), 160);
       for (let x = off - 160; x < W; x += 160) ctx.drawImage(strip, x, stripY);
-    }
-
-    // 5. Flugzeug in der Ferne mit Kondensstreifen (Höhenwind-Zone)
-    const planeY = at(3100, 0.55);
-    if (planeY > -10 && planeY < bottom) {
-      const px = Math.round(mod(v.calm ? 120 : v.time * 16, W + 160) - 60);
-      ctx.fillStyle = '#ffffff';
-      for (let i = 0; i < 60; i += 2) {
-        ctx.globalAlpha = clamp(1 - i / 60) * 0.8;
-        ctx.fillRect(px - 2 - i, planeY + 3, 2, 1);
-      }
-      ctx.globalAlpha = 1;
-      ctx.drawImage(this.plane, px, planeY);
     }
 
     // 6. Berge, Hügel, Waldrand
@@ -750,9 +716,11 @@ export class World {
 
     // 7. Wolken hinter dem Ballon
     this.drawClouds(ctx, W, H, v, groundY, false);
+    // Haufenwolken, Federwolken, Vogelschwärme, Flugzeuge, Windlinien, Wolkenbänke
+    this.midSky.mid(sky);
 
     // 8. Über den Sternen: Wolkendecke, Himmel, Himmelstor, darüber Kristallwolken, Polarlicht, Weltraum
-    this.heaven.back(this.skyFrame(ctx, W, H, v, ox, groundY));
+    this.heaven.back(sky);
 
     // 9. Vögel: kleine Schwärme über dem Wald, ab und zu ein Adler
     for (let i = 0; i < 6; i++) {

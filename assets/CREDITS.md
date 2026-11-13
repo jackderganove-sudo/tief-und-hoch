@@ -57,6 +57,8 @@ Selbst erstellt für dieses Projekt (gleiche Lizenz wie das Projekt):
 - Spielfigur Forscher (mit Stirnlampe, Seil) und Heißluftballon mit Brennerflamme – `src/pixel/sprites.ts`
 - Fledermäuse, Glühwürmchen, Tropfen, Flugzeug, Sterne, Partikel-Effekte (Feuerwerk, Kristallglühen), Tier-Icons – `src/pixel/sprites.ts`, `src/pixel/world.ts`
 - Himmelsverlauf, Erdschichten, Wurzeln und Schichtübergänge (prozedural) – `src/pixel/world.ts`
-- Hölle: Basalt-/Obsidiansäulen, Felsdecke mit Lava-Tropfsteinen, Flammengeister, Höllentor mit Hörnern, Eis-/Kristall-Hölle, Abgrund (prozedural) – `src/pixel/hell.ts`
+- Hölle: Basalt-/Obsidiansäulen mit Glutadern, Felsdecke mit Lava-Tropfsteinen, ferne Höhlenwand mit Feuerseen und Lavafällen, große Lavafälle mit Becken, Runentore, Käfige und Laternen an Ketten, fliegende Teufelchen (Flügel), Flammengeister, Schwefelschwaden, Vordergrund-Felsen, Höllentor mit Hörnern (prozedural) – `src/pixel/hell.ts`
+- Endlose Tiefen: Eis-Hölle (Eiswände, Eiszapfen, erstarrte Lavafälle, blaues Feuer), Kristall-Hölle (Kristallsäulen mit Spiegelung, Splitter), Abgrund (Leuchtquallen, Leuchtpilze, Ranken, ferne Lichter; schwebende Ruinen aus umgefärbten Magic-Cliffs- und Classical-Temple-Grafiken, beide CC0, siehe oben) – `src/pixel/deep.ts`
 - Himmel: Lichtstrahlen, Regenbogenbrücken, Perlentor mit Heiligenschein, Lichtwesen, Kristallwolken, Polarlicht (prozedural) – `src/pixel/heaven.ts`
+- Mittlerer Himmel: Haufenwolken in vier Parallax-Ebenen, Federwolken, Windlinien, Wolkenmeer, ferne Berggipfel mit Wolkenschatten, Vogelschwärme, zweites Flugzeug mit Kondensstreifen, mehrfarbige Wolkenbänke im Abendrot, Kristallinseln, Perlmuttwolken mit Regenbogensaum, Lichtfächer, Halo mit Nebensonnen (prozedural) – `src/pixel/heaven.ts`
 - Panel-, Knopf- und Feldrahmen (9-Slice) – `src/assets/pixel/frames/`, erzeugt mit `scripts/pixel-frames.py`

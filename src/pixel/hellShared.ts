@@ -47,6 +47,9 @@ export interface SharedParts {
 /** Licht: x, y, Radius, Farbe; baked = Schein liegt schon in einem vorberechneten Bild. */
 export type Light = [number, number, number, string?, boolean?];
 
+/** Hintergrundverlauf der Hölle (hell.ts nutzt ihn, deep.ts für den Dunst am Höllentor). */
+export const HELL_BG: [string, string] = ['#341028', '#1c0816'];
+
 export const LEVELS: Level[] = ['hell', 'icehell', 'crystalhell', 'abyss'];
 export const levelAt = (m: number): Level => {
   const z = caveZoneAt(Math.max(m, HELL_M + 1));
