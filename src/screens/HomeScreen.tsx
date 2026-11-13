@@ -112,6 +112,19 @@ export function HomeScreen({
                 >
                   {t('account.privacy')}
                 </button>
+                {/* Namensnennung (CC-BY) für die verwendeten Grafik-Packs */}
+                <p className="mt-2 text-xs leading-snug opacity-75">
+                  {t('home.credits')}{' '}
+                  <a
+                    href="https://github.com/playhighsandlows/playhighsandlows.github.io/blob/main/assets/CREDITS.md"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline decoration-dotted"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {t('home.creditsLink')}
+                  </a>
+                </p>
               </Panel>
             </motion.div>
           </motion.div>

@@ -5,6 +5,7 @@ import {
   emptySnapshot,
   histOf,
   progressFromLegacy,
+  type Achievements,
   type DayRecord,
   type ModeProgress,
   type ModeStats,
@@ -39,6 +40,10 @@ export interface ProgressRepository {
   clearAll(): void;
   /** Wird nach jeder Änderung aufgerufen (Sync). */
   onChange(listener: () => void): () => void;
+  /** Erfolge (Hölle/Himmel erreicht) mit Datum. */
+  getAchievements(): Achievements;
+  /** Erfolg festhalten; true, wenn er neu ist. */
+  recordAchievement(key: keyof Achievements, dateKey: string): boolean;
 }
 
 const KEEP_DAYS = 30;
@@ -156,8 +161,23 @@ export class LocalProgressRepository implements ProgressRepository {
     return computeStats(p);
   }
 
+  getAchievements(): Achievements {
+    return this.read<Achievements>(`${this.prefix}:achievements`) ?? {};
+  }
+
+  recordAchievement(key: keyof Achievements, dateKey: string): boolean {
+    const a = this.getAchievements();
+    if (a[key]) return false;
+    a[key] = dateKey;
+    this.write(`${this.prefix}:achievements`, a);
+    this.changed();
+    return true;
+  }
+
   exportSnapshot(): Snapshot {
     const snap = emptySnapshot();
+    const ach = this.getAchievements();
+    if (Object.keys(ach).length) snap.achievements = ach;
     for (const k of this.dayKeys()) {
       const d = this.read<DayRecord>(k);
       if (d) snap.days[`${d.mode}:${d.dateKey}`] = d;
@@ -172,6 +192,8 @@ export class LocalProgressRepository implements ProgressRepository {
     for (const k of this.dayKeys()) this.remove(k);
     for (const d of Object.values(snapshot.days)) this.write(`${this.prefix}:day:${d.mode}:${d.dateKey}`, d);
     for (const m of MODES) this.write(`${this.prefix}:progress:${m}`, snapshot.modes[m] ?? emptyModeProgress());
+    if (snapshot.achievements && Object.keys(snapshot.achievements).length) this.write(`${this.prefix}:achievements`, snapshot.achievements);
+    else this.remove(`${this.prefix}:achievements`);
     if (snapshot.settings.lang) {
       try {
         this.storage?.setItem('hal:v1:lang', snapshot.settings.lang);
@@ -187,6 +209,7 @@ export class LocalProgressRepository implements ProgressRepository {
       this.remove(`${this.prefix}:progress:${m}`);
       this.remove(`${this.prefix}:stats:${m}`);
     }
+    this.remove(`${this.prefix}:achievements`);
     this.changed();
   }
 
@@ -259,6 +282,12 @@ export class DebugAwareProgressRepository implements ProgressRepository {
       a();
       b();
     };
+  }
+  getAchievements() {
+    return this.r.getAchievements();
+  }
+  recordAchievement(key: 'hell' | 'heaven', dateKey: string) {
+    return this.r.recordAchievement(key, dateKey);
   }
   /** Sandbox mit einer Kopie des echten Stands füllen (beim Einschalten des Debug-Modus). */
   seedSandbox() {

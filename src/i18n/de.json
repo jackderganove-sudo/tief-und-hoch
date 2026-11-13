@@ -24,7 +24,9 @@
     "nextIn": "Neue Fragen in {{time}}",
     "rules": "So geht's",
     "rulesText": "7 offene Fragen, je 25 Sekunden, genau eine Antwort. Die Antwort muss passen – sonst gibt es 0 Punkte. 1 Punkt = 10 Meter.",
-    "loading": "Lade …"
+    "loading": "Lade …",
+    "credits": "Grafiken u. a. von Luis Zuno (ansimuz), KnoblePersona (CC-BY 3.0) und vielen CC0-Künstlern.",
+    "creditsLink": "Alle Credits"
   },
   "game": {
     "question": "Frage {{n}} von {{total}}",
@@ -336,5 +338,20 @@
       "other": "Das hat nicht geklappt. Bitte nochmal versuchen."
     },
     "invalidAnswers": "Ungültig"
+  },
+  "milestone": {
+    "hell": {
+      "title": "Du hast die Hölle erreicht!",
+      "text": "Durch die Lava bis ganz nach unten – das schafft nur eine richtig starke Runde.",
+      "share": "😈 Bis in die Hölle!",
+      "badge": "Hölle erreicht"
+    },
+    "heaven": {
+      "title": "Willkommen im Himmel!",
+      "text": "Über die Sterne hinaus bis zu den Wolkeninseln – eine richtig starke Runde.",
+      "share": "😇 Bis in den Himmel!",
+      "badge": "Himmel erreicht"
+    },
+    "achievements": "Erfolge"
   }
 }

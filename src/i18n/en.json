@@ -24,7 +24,9 @@
     "nextIn": "New questions in {{time}}",
     "rules": "How to play",
     "rulesText": "7 open questions, 25 seconds each, exactly one answer. It has to be a valid answer – otherwise 0 points. 1 point = 10 metres.",
-    "loading": "Loading …"
+    "loading": "Loading …",
+    "credits": "Graphics by Luis Zuno (ansimuz), KnoblePersona (CC-BY 3.0) and many CC0 artists, among others.",
+    "creditsLink": "All credits"
   },
   "game": {
     "question": "Question {{n}} of {{total}}",
@@ -336,5 +338,20 @@
       "other": "That didn't work. Please try again."
     },
     "invalidAnswers": "Invalid"
+  },
+  "milestone": {
+    "hell": {
+      "title": "You reached hell!",
+      "text": "Through the lava all the way down – only a really strong round gets here.",
+      "share": "😈 All the way to hell!",
+      "badge": "Reached hell"
+    },
+    "heaven": {
+      "title": "Welcome to heaven!",
+      "text": "Past the stars up to the cloud islands – a really strong round.",
+      "share": "😇 All the way to heaven!",
+      "badge": "Reached heaven"
+    },
+    "achievements": "Achievements"
   }
 }

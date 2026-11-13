@@ -53,8 +53,8 @@ export default defineConfig({
         ],
         screenshots: [
           { src: 'screenshots/home.png', sizes: '780x1688', type: 'image/png', form_factor: 'narrow', label: 'Startseite: Aufstieg oder Abstieg' },
-          { src: 'screenshots/descent.png', sizes: '780x1688', type: 'image/png', form_factor: 'narrow', label: 'Abstieg bis zum glühenden Kern' },
-          { src: 'screenshots/ascent.png', sizes: '780x1688', type: 'image/png', form_factor: 'narrow', label: 'Aufstieg im Heißluftballon' },
+          { src: 'screenshots/descent.png', sizes: '780x1688', type: 'image/png', form_factor: 'narrow', label: 'Abstieg durch die Lava bis in die Hölle' },
+          { src: 'screenshots/ascent.png', sizes: '780x1688', type: 'image/png', form_factor: 'narrow', label: 'Aufstieg über die Sterne bis in den Himmel' },
         ],
       },
       workbox: {

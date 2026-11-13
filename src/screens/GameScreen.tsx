@@ -10,6 +10,7 @@ import { TierReveal } from '../components/TierReveal';
 import { TIER_COLOR } from '../components/tierStyle';
 import { Panel, PxButton, TierIcon } from '../components/px';
 import { localeFor } from '../i18n';
+import { MilestoneCelebration, useMilestone } from '../components/MilestoneCelebration';
 
 /** Tagesspiel: 7 Fragen, einmal pro Tag und Modus. */
 export function GameScreen({
@@ -32,6 +33,8 @@ export function GameScreen({
   const total = game.record?.questionIds.length ?? 0;
   const question = game.questions[game.index];
   const finished = game.record?.finished ?? false;
+  const meters = pointsToMeters(totalPoints(results));
+  const { milestone, dismiss } = useMilestone(mode, meters, { daily: true, dateKey });
 
   // Bereits beendetes Spiel (z. B. nach Reload) direkt zum Ergebnis.
   useEffect(() => {
@@ -41,7 +44,7 @@ export function GameScreen({
   return (
     <PlayShell
       mode={mode}
-      meters={pointsToMeters(totalPoints(results))}
+      meters={meters}
       locale={localeFor(lang)}
       title={`${t(`modes.${mode}.name`)}`}
       backLabel={t('game.back')}
@@ -94,6 +97,7 @@ export function GameScreen({
           />
         )}
       </AnimatePresence>
+      <MilestoneCelebration milestone={milestone} onClose={dismiss} />
     </PlayShell>
   );
 }

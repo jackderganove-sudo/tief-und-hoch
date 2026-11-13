@@ -52,8 +52,6 @@ export const HOME_LAYOUT = {
 };
 const homeLayout = (W: number, H: number) => (W > H ? HOME_LAYOUT.landscape : HOME_LAYOUT.portrait);
 const BALLOON_H = 74;
-/** Tiefste Stelle der Höhle (knapp über dem Lavasee). */
-const MAX_DEPTH_M = 7000;
 
 const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
@@ -123,7 +121,7 @@ export function PixelWorld({ view, meters = 0, fx = null, crew }: { view: WorldV
       if (!world) return;
       const power = 0.5 + f.points / 100;
       const calm = reduce.matches;
-      if (view === 'rare') world.burst(f.tier, 0, Math.min(shown, MAX_DEPTH_M) * PPM, power, calm);
+      if (view === 'rare') world.burst(f.tier, 0, shown * PPM, power, calm);
       else world.burst(f.tier, BALLOON_X, -shown * PPM - 40, power, calm);
       mood = f.points >= 100 ? 'cheer' : f.points === 0 ? 'flinch' : 'idle';
       moodUntil = now + (mood === 'cheer' ? 2600 : 900);
@@ -160,8 +158,8 @@ export function PixelWorld({ view, meters = 0, fx = null, crew }: { view: WorldV
       }
       if (mood !== 'idle' && now > moodUntil) mood = 'idle';
 
-      // Die Höhle endet am Lavasee: in endlosen Übungen bleibt die Figur dort, die Anzeige zählt weiter
-      const pos = view === 'rare' ? Math.min(shown, MAX_DEPTH_M) : shown;
+      // Unter dem Höllentor bzw. über dem Himmelstor geht es endlos weiter (Übung, Freunde-Modus)
+      const pos = shown;
       const px = pos * PPM;
       const state: ViewState = {
         camX: view === 'common' ? BALLOON_X : 0,
@@ -189,7 +187,7 @@ export function PixelWorld({ view, meters = 0, fx = null, crew }: { view: WorldV
         const xs = crewOffsets(others.length, view);
         state.crew = others.map((c, i): CrewMember => {
           const prev = crewShown.get(c.id) ?? c.meters;
-          const goal = view === 'rare' ? Math.min(c.meters, MAX_DEPTH_M) : c.meters;
+          const goal = c.meters;
           const next = calm || Math.abs(goal - prev) < 2 ? goal : prev + (goal - prev) * Math.min(1, dt * 1.6);
           crewShown.set(c.id, next);
           return { x: xs[i], meters: next, color: c.color, mood: c.mood ?? 'idle' };

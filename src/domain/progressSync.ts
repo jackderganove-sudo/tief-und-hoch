@@ -59,12 +59,16 @@ export interface ModeProgress {
   legacy: LegacyBase;
 }
 
+/** Erfolge: erstes Erreichen von Hölle/Himmel in einer Tagesrunde (Datum). */
+export type Achievements = Partial<Record<'hell' | 'heaven', string>>;
+
 export interface Snapshot {
   version: 1;
   /** Schlüssel "mode:YYYY-MM-DD" */
   days: Record<string, DayRecord>;
   modes: Record<Mode, ModeProgress>;
   settings: { lang?: Lang };
+  achievements?: Achievements;
 }
 
 export const emptyLegacy = (): LegacyBase => ({ played: 0, totalPoints: 0, best: 0, maxStreak: 0, tierCounts: {} });
@@ -189,7 +193,13 @@ export function mergeSnapshots(remote: Snapshot, local: Snapshot): { merged: Sna
       },
     };
   }
+  // Erfolge: vereinigt, bei beiden zählt das frühere Datum
+  const achievements: Achievements = { ...(local.achievements ?? {}) };
+  for (const [k, d] of Object.entries(remote.achievements ?? {}) as [keyof Achievements, string][]) {
+    if (!achievements[k] || d < achievements[k]!) achievements[k] = d;
+  }
   const merged: Snapshot = { version: 1, days, modes, settings: { ...local.settings, ...remote.settings } };
+  if (Object.keys(achievements).length) merged.achievements = achievements;
   return {
     merged,
     summary: {

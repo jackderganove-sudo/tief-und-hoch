@@ -17,6 +17,31 @@ const TIER_CHOICES: Record<Mode, TierId[]> = {
   rare: [...MODE_TIERS.rare, 'tooClever', 'invalid'],
   common: [...MODE_TIERS.common, 'invalid'],
 };
+/** Mitten in jede Zone (zones.ts) – Abstieg und Aufstieg, alte und neue. */
+const ZONE_JUMPS: ['rare' | 'common', number, string][] = [
+  ['rare', 150, 'Erde'],
+  ['rare', 600, 'Fels'],
+  ['rare', 1250, 'Kristall'],
+  ['rare', 1950, 'Pilze'],
+  ['rare', 2600, 'Lava'],
+  ['rare', 3000, 'Lavafall'],
+  ['rare', 4500, 'Hölle'],
+  ['rare', 7000, 'Höllentor'],
+  ['rare', 8000, 'Eis-Hölle'],
+  ['rare', 10000, 'Kristall-Hölle'],
+  ['rare', 12000, 'Abgrund'],
+  ['common', 600, 'Wiese'],
+  ['common', 1900, 'Wolken'],
+  ['common', 3100, 'Höhenwind'],
+  ['common', 4150, 'Abendrot'],
+  ['common', 4950, 'Sterne'],
+  ['common', 5400, 'Wolkendecke'],
+  ['common', 6200, 'Himmel'],
+  ['common', 7000, 'Himmelstor'],
+  ['common', 8000, 'Kristallwolken'],
+  ['common', 10000, 'Polarlicht'],
+  ['common', 12500, 'Weltraum'],
+];
 const modeName = (m: Mode) => (m === 'rare' ? '▼ Abstieg' : '▲ Aufstieg');
 
 /**
@@ -192,11 +217,19 @@ export function DebugTab() {
             <div className="grid gap-2">
               <Chips label="Welt" value={view} onChange={setView} options={[['rare', '▼ Tiefe'], ['common', '▲ Höhe'], ['home', 'Start']]} />
               <Field label={`Meter: ${meters}`}>
-                <input type="range" min={0} max={7000} step={50} value={meters} onChange={(e) => setMeters(Number(e.target.value))} className="w-full" />
+                <input type="range" min={0} max={14000} step={50} value={meters} onChange={(e) => setMeters(Number(e.target.value))} className="w-full" />
               </Field>
               <PxButton tone="teal" small className="text-base" onClick={() => go({ world: view, m: String(meters) })}>
                 Anzeigen →
               </PxButton>
+              <p className="font-tiny text-[0.65rem] uppercase opacity-70">Jede Zone direkt</p>
+              <div className="flex flex-wrap gap-1">
+                {ZONE_JUMPS.map(([w, m, label]) => (
+                  <button key={`${w}${m}`} type="button" className="px-field px-field-dark px-1 text-sm leading-6 [--px:2px]" onClick={() => go({ world: w, m: String(m) })}>
+                    {w === 'rare' ? '▼' : '▲'} {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </Card>
 

@@ -324,6 +324,7 @@ function Profile({
           );
         })}
       </dl>
+      <Achievements />
 
       {admin && (
         // Nur für Admins sichtbar; das Dashboard prüft den Zugriff zusätzlich serverseitig
@@ -457,5 +458,26 @@ export function AccountNotice() {
         </button>
       </div>
     </div>
+  );
+}
+
+/** Erfolge im Profil: Hölle/Himmel erreicht (mit Datum). */
+function Achievements() {
+  const { t, i18n } = useTranslation();
+  const a = services.progress.getAchievements();
+  const list = (['hell', 'heaven'] as const).filter((k) => a[k]);
+  if (!list.length) return null;
+  const fmt = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString(i18n.language === 'en' ? 'en-GB' : 'de-DE');
+  return (
+    <>
+      <h3 className="mt-4 font-tiny text-xs uppercase opacity-75">{t('milestone.achievements')}</h3>
+      <ul className="mt-1 flex flex-wrap gap-2">
+        {list.map((k) => (
+          <li key={k} className="px-2 py-1 text-sm font-bold" style={{ background: k === 'hell' ? '#5a0c18' : '#fff2c8', color: k === 'hell' ? '#ffb347' : '#7a5a2a' }}>
+            {k === 'hell' ? '😈' : '😇'} {t(`milestone.${k}.badge`)} · {fmt(a[k]!)}
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }

@@ -12,6 +12,7 @@ import { TopicPicker } from '../components/TopicPicker';
 import { Panel, PxButton, TierIcon } from '../components/px';
 import { PixelWorld } from '../pixel/PixelWorld';
 import { localeFor } from '../i18n';
+import { MilestoneCelebration, useMilestone } from '../components/MilestoneCelebration';
 
 const SETUP_KEY = 'hal:v1:practice';
 
@@ -196,6 +197,7 @@ function PracticeSession({
   const n = game.results.length;
   // Diese Session allein: 0 m am Start, danach Summe der Punkte × 10 m
   const { meters, average: avg } = practiceProgress(game.results);
+  const { milestone, dismiss } = useMilestone(mode, meters, { daily: false, dateKey });
 
   return (
     <PlayShell
@@ -276,6 +278,7 @@ function PracticeSession({
           </motion.section>
         )}
       </AnimatePresence>
+      <MilestoneCelebration milestone={milestone} onClose={dismiss} />
     </PlayShell>
   );
 }

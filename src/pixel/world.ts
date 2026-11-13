@@ -7,6 +7,9 @@
  * ganzzahlig und ohne Glättung hochskaliert wird. Alle Positionen werden gerundet.
  */
 import type { Images } from './assets';
+import { caveZoneAt, HELL_M, LAVAFALL, type CaveZone } from './zones';
+import { HellRenderer } from './hell';
+import { HeavenRenderer, type SkyFrame } from './heaven';
 import { cobweb, crystalCluster, fossil, pebbles, roots, rng, shroomPatch, vine, worm } from './decor';
 import {
   balloonSprite,
@@ -35,9 +38,12 @@ export const PPM = 0.5; // Pixel pro Meter
 const T = 16; // Kachelgröße
 const HW = 48; // halbe Schachtbreite in px (3 Kacheln je Seite)
 export const BALLOON_X = 104; // Startplatz des Ballons rechts neben dem Höhleneingang
-const LAKE_ROW = Math.round((7150 * PPM) / T); // Lavasee knapp unter 7000 m
+/** Ab dieser Kachelzeile öffnet sich der Schacht in die Hölle (Riesenhöhle, eigene Zeichnung). */
+const HELL_ROW = Math.round((HELL_M * PPM) / T);
 
-type Zone = 'earth' | 'rock' | 'crystal' | 'shroom' | 'lava';
+type Zone = CaveZone;
+/** Zonen mit Schacht (über der Hölle). */
+type ShaftZone = 'earth' | 'rock' | 'crystal' | 'shroom' | 'lava';
 type Mood = 'idle' | 'cheer' | 'flinch';
 
 export interface ViewState {
@@ -97,14 +103,6 @@ const hash = (a: number, b = 0) => {
 const mod = (n: number, m: number) => ((n % m) + m) % m;
 const clamp = (v: number, lo = 0, hi = 1) => Math.max(lo, Math.min(hi, v));
 
-/** Zonengrenzen der Höhle in Metern Tiefe. */
-export const CAVE_ZONES: [number, Zone][] = [
-  [800, 'earth'],
-  [2300, 'rock'],
-  [3800, 'crystal'],
-  [5300, 'shroom'],
-  [Infinity, 'lava'],
-];
 
 /**
  * Dunkelheit je Zone: [Deckkraft, Farbton]. Leuchtende Zonen (Kristall, Pilze, Lava)
@@ -116,6 +114,11 @@ const ZONE_DARK: Record<Zone, [number, [number, number, number]]> = {
   crystal: [0.62, [20, 6, 40]],
   shroom: [0.62, [3, 20, 24]],
   lava: [0.48, [40, 8, 4]],
+  // Hölle: offene Riesenhöhle, rot-violettes Licht
+  hell: [0.42, [40, 6, 30]],
+  icehell: [0.46, [8, 18, 40]],
+  crystalhell: [0.44, [30, 8, 48]],
+  abyss: [0.6, [10, 4, 18]],
 };
 
 /** Gesteinstöne je Zone [dunkel, mittel, hell] – für Felsnasen, Einbettungen und Steine. */
@@ -125,33 +128,39 @@ const ROCK_TONES: Record<Zone, [string, string, string]> = {
   crystal: ['#24143c', '#4a2a78', '#7a50b8'],
   shroom: ['#0c2a2c', '#1c4a48', '#3f8e7e'],
   lava: ['#2a0c0a', '#5a1c12', '#8a3418'],
+  hell: ['#1a0a18', '#3a1630', '#6a2a48'],
+  icehell: ['#0e1a2e', '#2a4a6e', '#8ab8e0'],
+  crystalhell: ['#1c0c30', '#46207a', '#9a5ae0'],
+  abyss: ['#08060e', '#1c1428', '#3a2a50'],
 };
 
-/** Weich zwischen den Zonen überblendet (±200 m um jede Grenze). */
+/** Weich zwischen den Zonen überblendet (±150 m um jede Grenze). */
 function zoneDarkness(m: number): [number, [number, number, number]] {
-  for (const [limit, zone] of CAVE_ZONES) {
-    if (m < limit - 200) return ZONE_DARK[zone];
-    if (m < limit + 200 && limit !== Infinity) {
-      const next = CAVE_ZONES[CAVE_ZONES.findIndex(([l]) => l === limit) + 1]?.[1] ?? zone;
-      const t = (m - (limit - 200)) / 400;
-      const [a0, c0] = ZONE_DARK[zone];
-      const [a1, c1] = ZONE_DARK[next];
-      return [a0 + (a1 - a0) * t, [0, 1, 2].map((i) => Math.round(c0[i] + (c1[i] - c0[i]) * t)) as [number, number, number]];
-    }
+  const a = caveZoneAt(m - 150);
+  const b = caveZoneAt(m + 150);
+  if (a === b) return ZONE_DARK[a];
+  // Grenze liegt irgendwo im Fenster: Anteil der unteren Zone bestimmen
+  let lo = m - 150;
+  let hi = m + 150;
+  for (let i = 0; i < 10; i++) {
+    const mid = (lo + hi) / 2;
+    if (caveZoneAt(mid) === a) lo = mid;
+    else hi = mid;
   }
-  return ZONE_DARK.lava;
+  const t = clamp((m - (lo - 150)) / 300);
+  const [a0, c0] = ZONE_DARK[a];
+  const [a1, c1] = ZONE_DARK[b];
+  return [a0 + (a1 - a0) * t, [0, 1, 2].map((i) => Math.round(c0[i] + (c1[i] - c0[i]) * t)) as [number, number, number]];
 }
 
-/** Zone einer Kachelzeile; an den Grenzen verzahnen sich die Schichten. */
+/** Zone einer Kachelzeile. */
 function zoneOfRow(row: number): Zone {
-  const m = (row * T) / PPM;
-  for (const [limit, zone] of CAVE_ZONES) if (m < limit) return zone;
-  return 'lava';
+  return caveZoneAt((row * T) / PPM);
 }
 
 /** Felsvorsprung: alle ~11 Zeilen ragt von links oder rechts ein Sims in den Schacht. */
 function ledgeOfRow(row: number): { side: -1 | 1; len: number; k: number } | null {
-  if (row < 5 || row >= LAKE_ROW - 2) return null;
+  if (row < 5 || row >= HELL_ROW - 3) return null;
   const k = Math.floor((row - 5) / 11);
   const base = 5 + k * 11 + Math.floor(hash(k, 3) * 5);
   if (row !== base) return null;
@@ -168,29 +177,45 @@ interface TileSet {
   fringe: [number, number][];
 }
 
-// Himmelsfarbe nach "Sichthöhe" in Metern. Zonen: Wiese/Wald 0–1300, Wolken 1300–2700,
-// Höhenwind 2700–4000, Abendrot 4000–5300, Sterne ab 5300.
+// Himmelsfarbe nach "Sichthöhe" in Metern (Zonen siehe zones.ts): Wiese/Wald 0–1200,
+// Wolken 1200–2500, Höhenwind 2500–3700, Abendrot 3700–4600, Sterne 4600–5300,
+// leuchtende Wolkendecke 5300–5500, Himmel 5500–7000, darüber Kristallwolken, Polarlicht, Weltraum.
 const SKY_STOPS: [number, string][] = [
   [0, ''], // wird beim Laden aus back.png gelesen
-  [1300, ''], // Unterkante Wolkenband (bg-clouds)
-  [2600, ''], // Oberkante Wolkenband
-  [3500, '#2f6fe4'],
-  [3850, '#6f7fe0'],
-  [4100, '#c47fc4'],
-  [4350, '#f79a7a'],
-  [4550, '#f7a05e'],
-  [4800, '#e2567c'],
-  [5350, '#6c3c8c'],
-  [5900, '#221d52'],
-  [6500, '#0b0b22'],
+  [1200, ''], // Unterkante Wolkenband (bg-clouds)
+  [2400, ''], // Oberkante Wolkenband
+  [3150, '#2f6fe4'],
+  [3450, '#6f7fe0'],
+  [3700, '#c47fc4'],
+  [3900, '#f79a7a'],
+  [4100, '#f7a05e'],
+  [4350, '#e2567c'],
+  [4650, '#6c3c8c'],
+  [4950, '#221d52'],
+  [5250, '#0b0b22'],
+  // Wolkendecke: Gold bricht durch
+  [5380, '#3a2a5e'],
+  [5470, '#c98bb0'],
+  [5560, '#ffd9a0'],
+  [5900, '#fff1c8'],
+  [6600, '#fff8e4'],
+  [7000, '#eaf4ff'],
+  // Kristallwolken
+  [7600, '#cfe4ff'],
+  [8700, '#b4c4f0'],
+  // Polarlicht (Nacht)
+  [9150, '#1a2850'],
+  [10600, '#0c1830'],
+  // Weltraum
+  [11300, '#05040c'],
 ];
 /** Wie stark der Himmelsverlauf auf dem Bildschirm gestaucht ist (Ferne). */
 const SKY_F = 0.25;
 
 export class World {
   private img: Images;
-  private sets: Record<Zone, TileSet>;
-  private bg: Record<Zone, { far: CanvasPattern | null; mid: CanvasPattern | null; base: string; farH: number; midH: number }>;
+  private sets: Record<ShaftZone, TileSet>;
+  private bg: Record<ShaftZone, { far: CanvasPattern | null; mid: CanvasPattern | null; base: string; farH: number; midH: number }>;
   private explorer = explorerSprites();
   private balloons = new Map<string, Sprite>();
   private bats = batSprites();
@@ -211,6 +236,8 @@ export class World {
   private glowCache = new Map<string, Sprite>();
   private stars: [number, number, number][] = [];
   private stalactite: Sprite;
+  private hell: HellRenderer;
+  private heaven: HeavenRenderer;
 
   constructor(images: Images, ctx: CanvasRenderingContext2D) {
     this.img = images;
@@ -285,11 +312,11 @@ export class World {
     const dusk: [string, string, string] = ['#c79bd8', '#8e62b0', '#5a3f86'];
     for (let i = 0; i < 30; i++) {
       const f = [0.6, 0.85, 1.25][i % 3];
-      this.clouds.push({ alt: 1300 + hash(i, 1) * 1400, x: hash(i, 2) * 600, f, speed: 2 + hash(i, 3) * 5, sprite: cloudSprite(i + 1, Math.round(26 + hash(i, 4) * 44 * f)) });
+      this.clouds.push({ alt: 1200 + hash(i, 1) * 1250, x: hash(i, 2) * 600, f, speed: 2 + hash(i, 3) * 5, sprite: cloudSprite(i + 1, Math.round(26 + hash(i, 4) * 44 * f)) });
     }
     for (let i = 0; i < 6; i++) {
       // vereinzelte Schönwetterwolken über dem Wald
-      this.clouds.push({ alt: 500 + hash(i, 5) * 700, x: hash(i, 6) * 600, f: 0.7, speed: 3, sprite: cloudSprite(60 + i, 24 + Math.round(hash(i, 7) * 16)) });
+      this.clouds.push({ alt: 450 + hash(i, 5) * 650, x: hash(i, 6) * 600, f: 0.7, speed: 3, sprite: cloudSprite(60 + i, 24 + Math.round(hash(i, 7) * 16)) });
     }
     for (let i = 0; i < 12; i++) {
       // Höhenwind: lange, flache Schleierwolken, die schnell ziehen
@@ -299,19 +326,19 @@ export class World {
       cx.fillRect(0, 1, c.width, 1);
       cx.fillStyle = '#bcdcf7';
       cx.fillRect(8, 2, c.width - 14, 1);
-      this.clouds.push({ alt: 2750 + hash(i, 12) * 1200, x: hash(i, 13) * 600, f: [0.7, 1.1][i % 2], speed: 18 + hash(i, 14) * 14, sprite: c });
+      this.clouds.push({ alt: 2550 + hash(i, 12) * 1100, x: hash(i, 13) * 600, f: [0.7, 1.1][i % 2], speed: 18 + hash(i, 14) * 14, sprite: c });
     }
     for (let i = 0; i < 16; i++) {
       const high = i > 9;
       this.clouds.push({
-        alt: high ? 5250 + hash(i, 21) * 500 : 4150 + hash(i, 21) * 1000,
+        alt: high ? 4500 + hash(i, 21) * 300 : 3800 + hash(i, 21) * 700,
         x: hash(i, 22) * 600,
         f: [0.6, 0.9, 1.2][i % 3],
         speed: 2 + hash(i, 23) * 4,
         sprite: cloudSprite(100 + i, Math.round(30 + hash(i, 24) * 50), high ? dusk : sunset),
       });
     }
-    for (let i = 0; i < 220; i++) this.stars.push([hash(i, 31), 5300 + hash(i, 32) * 2600, hash(i, 33)]);
+    for (let i = 0; i < 220; i++) this.stars.push([hash(i, 31), 4500 + hash(i, 32) * 1300, hash(i, 33)]);
 
     const sheet = images['sunny/eagle'];
     const [e, ex] = canvas(80, 41);
@@ -324,6 +351,8 @@ export class World {
     })();
 
     [this.dark, this.darkCtx] = canvas(8, 8);
+    this.hell = new HellRenderer(images);
+    this.heaven = new HeavenRenderer(images);
   }
 
   // ---------------------------------------------------------------- Effekte
@@ -395,13 +424,20 @@ export class World {
       // Staub im Lampenlicht
       if (Math.random() < dt * 5)
         this.particles.push({ x: (Math.random() - 0.5) * HW * 1.8, y: top + Math.random() * H, vx: (Math.random() - 0.5) * 4, vy: -2 - Math.random() * 3, life: 0, max: 3, color: '#cfc6dc', size: 1, gravity: 0, glow: false });
-      const zone = centerDepth > 5300 ? 'lava' : centerDepth > 3800 ? 'shroom' : centerDepth > 2300 ? 'crystal' : 'other';
+      const zone = caveZoneAt(centerDepth);
       if (zone === 'lava' && Math.random() < dt * 14)
         this.particles.push({ x: (Math.random() - 0.5) * HW * 2, y: top + H + 4, vx: (Math.random() - 0.5) * 8, vy: -24 - Math.random() * 26, life: 0, max: 3.2, color: Math.random() < 0.5 ? '#ffb347' : '#ff6a2b', size: 1, gravity: -4, glow: true });
+      if (centerDepth > LAVAFALL[0] - 100 && centerDepth < HELL_M + 300 && Math.random() < dt * 30)
+        // Funkenregen: fällt von oben herab
+        this.particles.push({ x: (Math.random() - 0.5) * HW * 2, y: top - 4, vx: (Math.random() - 0.5) * 10, vy: 30 + Math.random() * 30, life: 0, max: 2.4, color: Math.random() < 0.5 ? '#ffe28a' : '#ff8a2b', size: 1, gravity: 30, glow: true });
+      if ((zone === 'hell' || zone === 'crystalhell' || zone === 'abyss') && Math.random() < dt * 6)
+        this.particles.push({ x: (Math.random() - 0.5) * W, y: top + H + 4, vx: (Math.random() - 0.5) * 6, vy: -14 - Math.random() * 14, life: 0, max: 5, color: zone === 'hell' ? '#ff8a4a' : zone === 'crystalhell' ? '#f0a0ff' : '#a888ff', size: 1, gravity: -2, glow: true });
+      if (zone === 'icehell' && Math.random() < dt * 10)
+        // Eis-Hölle: Schneeflocken
+        this.particles.push({ x: (Math.random() - 0.5) * W, y: top - 4, vx: (Math.random() - 0.5) * 8, vy: 10 + Math.random() * 10, life: 0, max: 8, color: '#e8f6ff', size: 1, gravity: 0, glow: true });
       if (zone === 'shroom' && Math.random() < dt * 5)
         this.particles.push({ x: (Math.random() - 0.5) * HW * 1.9, y: top + Math.random() * H, vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 8, life: 0, max: 4, color: Math.random() < 0.6 ? '#d8ff7a' : '#7af0d0', size: 1, gravity: 0, glow: true });
     }
-    void W;
   }
 
   private updateParticles(dt: number) {
@@ -433,8 +469,20 @@ export class World {
 
     if (groundY > 0) this.drawSky(ctx, W, H, v, ox, groundY);
     if (groundY < H) {
-      if (v.show.cave) this.drawCave(ctx, W, H, v, ox, oy);
-      else this.drawGround(ctx, W, H, ox, oy);
+      if (v.show.cave) {
+        this.drawCave(ctx, W, H, v, ox, oy);
+        this.hell.draw({
+          ctx, W, H, ox, oy,
+          camX: v.camX,
+          camY: v.camY,
+          anchorY: v.anchorY,
+          time: v.time,
+          calm: v.calm,
+          explorerY: Math.round(v.depth * PPM) + oy,
+          lights: this.lights,
+          sign: (t) => this.sign(t),
+        });
+      } else this.drawGround(ctx, W, H, ox, oy);
     }
     if (groundY > -60 && groundY < H + 200) this.drawSurface(ctx, W, ox, groundY, v.show.cave);
 
@@ -444,6 +492,7 @@ export class World {
 
     // Wolken vor dem Ballon
     this.drawClouds(ctx, W, H, v, groundY, true);
+    if (groundY > 0 && v.show.balloon) this.heaven.front(this.skyFrame(ctx, W, H, v, ox, groundY));
 
     this.ambient(v, W, H, dt);
     this.updateParticles(dt);
@@ -454,6 +503,7 @@ export class World {
     }
 
     if (groundY < H && v.show.cave) this.drawDarkness(ctx, W, H, v, oy);
+    if (v.show.cave && !v.calm) this.heatShimmer(ctx, W, H, v, oy);
 
     for (const p of this.particles) {
       if (p.life < 0 || !p.glow) continue;
@@ -473,6 +523,16 @@ export class World {
       ctx.fillRect(ox, ropeTop, 1, ey - 9 - ropeTop);
       ctx.fillStyle = '#a8824e';
       for (let y = ropeTop + ((oy % 4) + 4) % 4; y < ey - 9; y += 4) ctx.fillRect(ox, y, 1, 1);
+      // im Lavafall glüht das Seil kurz auf
+      const g0 = Math.max(ropeTop, Math.round(LAVAFALL[0] * PPM) + oy);
+      const g1 = Math.min(ey - 9, Math.round((LAVAFALL[1] + 60) * PPM) + oy);
+      if (g1 > g0) {
+        for (let y = g0; y < g1; y++) {
+          ctx.fillStyle = (y + Math.floor(v.time * 20)) % 6 < 3 ? '#ffb347' : '#ff6a2b';
+          ctx.fillRect(ox, y, 1, 1);
+        }
+        this.lights.push([ox, Math.round((g0 + g1) / 2), 18, '#ff8a2b']);
+      }
     }
     const sway = v.calm || v.explorerMoving ? 0 : Math.round(Math.sin(v.time * 1.6) * 1);
     const frame =
@@ -593,7 +653,9 @@ export class World {
     }
 
     // 2. Sterne, Mond, Satellit (ganz fern)
-    if (camM > 4300) {
+    // Sterne nur in der Nacht zwischen Abendrot und Wolkendecke (und wieder im Polarlicht/Weltraum, siehe drawHeaven)
+    const starAlpha = clamp((camM - 3700) / 900) * clamp((5600 - camM) / 300);
+    if (starAlpha > 0) {
       for (const [sx, m, ph] of this.stars) {
         const y = at(m, 0.12);
         if (y < 0 || y >= bottom) continue;
@@ -601,7 +663,7 @@ export class World {
         if (tw < -0.6) continue;
         const x = Math.floor(sx * W);
         ctx.fillStyle = ph > 0.8 ? '#bfe6ff' : ph > 0.6 ? '#ffe9b8' : '#ffffff';
-        ctx.globalAlpha = clamp((camM - 4300) / 1200);
+        ctx.globalAlpha = starAlpha;
         ctx.fillRect(x, y, 1, 1);
         if (ph > 0.92 && tw > 0.5) {
           ctx.fillRect(x - 1, y, 3, 1);
@@ -609,13 +671,13 @@ export class World {
         }
       }
       ctx.globalAlpha = 1;
-      ctx.drawImage(this.moon, Math.round(W * 0.7), at(6700, 0.2));
+      ctx.drawImage(this.moon, Math.round(W * 0.7), at(5150, 0.2));
       const sat = mod(v.calm ? 60 : v.time * 5, W + 60) - 30;
-      ctx.drawImage(this.satellite, Math.round(sat), at(7100, 0.35) + Math.round(sat * 0.12));
+      ctx.drawImage(this.satellite, Math.round(sat), at(5200, 0.35) + Math.round(sat * 0.12));
     }
 
     // 3. Sonne im Abendrot – sinkt beim Steigen langsam
-    const sunY = at(4700, 0.6);
+    const sunY = at(4200, 0.6);
     if (sunY > -50 && sunY < bottom) ctx.drawImage(this.sun, Math.round(W * 0.22) - 22, sunY);
 
     // 4. Meer am Horizont und Wolkenband (fernste Ebenen)
@@ -626,14 +688,14 @@ export class World {
       for (let x = off - 384; x < W; x += 384) ctx.drawImage(back, x, backY);
     }
     const strip = this.img['woods/bg-clouds'];
-    const stripY = at(2350, 0.4);
+    const stripY = at(2150, 0.4);
     if (stripY < bottom && stripY + 208 > 0) {
       const off = mod(Math.round(-v.camX * 0.15 + (v.calm ? 0 : v.time * 1.5)), 160);
       for (let x = off - 160; x < W; x += 160) ctx.drawImage(strip, x, stripY);
     }
 
     // 5. Flugzeug in der Ferne mit Kondensstreifen (Höhenwind-Zone)
-    const planeY = at(3350, 0.55);
+    const planeY = at(3100, 0.55);
     if (planeY > -10 && planeY < bottom) {
       const px = Math.round(mod(v.calm ? 120 : v.time * 16, W + 160) - 60);
       ctx.fillStyle = '#ffffff';
@@ -670,9 +732,12 @@ export class World {
     // 7. Wolken hinter dem Ballon
     this.drawClouds(ctx, W, H, v, groundY, false);
 
+    // 8. Über den Sternen: Wolkendecke, Himmel, Himmelstor, darüber Kristallwolken, Polarlicht, Weltraum
+    this.heaven.back(this.skyFrame(ctx, W, H, v, ox, groundY));
+
     // 9. Vögel: kleine Schwärme über dem Wald, ab und zu ein Adler
     for (let i = 0; i < 6; i++) {
-      const alt = 350 + hash(i, 41) * 1000;
+      const alt = 300 + hash(i, 41) * 850;
       const baseY = at(alt, 0.9) + (v.calm ? 0 : Math.round(Math.sin(v.time * 0.9 + i) * 3));
       if (baseY < -20 || baseY > bottom) continue;
       const dir = i % 2 ? 1 : -1;
@@ -691,8 +756,8 @@ export class World {
       ctx.drawImage(this.eagleFlip, fr * 40, 0, 40, 41, ex, eY, 40, 41);
     }
 
-    // 10. Höhenschilder an Signalballons
-    for (let m = 500; m <= 7000; m += 500) {
+    // 10. Höhenschilder an Signalballons (bis zum Himmel; dort eigene Schilder, siehe drawHeaven)
+    for (let m = 500; m < 5500; m += 500) {
       const y = groundY - Math.round(m * PPM);
       if (y < -30 || y > bottom + 10) continue;
       const sign = this.sign(`+${m} m`);
@@ -701,6 +766,25 @@ export class World {
       ctx.drawImage(this.buoy, x + Math.floor(sign.width / 2) - 4, y - 12 + bobS);
       ctx.drawImage(sign, x, y - 2 + bobS);
     }
+  }
+
+  private skyFrame(ctx: CanvasRenderingContext2D, W: number, H: number, v: ViewState, ox: number, groundY: number): SkyFrame {
+    const camAlt = -v.camY;
+    return {
+      ctx,
+      W,
+      H,
+      at: (m: number, f: number) => Math.round(v.anchorY - (m * PPM - camAlt) * f),
+      camM: camAlt / PPM,
+      camX: v.camX,
+      time: v.time,
+      calm: v.calm,
+      balloonX: ox + v.balloonX,
+      balloonY: groundY - Math.round(v.altitude * PPM) - 40,
+      bottom: Math.min(H, groundY),
+      sign: (t) => this.sign(t),
+      buoy: this.buoy,
+    };
   }
 
   private drawClouds(ctx: CanvasRenderingContext2D, W: number, H: number, v: ViewState, groundY: number, front: boolean) {
@@ -783,14 +867,15 @@ export class World {
 
   private drawCave(ctx: CanvasRenderingContext2D, W: number, H: number, v: ViewState, ox: number, oy: number) {
     const r0 = Math.max(0, Math.floor(-oy / T));
-    const r1 = Math.ceil((H - oy) / T);
+    // ab HELL_ROW zeichnet drawHell die offene Riesenhöhle
+    const r1 = Math.min(Math.ceil((H - oy) / T), HELL_ROW - 1);
     const c0 = Math.floor(-ox / T);
     const c1 = Math.ceil((W - ox) / T);
     const earth = this.sets.earth;
 
     for (let r = r0; r <= r1; r++) {
       const y = r * T + oy;
-      const zone = zoneOfRow(r);
+      const zone = zoneOfRow(r) as ShaftZone; // r < HELL_ROW
       const set = this.sets[zone];
       const bg = this.bg[zone];
       const ledge = ledgeOfRow(r);
@@ -836,7 +921,7 @@ export class World {
           ctx.fillRect(60 - HW, y - ty, HW * 2, T);
           ctx.restore();
         }
-        if (zone !== 'earth' && r < LAKE_ROW) this.backWallDetails(ctx, zone, r, ox, y, v);
+        if (zone !== 'earth') this.backWallDetails(ctx, zone, r, ox, y, v);
         // Schatten der Seitenwände auf der Rückwand
         ctx.fillStyle = 'rgba(0,0,0,0.28)';
         ctx.fillRect(ox - HW, y, 3, T);
@@ -844,22 +929,6 @@ export class World {
         ctx.fillStyle = 'rgba(0,0,0,0.12)';
         ctx.fillRect(ox - HW + 3, y, 4, T);
         ctx.fillRect(ox + HW - 7, y, 4, T);
-      }
-
-      // --- Lavasee
-      if (r >= LAKE_ROW) {
-        for (let x = -HW; x < HW; x += 2) {
-          const wave = r === LAKE_ROW ? Math.round(Math.sin(x * 0.22 + v.time * 2) * 1.5 + Math.sin(x * 0.5 - v.time * 1.3)) + 3 : 0;
-          ctx.fillStyle = r === LAKE_ROW ? '#ffd27a' : '#ff7a2b';
-          ctx.fillRect(ox + x, y + wave, 2, T - wave);
-          ctx.fillStyle = r === LAKE_ROW ? '#ff8a2b' : r === LAKE_ROW + 1 ? '#e2541e' : '#c23a16';
-          ctx.fillRect(ox + x, y + wave + 2, 2, T - wave - 2);
-          if (r === LAKE_ROW && !v.calm && hash(x, Math.floor(v.time * 1.5)) < 0.05) {
-            ctx.fillStyle = '#fff1b0';
-            ctx.fillRect(ox + x, y + wave + 4, 2, 2);
-          }
-        }
-        if (r === LAKE_ROW) for (let x = -HW + 12; x < HW; x += 24) this.lights.push([ox + x, y + 6, 44, '#ff7a2b']);
       }
 
       // --- Fels links und rechts vom Schacht
@@ -879,17 +948,31 @@ export class World {
         }
       }
 
+      // --- Lavafall: im Übergang zur Hölle rinnt Lava an beiden Schachtwänden herab
+      const rowM = (r * T) / PPM;
+      if (rowM >= LAVAFALL[0] - 40 && rowM < HELL_M) {
+        const fall = this.img['hell/lavafall'];
+        const fr = v.calm ? 0 : Math.floor(v.time * 8 + r) % 3;
+        const fade = clamp((rowM - (LAVAFALL[0] - 40)) / 120);
+        ctx.globalAlpha = fade;
+        ctx.drawImage(fall, fr * 16, 0, 16, 16, ox - HW, y, 16, 16);
+        ctx.drawImage(fall, ((fr + 1) % 3) * 16, 0, 16, 16, ox + HW - 16, y, 16, 16);
+        ctx.globalAlpha = 1;
+        this.lights.push([ox - HW + 8, y + 8, 22, '#ff7a2b']);
+        this.lights.push([ox + HW - 8, y + 8, 22, '#ff7a2b']);
+      }
+
       // --- Hintergrund-Fels neben dem Schacht: dunkler, eigene Struktur (Deko hängt nicht vor „nichts“)
       if (r >= 1) this.backRock(ctx, zone, r, ox, y, W);
 
       // --- Leuchtendes im Fels neben dem Schacht: die Zone ist auch außerhalb der Lampe erkennbar
-      if (r >= 2 && r < LAKE_ROW) {
+      if (r >= 2) {
         if (zone === 'lava') this.lavaRock(ctx, r, ox, y, W, v);
         else this.sideEmitters(ctx, zone, r, ox, y, W);
       }
 
       // --- Sims mit allem, was darauf wächst oder daran hängt
-      if (ledge && r < LAKE_ROW) {
+      if (ledge) {
         const { side, len, k } = ledge;
         const lx = (i: number) => ox + (side < 0 ? -HW + i * T : HW - (i + 1) * T);
         if (zone === 'earth') {
@@ -966,7 +1049,7 @@ export class World {
       }
 
       // --- Kleinteile an den Wänden: alles sitzt an der Wand und wächst zur Schachtmitte
-      if (r >= 2 && r < LAKE_ROW - 1 && !ledge) {
+      if (r >= 2 && !ledge) {
         const h = hash(r, 81);
         const left = hash(r, 82) < 0.5;
         const k = Math.floor(h * 90) % 3;
@@ -1014,8 +1097,8 @@ export class World {
     // --- Übergang Wiese → Schacht (nach den Zeilen, damit er obenauf liegt)
     if (oy > -40 && oy < H) this.shaftLip(ctx, ox, oy);
 
-    // --- Tiefenschilder an der rechten Wand
-    for (let m = 500; m <= 7000; m += 500) {
+    // --- Tiefenschilder an der rechten Wand (in der Hölle hängen sie an Ketten, siehe drawHell)
+    for (let m = 500; m < HELL_M; m += 500) {
       const y = Math.round(m * PPM) + oy;
       if (y < -20 || y > H + 20) continue;
       const s = this.sign(`-${m} m`);
@@ -1036,6 +1119,10 @@ export class World {
       crystal: ['#3a2560', '#5a3f8a', '#1a0f2c'],
       shroom: ['#1c3a3a', '#2c5450', '#0a1a1c'],
       lava: ['#5a1f14', '#7a2a18', '#24090a'],
+      hell: ['#3a1630', '#6a2a48', '#1a0a18'],
+      icehell: ['#2a4a6e', '#8ab8e0', '#0e1a2e'],
+      crystalhell: ['#46207a', '#9a5ae0', '#1c0c30'],
+      abyss: ['#1c1428', '#3a2a50', '#08060e'],
     };
     const [stone, light, crack] = tone[zone];
     for (let i = 0; i < 3; i++) {
@@ -1102,10 +1189,14 @@ export class World {
         this.embedLip(ctx, Math.round(x - s.width / 2), y + 15, s.width, 'crystal', seed);
         this.lights.push([x, y + 9, 11, CRYSTAL_COLORS[k][1]]);
       } else {
-        // Pilzgruppe auf Moospolster, direkt am Fels (kein Kasten)
+        // Pilzgruppe auf Moospolster – sitzt auf einem Felssims, der aus dem Gestein ragt
+        // (vorher schwebten die Polster als kleine Inseln im Dunkeln)
         const k = Math.floor(h * 97) % 3;
         const s = shroomPatch(seed * 5 + 2, k);
-        ctx.drawImage(s, Math.round(x - s.width / 2), y + 18 - s.height);
+        const px0 = Math.round(x - s.width / 2);
+        this.rockShelf(ctx, px0 - 3, y + 17, s.width + 6, 'shroom', seed);
+        ctx.drawImage(s, px0, y + 18 - s.height);
+        this.embedLip(ctx, px0, y + 17, s.width, 'shroom', seed);
         this.softGlow(x, y + 8, s.width, ['#63f0d0', '#b8f05a', '#f08ae6'][k], seed);
       }
     }
@@ -1177,6 +1268,31 @@ export class World {
     }
     ctx.fillStyle = glint;
     ctx.fillRect(x + 1, y + 2, 1, 1);
+  }
+
+  /** Felssims im Hintergrund-Gestein: Oberkante hell, darunter Fels, der in die Wand übergeht. */
+  private rockShelf(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, zone: Zone, seed: number) {
+    const [dark, mid, light] = ROCK_TONES[zone];
+    const r = rng(seed * 13 + 5);
+    for (let i = 0; i < w; i++) {
+      // nach unten verjüngt, unregelmäßig – wie aus der Wand gebrochen
+      const t = Math.abs(i - w / 2) / (w / 2);
+      const depth = Math.max(2, Math.round((1 - t * t) * 9 + r() * 2));
+      ctx.fillStyle = mid;
+      ctx.fillRect(x + i, y, 1, depth);
+      ctx.fillStyle = r() < 0.5 ? light : mid;
+      ctx.fillRect(x + i, y, 1, 1);
+      ctx.fillStyle = dark;
+      ctx.fillRect(x + i, y + depth, 1, 2);
+      // Risse/Moos an der Unterseite
+      if (r() < 0.12) {
+        ctx.fillStyle = '#2f8e6a';
+        ctx.fillRect(x + i, y + depth, 1, 1 + Math.floor(r() * 3));
+      }
+    }
+    // Schatten auf der Wand darunter
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(x + 2, y + 10, w - 4, 3);
   }
 
   /** Unregelmäßige Gesteinskante vor dem Fuß eines Objekts – es wirkt eingewachsen statt aufgelegt. */
@@ -1441,6 +1557,10 @@ export class World {
       crystal: ['#2e1a4a', '#5a2f8a', '#8a55d0'],
       shroom: ['#0c2a2c', '#1c5a58', '#3fae8e'],
       lava: ['#3a0f10', '#7a2416', '#c9541e'],
+      hell: ROCK_TONES.hell,
+      icehell: ROCK_TONES.icehell,
+      crystalhell: ROCK_TONES.crystalhell,
+      abyss: ROCK_TONES.abyss,
     };
     const a = col[upper];
     const b = col[lower];
@@ -1461,6 +1581,19 @@ export class World {
         ctx.fillStyle = c;
         ctx.fillRect(x, y + dy + wave + ((wx & 1) && h > 1 ? 1 : 0), 1, h);
       }
+    }
+  }
+
+  /** Hitzeflimmern über dem Lavafall: Zeilenbänder leicht seitlich versetzt (kopiert vom eigenen Canvas). */
+  private heatShimmer(ctx: CanvasRenderingContext2D, W: number, H: number, v: ViewState, oy: number) {
+    const y0 = Math.max(0, Math.round((LAVAFALL[0] - 80) * PPM) + oy);
+    const y1 = Math.min(H, Math.round((HELL_M + 160) * PPM) + oy);
+    if (y1 <= y0) return;
+    const c = ctx.canvas;
+    for (let y = y0; y < y1; y += 3) {
+      const dx = Math.round(Math.sin(y * 0.35 + v.time * 7));
+      if (dx === 0) continue;
+      ctx.drawImage(c, 0, y, W, 3, dx, y, W, 3);
     }
   }
 

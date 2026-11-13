@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import { MAX_POINTS, pointsToMeters, totalPoints } from '../domain/scoring';
 import { buildShareText } from '../domain/share';
+import { milestoneOf } from '../pixel/zones';
 import type { Mode, Question } from '../domain/types';
 import { services, type DayRecord } from '../services';
 import { PixelWorld } from '../pixel/PixelWorld';
@@ -56,6 +57,7 @@ export function ResultScreen({
   const stats = services.progress.getStats(mode);
   const streak = services.progress.getStreak(mode, dateKey);
   const avg = stats.played ? Math.round(stats.totalPoints / stats.played) : 0;
+  const reached = milestoneOf(mode, meters);
 
   const share = async () => {
     const text = buildShareText(mode, dateKey, record.results, {
@@ -64,6 +66,7 @@ export function ResultScreen({
       measureLabel: t(`modes.${mode}.measure`),
       locale,
       url: location.protocol === 'https:' ? location.origin + location.pathname : undefined,
+      milestone: reached ? t(`milestone.${reached}.share`) : null,
     });
     try {
       // Auf Handys das native Teilen-Menü, sonst Zwischenablage.
@@ -97,6 +100,11 @@ export function ResultScreen({
               {fmt.format(meters)} m
             </p>
             <p className="mt-2 text-lg">{t('result.points', { points, max: MAX_POINTS })}</p>
+            {reached && (
+              <p className="mx-auto mt-2 inline-block px-2 text-lg font-bold" style={{ background: reached === 'hell' ? '#5a0c18' : '#fff2c8', color: reached === 'hell' ? '#ffb347' : '#7a5a2a' }}>
+                {t(`milestone.${reached}.share`)}
+              </p>
+            )}
             <p className="mt-3 flex justify-center gap-1" aria-label={record.results.map((r) => t(`tiers.${r.tier}`)).join(', ')}>
               {record.results.map((r, i) => (
                 <TierIcon key={i} tier={r.tier} scale={2} />

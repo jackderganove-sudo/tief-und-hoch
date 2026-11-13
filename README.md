@@ -271,6 +271,26 @@ Fragen künftiger Tage können aber vorkommen. Die Themenauswahl (`TopicPicker`,
 `TopicSelection`, `QuestionRepository.getQuestions`) ist eigenständig gebaut und für den
 Freunde-Modus wiederverwendbar.
 
+## Welt: Zonen (Hölle und Himmel)
+
+1 Punkt = 10 m, eine perfekte Tagesrunde (700) = 7.000 m. Grenzen in `src/pixel/zones.ts`
+(dort auch die Annahmen; nach ein paar Wochen echter Runden nachjustieren).
+
+| Abstieg | Meter | | Aufstieg | Meter |
+| --- | --- | --- | --- | --- |
+| Erde | 0–300 | | Wiese/Wald | 0–1.200 |
+| Fels | 300–900 | | Wolken | 1.200–2.500 |
+| Kristallhöhle | 900–1.600 | | Höhenwind | 2.500–3.700 |
+| Pilzgrotte (Ø-Runde) | 1.600–2.300 | | Abendrot (Ø-Runde) | 3.700–4.600 |
+| Lava (oberes Drittel) | 2.300–3.100, Lavafall ab 2.850 | | Sterne (oberes Drittel) | 4.600–5.300 |
+| **Hölle** (beste ~12 %) | 3.100–7.000, **Höllentor bei 7.000** | | Wolkendecke | 5.300–5.500 |
+| Endlos: Eis-Hölle, Kristall-Hölle, Abgrund (je 2.000 m, wiederholt) | ab 7.000 | | **Himmel** (beste ~12 %) | 5.500–7.000, **Himmelstor bei 7.000** |
+| | | | Endlos: Kristallwolken, Polarlicht, Weltraum | ab 7.000 |
+
+Wer in einer Tagesrunde zum ersten Mal Hölle bzw. Himmel erreicht, bekommt eine Feier und einen
+Erfolg im Profil (wird mit dem Konto synchronisiert); im Teilen-Text steht es auch.
+Admin → Debug → „Jede Zone direkt“ springt in jede Zone.
+
 ## Freunde-Modus (Live-Räume)
 
 Ein Gastgeber erstellt einen Raum (6-stelliger Code ohne verwechselbare Zeichen), Freunde treten per

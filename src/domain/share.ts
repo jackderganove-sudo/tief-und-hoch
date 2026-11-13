@@ -8,6 +8,8 @@ export interface ShareLabels {
   measureLabel: string;
   locale: string;
   url?: string;
+  /** z. B. „😈 Bis in die Hölle!“ – nur, wenn die Runde so weit kam */
+  milestone?: string | null;
 }
 
 /** Teilbarer Text mit einer Emoji-Reihe, Wordle-Stil. */
@@ -35,6 +37,7 @@ export function buildShareText(
     `${labels.title} · ${labels.modeName} ${icon} ${date}`,
     row,
     `${labels.measureLabel}: ${sign}${fmt.format(meters)} m (${points}/${MAX_POINTS})`,
+    labels.milestone,
     labels.url,
   ]
     .filter(Boolean)

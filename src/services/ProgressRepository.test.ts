@@ -91,3 +91,19 @@ describe('Debug-Runden zählen nicht (Sandbox)', async () => {
     expect(synced).not.toHaveBeenCalled();
   });
 });
+
+describe('Erfolge', () => {
+  it('nur beim ersten Mal neu, im Snapshot enthalten, Debug-Sandbox getrennt', async () => {
+    const { DebugAwareProgressRepository } = await import('./ProgressRepository');
+    const storage = new MemoryStorage();
+    const real = new LocalProgressRepository(storage);
+    expect(real.recordAchievement('hell', '2026-11-14')).toBe(true);
+    expect(real.recordAchievement('hell', '2026-11-15')).toBe(false);
+    expect(real.exportSnapshot().achievements).toEqual({ hell: '2026-11-14' });
+    let debug = true;
+    const repo = new DebugAwareProgressRepository(real, new LocalProgressRepository(storage, 'hal:v1:debug'), () => debug);
+    expect(repo.recordAchievement('heaven', '2026-11-16')).toBe(true);
+    debug = false;
+    expect(real.getAchievements()).toEqual({ hell: '2026-11-14' });
+  });
+});
