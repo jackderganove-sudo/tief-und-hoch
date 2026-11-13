@@ -8,7 +8,8 @@
  */
 import type { Images } from './assets';
 import { caveZoneAt, HELL_M, LAVAFALL, type CaveZone } from './zones';
-import { HellRenderer } from './hell';
+import { HELL_DARK, HellRenderer } from './hell';
+import { DEEP_DARK } from './deep';
 import { HeavenRenderer, type SkyFrame } from './heaven';
 import { cobweb, crystalCluster, fossil, pebbles, roots, rng, shroomPatch, vine, worm } from './decor';
 import {
@@ -124,11 +125,9 @@ const ZONE_DARK: Record<Zone, [number, [number, number, number]]> = {
   crystal: [0.62, [20, 6, 40]],
   shroom: [0.62, [3, 20, 24]],
   lava: [0.48, [40, 8, 4]],
-  // Hölle: offene Riesenhöhle, rot-violettes Licht
-  hell: [0.42, [40, 6, 30]],
-  icehell: [0.46, [8, 18, 40]],
-  crystalhell: [0.44, [30, 8, 48]],
-  abyss: [0.6, [10, 4, 18]],
+  // Hölle und Tiefen: Werte gehören zu hell.ts bzw. deep.ts
+  hell: HELL_DARK,
+  ...DEEP_DARK,
 };
 
 /** Gesteinstöne je Zone [dunkel, mittel, hell] – für Felsnasen, Einbettungen und Steine. */

@@ -11,29 +11,14 @@
 import type { Images } from './assets';
 import { crystalCluster } from './decor';
 import { canvas, lerpColor, rampMap, recolor, type Sprite } from './sprites';
-import { caveZoneAt, GATE_M, HELL_M, type CaveZone } from './zones';
+import { DEEP_PAL, DeepRenderer } from './deep';
+import { hash, HW, levelAt, levelBlend, LEVELS, mod, PPM, type Darkness, type HellFrame, type Level, type Palette } from './hellShared';
+import { GATE_M, HELL_M } from './zones';
 
-const PPM = 0.5;
-const HW = 48;
-
-type Level = 'hell' | 'icehell' | 'crystalhell' | 'abyss';
-
-interface Palette {
-  /** Hintergrund oben/unten (wechselt langsam mit der Tiefe) */
-  bg: [string, string];
-  far: [string, string];
-  /** Säulen: dunkel, mittel, hell, Randlicht */
-  col: [string, string, string, string];
-  /** Feuersee: dunkel → hell */
-  lake: [string, string, string, string, string];
-  rune: string;
-  flame: [string, string, string];
-  /** Rampe für Teufelchen (dunkel → hell) */
-  imp: string[];
-  steam: string[];
-}
+export type { Light } from './hellShared';
 
 const PAL: Record<Level, Palette> = {
+  ...DEEP_PAL,
   hell: {
     bg: ['#2a0a22', '#160614'],
     far: ['#1c0818', '#3a1230'],
@@ -44,77 +29,12 @@ const PAL: Record<Level, Palette> = {
     imp: ['#1a0606', '#5a0c0c', '#c21e1e', '#ff6a4a', '#ffe08a'],
     steam: ['#3a4a10', '#7a8a20', '#b8c84a', '#e8f08a', '#f8ffd0'],
   },
-  icehell: {
-    bg: ['#0e2038', '#060c1c'],
-    far: ['#0a1628', '#1e3a5e'],
-    col: ['#081222', '#1c3454', '#4e7eb0', '#bfe8ff'],
-    lake: ['#0c2a4a', '#2a6aa8', '#6ab8e8', '#bfe8ff', '#ffffff'],
-    rune: '#8be9fd',
-    flame: ['#ffffff', '#bfe8ff', '#5ab8ff'],
-    imp: ['#06121e', '#123a5a', '#2a7ab0', '#8ad0f8', '#ffffff'],
-    steam: ['#4a6a8a', '#8aaccc', '#c8e4f8', '#e8f6ff', '#ffffff'],
-  },
-  crystalhell: {
-    bg: ['#2a0e46', '#120622'],
-    far: ['#1a0a2e', '#3c1a66'],
-    col: ['#120624', '#2e1452', '#6a32b0', '#f08ae6'],
-    lake: ['#3a0a5a', '#7a20b0', '#c050f0', '#f0a0ff', '#ffe0ff'],
-    rune: '#f08ae6',
-    flame: ['#ffe0ff', '#f0a0ff', '#b04af0'],
-    imp: ['#14061e', '#4a1270', '#9a32d0', '#e08af8', '#fff0ff'],
-    steam: ['#4a2a6a', '#8a5ab0', '#c8a0e8', '#ecd8ff', '#ffffff'],
-  },
-  abyss: {
-    bg: ['#100820', '#04020a'],
-    far: ['#0a0614', '#1c1230'],
-    col: ['#06040c', '#140e22', '#2e2248', '#7a5aff'],
-    lake: ['#140830', '#3a1a80', '#6a40d0', '#a888ff', '#e0d8ff'],
-    rune: '#8a6aff',
-    flame: ['#e0d8ff', '#a888ff', '#6a40d0'],
-    imp: ['#06040c', '#1e1440', '#4a3a90', '#9a88e0', '#f0ecff'],
-    steam: ['#2a2240', '#4a3e6a', '#7a6aa0', '#b0a4d0', '#e0dcf0'],
-  },
 };
 
-const LEVELS: Level[] = ['hell', 'icehell', 'crystalhell', 'abyss'];
-const levelAt = (m: number): Level => {
-  const z = caveZoneAt(Math.max(m, HELL_M + 1));
-  return (LEVELS as CaveZone[]).includes(z) ? (z as Level) : 'hell';
-};
+/** Dunkelheit über der Hölle (bis zum Tor). */
+export const HELL_DARK: Darkness = [0.42, [40, 6, 30]];
 
-/** Ebene(n) an einer Tiefe mit Überblendanteil der unteren Ebene (±200 m um jede Grenze). */
-function levelBlend(m: number): { a: Level; b: Level; t: number } {
-  const a = levelAt(m - 200);
-  const b = levelAt(m + 200);
-  if (a === b) return { a, b, t: 0 };
-  const edge = m < GATE_M + 1000 ? GATE_M : GATE_M + Math.round((m - GATE_M) / 2000) * 2000;
-  return { a, b, t: Math.max(0, Math.min(1, (m - (edge - 200)) / 400)) };
-}
 
-const hash = (a: number, b = 0) => {
-  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
-  return s - Math.floor(s);
-};
-const mod = (n: number, m: number) => ((n % m) + m) % m;
-
-export type Light = [number, number, number, string?, boolean?];
-
-interface Drawn {
-  ctx: CanvasRenderingContext2D;
-  W: number;
-  H: number;
-  ox: number;
-  oy: number;
-  camX: number;
-  camY: number;
-  anchorY: number;
-  time: number;
-  calm: boolean;
-  /** Bildschirm-y der Figur (Teufelchen winken, wenn sie vorbeikommt) */
-  explorerY: number;
-  lights: Light[];
-  sign: (text: string) => Sprite;
-}
 
 export class HellRenderer {
   private lava = new Map<Level, Sprite>();
@@ -125,8 +45,10 @@ export class HellRenderer {
   private columns = new Map<string, Sprite>();
   private lavafall: Sprite;
   private chain: Sprite;
+  private deep: DeepRenderer;
 
   constructor(img: Images) {
+    this.deep = new DeepRenderer(img);
     this.lavafall = img['hell/lavafall'] as unknown as Sprite;
     this.chain = img['hell/chain'] as unknown as Sprite;
     for (const l of LEVELS) {
@@ -179,7 +101,7 @@ export class HellRenderer {
     return s;
   }
 
-  draw(d: Drawn) {
+  draw(d: HellFrame) {
     const { ctx, W, H, oy } = d;
     const top = Math.round(HELL_M * PPM + oy);
     if (top >= H) return;
@@ -190,17 +112,19 @@ export class HellRenderer {
     ctx.rect(0, clipTop, W, H - clipTop);
     ctx.clip();
     this.background(d, clipTop);
+    this.deep.back(d, clipTop);
     this.farLayer(d, clipTop);
     this.midLayer(d, clipTop);
     this.gate(d);
     this.spirits(d, clipTop);
     this.signs(d);
+    this.deep.front(d, clipTop);
     ctx.restore();
     if (top > -60) this.ceiling(d, top);
   }
 
   /** Riesenhöhle: Farbverlauf in Bändern, je Ebene getönt, weich überblendet. */
-  private background(d: Drawn, clipTop: number) {
+  private background(d: HellFrame, clipTop: number) {
     const { ctx, W, H, oy } = d;
     for (let y = clipTop; y < H; y += 2) {
       const m = (y - oy) / PPM;
@@ -215,7 +139,7 @@ export class HellRenderer {
   }
 
   /** Bildschirm-Koordinaten einer Parallax-Ebene. */
-  private layer(d: Drawn, f: number) {
+  private layer(d: HellFrame, f: number) {
     return {
       sx: (lx: number) => Math.round(d.W / 2 + (lx - d.camX) * f),
       sy: (ly: number) => Math.round(d.anchorY + (ly - d.camY) * f),
@@ -224,7 +148,7 @@ export class HellRenderer {
   }
 
   /** Ferne Säulen als Silhouetten, mit dunklem Glühen. */
-  private farLayer(d: Drawn, clipTop: number) {
+  private farLayer(d: HellFrame, clipTop: number) {
     const { ctx, W, H } = d;
     const f = 0.35;
     const L = this.layer(d, f);
@@ -260,7 +184,7 @@ export class HellRenderer {
   }
 
   /** Obsidiansäulen mit Runen, Simsen, Feuerseen, Teufelchen, Fackeln, Dampf und Ketten. */
-  private midLayer(d: Drawn, clipTop: number) {
+  private midLayer(d: HellFrame, clipTop: number) {
     const { ctx, W, H, time, calm } = d;
     const f = 0.7;
     const L = this.layer(d, f);
@@ -401,7 +325,7 @@ export class HellRenderer {
   }
 
   /** Höllentor bei 7.000 m: Säulen mit Runen, Bogen mit Hörnern, glühende Torflügel, Feuerschalen. */
-  private gate(d: Drawn) {
+  private gate(d: HellFrame) {
     const { ctx, ox, oy, H, time, calm } = d;
     const base = Math.round(GATE_M * PPM + oy) + 28; // Schwelle knapp unter der Figur bei 7.000 m
     if (base < -10 || base - 150 > H) return;
@@ -464,7 +388,7 @@ export class HellRenderer {
   }
 
   /** Flammengeister: kleine flackernde Flammen, die durch die Höhle treiben. */
-  private spirits(d: Drawn, clipTop: number) {
+  private spirits(d: HellFrame, clipTop: number) {
     const { ctx, W, H, oy, time, calm } = d;
     const y0 = Math.floor((clipTop - oy) / 80) - 1;
     const y1 = Math.ceil((H - oy) / 80) + 1;
@@ -493,7 +417,7 @@ export class HellRenderer {
   }
 
   /** Tiefenschilder an Ketten (in der offenen Höhle gibt es keine Wand). */
-  private signs(d: Drawn) {
+  private signs(d: HellFrame) {
     const { ctx, H, ox, oy } = d;
     for (let m = HELL_M + 400; m < GATE_M + 40000; m += m < GATE_M ? 500 : 1000) {
       if (m === GATE_M) continue;
@@ -511,7 +435,7 @@ export class HellRenderer {
    * Übergang: Der Schacht endet, darunter öffnet sich die Höhle. Felsdecke mit
    * Zacken über die ganze Breite, im Schacht-Ausgang zwei Lavafälle.
    */
-  private ceiling(d: Drawn, top: number) {
+  private ceiling(d: HellFrame, top: number) {
     const { ctx, W, ox, time, calm } = d;
     // Lavagestein wie in der Zone darüber: dunkel, mittel, hell, Glut
     const rock = ['#2a0c0a', '#5a1c12', '#8a3418'];
