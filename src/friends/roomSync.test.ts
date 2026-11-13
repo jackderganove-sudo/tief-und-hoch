@@ -5,7 +5,7 @@ import type { RoomState } from './roomApi';
 const base = (over: Partial<RoomState> = {}): RoomState => ({
   code: 'ABCDEF',
   status: 'question',
-  settings: { mode: 'rare', scoring: 'group', source: 'random', topics: [], count: 5, seconds: 25, lang: 'de' },
+  settings: { mode: 'rare', scoring: 'group', source: 'random', topics: [], count: 5, seconds: 25, lang: 'de', show_attempts: false },
   custom_prompts: null,
   index: 0,
   count: 5,
@@ -16,8 +16,8 @@ const base = (over: Partial<RoomState> = {}): RoomState => ({
   host_id: 'a',
   me: 'a',
   players: [
-    { user_id: 'a', name: 'A', avatar: 0, color: 0, from_index: 0, online: true, answered: false, points: 0 },
-    { user_id: 'b', name: 'B', avatar: 0, color: 1, from_index: 0, online: true, answered: false, points: 0 },
+    { user_id: 'a', name: 'A', avatar: 0, color: 0, from_index: 0, online: true, answered: false, attempts: 0, points: 0 },
+    { user_id: 'b', name: 'B', avatar: 0, color: 1, from_index: 0, online: true, answered: false, attempts: 0, points: 0 },
   ],
   question: null,
   my_answer: null,

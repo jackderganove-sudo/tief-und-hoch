@@ -59,6 +59,57 @@ describe('Einstellungen', () => {
   });
 });
 
+describe('Mehrere Versuche', () => {
+  it('Fehlversuche in der Auflösung sind Standard aus und nur ein echter Schalter stellt sie an', () => {
+    expect(sanitizeSettings({}).show_attempts).toBe(false);
+    expect(sanitizeSettings({ show_attempts: true }).show_attempts).toBe(true);
+    expect(sanitizeSettings({ show_attempts: 'yes' }).show_attempts).toBe(false);
+    // alte Räume ohne das Feld
+    const { show_attempts: _drop, ...old } = sanitizeSettings({});
+    expect(sanitizeSettings({}, old as never).show_attempts).toBe(false);
+  });
+
+  it('nach Ablauf der Fragezeit werden keine Versuche mehr angenommen', () => {
+    expect(acceptsAnswer('question', 10_000, 9_000)).toBe(true);
+    expect(acceptsAnswer('question', 10_000, 10_000 + ANSWER_GRACE_MS)).toBe(true);
+    expect(acceptsAnswer('question', 10_000, 10_001 + ANSWER_GRACE_MS)).toBe(false);
+    expect(acceptsAnswer('scoring', 10_000, 9_000)).toBe(false);
+    expect(acceptsAnswer('reveal', 10_000, 9_000)).toBe(false);
+  });
+
+  it('wer noch rät, hält die Frage bis zum Zeitablauf offen', () => {
+    const base = { status: 'question' as const, index: 0, count: 5, endsAt: 10_000, pending: false };
+    // nicht alle haben eine gültige Antwort → weiter bis zum Ablauf
+    expect(nextTransition({ ...base, now: 5_000, allAnswered: false })).toBeNull();
+    expect(nextTransition({ ...base, now: 10_000, allAnswered: false })).toEqual({ to: 'scoring' });
+    // alle gültig → sofort auflösen
+    expect(nextTransition({ ...base, now: 5_000, allAnswered: true })).toEqual({ to: 'scoring' });
+    // eine Prüfung läuft noch über das Ende hinaus → kurz warten, dann auflösen
+    expect(nextTransition({ ...base, now: 11_000, allAnswered: false, pending: true })).toBeNull();
+    expect(nextTransition({ ...base, now: 10_000 + PENDING_GRACE_MS, allAnswered: false, pending: true })).toEqual({ to: 'scoring' });
+  });
+
+  it('nur die akzeptierte Antwort zählt für die Gruppen-Wertung; wer nichts Gültiges fand, bekommt 0', () => {
+    // a und b: gültig (b erst im 3. Versuch – das ändert nichts), c: nur Fehlversuche (letzter als ungültige Antwort), d: nichts
+    const r = scoreQuestion({
+      mode: 'rare',
+      scoring: 'group',
+      participants: ['a', 'b', 'c', 'd'],
+      answers: [
+        { userId: 'a', raw: 'Karotte', valid: true, groupKey: 'karotte', display: 'Karotte' },
+        { userId: 'b', raw: 'Pastinake', valid: true, groupKey: 'pastinake', display: 'Pastinake' },
+        { userId: 'c', raw: 'Stein', valid: false, groupKey: 'stein', display: 'Stein' },
+      ],
+    });
+    expect(r.perPlayer.a.points).toBe(100);
+    expect(r.perPlayer.b.points).toBe(100);
+    expect(r.perPlayer.c.points).toBe(0);
+    expect(r.perPlayer.d.points).toBe(0);
+    expect(r.missed).toEqual(['d']);
+    expect(r.groups.filter((g) => g.valid).map((g) => g.text)).toEqual(['Karotte', 'Pastinake']);
+  });
+});
+
 describe('Wertung „Gruppe“', () => {
   it('Abstieg, 30 Spieler: nur du = 100, je mehr Gleiche desto weniger', () => {
     const ps = players(30);

@@ -6,5 +6,8 @@ import type { Question } from '../domain/types';
  * Tippfehler) nicht kennt. Wird nur dann aufgerufen.
  */
 export interface AnswerJudge {
-  judge(question: Question, input: string): Promise<AiVerdict>;
+  /** `cacheOnly`: nur bekannte Urteile (Freigaben, Cache) – die KI wird nicht gefragt. */
+  judge(question: Question, input: string, opts?: { cacheOnly?: boolean }): Promise<AiVerdict>;
+  /** Urteil, das ohne Netz schon bekannt ist (Geräte-Cache). */
+  peek?(question: Question, input: string): AiVerdict | null;
 }

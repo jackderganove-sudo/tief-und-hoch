@@ -9,8 +9,12 @@
  *
  * Aktionen: create, join, leave, settings, kick, start, answer, tick, next, override, again
  *
- * Anti-Schummeln: Zeit kommt vom Server, Antworten nur in der Fragephase und nur einmal,
- * Antwortlisten verlassen den Server nie (nur die Gruppen der Auflösung).
+ * Anti-Schummeln: Zeit kommt vom Server, Versuche nur in der Fragephase, Antwortlisten
+ * verlassen den Server nie (nur die Gruppen der Auflösung).
+ *
+ * Mehrere Versuche: Jeder Versuch wird einzeln geprüft (room_attempts). Die erste gültige
+ * Antwort zählt und beendet die Frage für den Spieler; nach Ablauf der Fragezeit gibt es
+ * keine Versuche mehr. KI höchstens MAX_AI_CHECKS-mal pro Frage und Spieler.
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 import { compact, normalize } from '../_shared/domain/normalize.ts';
@@ -40,6 +44,7 @@ import {
   type RoomStatus,
 } from '../_shared/domain/room.ts';
 import { scoreQuestion, type RoomAnswerInput } from '../_shared/domain/roomScoring.ts';
+import { isNonsense, MAX_AI_CHECKS, nearMiss, pickFunnyAttempts, ROOM_MAX_ATTEMPTS } from '../_shared/domain/attempts.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? firstKey('SUPABASE_PUBLISHABLE_KEYS');
@@ -116,6 +121,14 @@ interface AnswerRow {
   global_points: number | null;
   override_valid: boolean | null;
   created_at: string;
+}
+interface AttemptRow {
+  user_id: string;
+  n: number;
+  raw: string;
+  status: 'pending' | 'valid' | 'invalid' | 'unchecked';
+  reason: 'nonsense' | 'ai' | 'list_only' | 'limited' | null;
+  ai: boolean;
 }
 
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -341,69 +354,145 @@ async function askJudge(jwt: string, payload: Record<string, unknown>): Promise<
       signal: AbortSignal.timeout(9000),
     });
     if (!res.ok) return { status: 'error' };
-    const r = (await res.json()) as { status: AiVerdict['status']; list_answer: string | null; canonical_text: string | null; estimated_base_score: number | null; approved?: boolean };
-    return { status: r.status, approved: r.approved === true, listAnswer: r.list_answer, canonicalText: r.canonical_text, estimatedBaseScore: r.estimated_base_score };
+    const r = (await res.json()) as { status: AiVerdict['status']; list_answer: string | null; canonical_text: string | null; estimated_base_score: number | null; approved?: boolean; cached?: boolean; scope?: 'question' | 'day' };
+    return { status: r.status, approved: r.approved === true, cached: r.cached === true || r.approved === true, scope: r.scope, listAnswer: r.list_answer, canonicalText: r.canonical_text, estimatedBaseScore: r.estimated_base_score };
   } catch {
     return { status: 'error' };
   }
 }
 
-async function answer(uid: string, jwt: string, body: Record<string, unknown>) {
+/** Antwort an den Client auf einen Versuch. */
+interface AttemptReply {
+  accepted: boolean;
+  /** duplicate: schon versucht · invalid: nicht gültig · list_only/limited: keine KI mehr · unchecked: KI nicht erreichbar · too_many */
+  reason?: 'duplicate' | 'invalid' | 'list_only' | 'limited' | 'unchecked' | 'too_many';
+  /** „Meintest du …?“ (knapp neben einer Listen-Antwort) */
+  hint?: string | null;
+  ai_left: number;
+  attempts: number;
+}
+
+/**
+ * Ein Versuch. Die erste gültige Antwort zählt (room_answers) und beendet die Frage für den
+ * Spieler; alles andere wird nur als Versuch festgehalten und er darf weiter raten.
+ */
+async function answer(uid: string, jwt: string, body: Record<string, unknown>): Promise<AttemptReply> {
   const room = await loadRoom(body.code);
   const now = Date.now();
   const idx = Number(body.idx);
+  // Nach Ablauf der Fragezeit keine Versuche mehr
   if (idx !== room.current_index || !acceptsAnswer(room.status, ms(room.phase_ends_at), now)) throw new Fail('too_late', 409);
-  const players = await loadPlayers(room.id);
+  const raw = typeof body.answer === 'string' ? body.answer.replace(/\s+/g, ' ').trim().slice(0, 60) : '';
+  if (!raw) throw new Fail('empty', 400);
+
+  // alles Nötige in einem Rutsch (jeder Versuch soll schnell beantwortet sein)
+  const [players, banned, { data: accepted }, { data: before }, { data: rq }] = await Promise.all([
+    loadPlayers(room.id),
+    isBanned(uid),
+    db.from('room_answers').select('user_id').eq('room_id', room.id).eq('idx', idx).eq('user_id', uid).maybeSingle(),
+    db.from('room_attempts').select('user_id, n, raw, status, reason, ai, created_at').eq('room_id', room.id).eq('idx', idx).eq('user_id', uid).order('n'),
+    db.from('room_questions').select('question_id, custom_prompt').eq('room_id', room.id).eq('idx', idx).single(),
+  ]);
   const me = players.find((p) => p.user_id === uid);
   if (!me || !playsQuestion(me, idx)) throw new Fail('not_playing', 403);
-  if (await isBanned(uid)) throw new Fail('banned', 403);
-  const raw = typeof body.answer === 'string' ? body.answer.replace(/\s+/g, ' ').trim().slice(0, 60) : '';
-
-  // Nur einmal pro Frage (Primärschlüssel); leere Eingabe = Pass (0 Punkte)
-  const { error } = await db.from('room_answers').insert({ room_id: room.id, idx, user_id: uid, raw, normalized: normalize(raw).slice(0, 100), status: raw ? 'pending' : 'invalid' });
-  if (error?.code === '23505') throw new Fail('already_answered', 409);
-  if (error) throw new Fail(error.message, 500);
-
-  if (raw) {
-    const { data: rq } = await db.from('room_questions').select('question_id, custom_prompt').eq('room_id', room.id).eq('idx', idx).single();
-    const patch = rq?.custom_prompt
-      ? await judgeCustom(jwt, room, idx, raw)
-      : await judgeCatalog(jwt, room.settings.mode, rq?.question_id as string, raw);
-    await db.from('room_answers').update(patch).eq('room_id', room.id).eq('idx', idx).eq('user_id', uid);
+  if (banned) throw new Fail('banned', 403);
+  if (accepted) throw new Fail('already_answered', 409);
+  const attempts = (before ?? []) as (AttemptRow & { created_at: string })[];
+  // immer nur eine Prüfung gleichzeitig (eine hängengebliebene gilt nach 15 s als „nicht geprüft“)
+  for (const a of attempts.filter((x) => x.status === 'pending')) {
+    if (now - Date.parse(a.created_at) < 15_000) throw new Fail('busy', 409);
+    a.status = 'unchecked';
+    await db.from('room_attempts').update({ status: 'unchecked' }).eq('room_id', room.id).eq('idx', idx).eq('user_id', uid).eq('n', a.n);
   }
-  // Vielleicht haben jetzt alle geantwortet → sofort auflösen
+  const aiUsed = attempts.filter((a) => a.ai).length;
+  const reply = (r: Partial<AttemptReply> & { accepted: boolean }, used = aiUsed, count = attempts.length): AttemptReply => ({ ai_left: Math.max(0, MAX_AI_CHECKS - used), attempts: count, ...r });
+
+  // Doppelte Eingabe: sofort ablehnen, ohne Prüfung und ohne neuen Versuch
+  const key = compact(raw);
+  if (attempts.some((a) => a.status === 'invalid' && compact(a.raw) === key)) return reply({ accepted: false, reason: 'duplicate' });
+  if (attempts.length >= ROOM_MAX_ATTEMPTS) return reply({ accepted: false, reason: 'too_many' });
+
+  const n = (attempts.at(-1)?.n ?? 0) + 1;
+  const base = { room_id: room.id, idx, user_id: uid, n, raw, normalized: normalize(raw).slice(0, 100) };
+  const record = async (row: Partial<AttemptRow>) => {
+    const { error } = await db.from('room_attempts').insert({ ...base, ...row });
+    // gleichzeitiger Versuch desselben Spielers (gleiche Nummer)
+    if (error?.code === '23505') throw new Fail('busy', 409);
+    if (error) throw new Fail(error.message, 500);
+  };
+  const settle = (row: Partial<AttemptRow>) => db.from('room_attempts').update(row).eq('room_id', room.id).eq('idx', idx).eq('user_id', uid).eq('n', n);
+  /** Gültig: als gewertete Antwort eintragen – nur solange die Frage noch läuft. */
+  const accept = async (patch: Partial<AnswerRow>): Promise<boolean> => {
+    const fresh = await loadRoom(room.code);
+    if (fresh.status !== 'question' || fresh.current_index !== idx) return false;
+    const { error } = await db.from('room_answers').insert({ room_id: room.id, idx, user_id: uid, raw, normalized: base.normalized, attempts: n, ...patch });
+    if (error?.code === '23505') throw new Fail('already_answered', 409);
+    if (error) throw new Fail(error.message, 500);
+    return true;
+  };
+
+  const custom = !!rq?.custom_prompt;
+  let question: Question | null = null;
+  let hint: string | null = null;
+  if (!custom) {
+    // 1. Lokal: Liste, Aliase, Tippfehler-Toleranz
+    const { data } = await db.from('questions').select('*').eq('id', rq?.question_id as string).single();
+    question = { ...(data as CatalogQuestion), approvedKeys: [] } as unknown as Question;
+    const match = matchAnswer(question, raw);
+    if (match) {
+      const r = scoreAnswer({ mode: room.settings.mode, questionId: question.id, input: raw, match, frequency: match.answer.baseScore });
+      await record({ status: 'valid' });
+      const ok = await accept({ status: 'valid', list_answer: match.answer.text, canonical: match.answer.text, base_score: match.answer.baseScore, source: 'list', global_tier: r.tier, global_points: r.points } as Partial<AnswerRow>);
+      if (!ok) throw new Fail('too_late', 409);
+      await advance(room.code);
+      return reply({ accepted: true }, aiUsed, n);
+    }
+    hint = nearMiss(question, raw);
+  }
+
+  // 2. Offensichtlicher Unsinn geht gar nicht erst an die KI
+  if (isNonsense(question ?? { answers: [] }, raw)) {
+    await record({ status: 'invalid', reason: 'nonsense' });
+    return reply({ accepted: false, reason: 'invalid', hint }, aiUsed, n);
+  }
+
+  // 3. Server-Cache/Freigaben; KI nur, solange das Kontingent der Frage reicht
+  const cacheOnly = aiUsed >= MAX_AI_CHECKS;
+  if (cacheOnly && custom) {
+    // eigene Fragen haben weder Liste noch Cache
+    await record({ status: 'invalid', reason: 'list_only' });
+    return reply({ accepted: false, reason: 'list_only' }, aiUsed, n);
+  }
+  await record({ status: 'pending' });
+  const verdict = custom
+    ? await askJudge(jwt, { room_code: room.code, room_idx: idx, answer: raw })
+    : await askJudge(jwt, { question_id: question!.id, answer: raw, ...(cacheOnly ? { cache_only: true } : {}) });
+  // Cache-Treffer, Freigaben und reine Cache-Abfragen verbrauchen kein Kontingent
+  const ai = !cacheOnly && !verdict.cached && verdict.status !== 'limited' && verdict.status !== 'uncached';
+  const used = aiUsed + (ai ? 1 : 0);
+
+  if (verdict.status === 'valid') {
+    let patch: Partial<AnswerRow> = { status: 'valid', canonical: verdict.canonicalText ?? null, source: 'ai' };
+    if (question) {
+      const r = scoreAiVerdict({ mode: room.settings.mode, question, input: raw, verdict });
+      patch = { ...patch, list_answer: verdict.listAnswer ?? null, base_score: verdict.estimatedBaseScore ?? null, source: r.source ?? 'ai', global_tier: r.tier, global_points: r.points } as Partial<AnswerRow>;
+    }
+    const ok = await accept(patch);
+    await settle({ status: ok ? 'valid' : 'invalid', ai });
+    if (!ok) throw new Fail('too_late', 409);
+    await advance(room.code);
+    return reply({ accepted: true }, used, n);
+  }
+  if (verdict.status === 'error') {
+    await settle({ status: 'unchecked', ai });
+    await advance(room.code);
+    return reply({ accepted: false, reason: 'unchecked' }, used, n);
+  }
+  const reason = verdict.status === 'invalid' ? 'ai' : verdict.status === 'limited' && verdict.scope !== 'question' ? 'limited' : 'list_only';
+  await settle({ status: 'invalid', reason, ai });
+  // Wartete die Auflösung nur noch auf diese Prüfung?
   await advance(room.code);
-  return { accepted: true };
-}
-
-async function judgeCatalog(jwt: string, mode: 'rare' | 'common', questionId: string, raw: string): Promise<Partial<AnswerRow>> {
-  const { data } = await db.from('questions').select('*').eq('id', questionId).single();
-  const q = data as CatalogQuestion;
-  const question: Question = { ...q, approvedKeys: [] } as unknown as Question;
-  const match = matchAnswer(question, raw);
-  if (match) {
-    const r = scoreAnswer({ mode, questionId, input: raw, match, frequency: match.answer.baseScore });
-    return { status: 'valid', list_answer: match.answer.text, canonical: match.answer.text, base_score: match.answer.baseScore, source: 'list', global_tier: r.tier, global_points: r.points } as Partial<AnswerRow>;
-  }
-  // Nicht in der Liste: freigegebene Antworten, Cache und KI über judge-answer
-  const verdict = await askJudge(jwt, { question_id: questionId, answer: raw });
-  const r = scoreAiVerdict({ mode, question, input: raw, verdict });
-  if (verdict.status === 'error' || verdict.status === 'limited') return { status: 'unchecked', source: 'ai', global_tier: 'invalid', global_points: 0 };
-  return {
-    status: verdict.status === 'valid' ? 'valid' : 'invalid',
-    list_answer: verdict.listAnswer ?? null,
-    canonical: verdict.canonicalText ?? null,
-    base_score: verdict.estimatedBaseScore ?? null,
-    source: r.source ?? 'ai',
-    global_tier: r.tier,
-    global_points: r.points,
-  } as Partial<AnswerRow>;
-}
-
-async function judgeCustom(jwt: string, room: Room, idx: number, raw: string): Promise<Partial<AnswerRow>> {
-  const verdict = await askJudge(jwt, { room_code: room.code, room_idx: idx, answer: raw });
-  if (verdict.status === 'error' || verdict.status === 'limited') return { status: 'unchecked', source: 'ai' };
-  return { status: verdict.status === 'valid' ? 'valid' : 'invalid', canonical: verdict.canonicalText ?? null, source: 'ai' };
+  return reply({ accepted: false, reason: reason === 'ai' ? 'invalid' : reason, hint }, used, n);
 }
 
 // ---------------------------------------------------------------- Ablauf
@@ -433,11 +522,14 @@ async function advance(code: string, force = false): Promise<void> {
     let allAnswered = false;
     let pending = false;
     if (room.status === 'question') {
-      const { data } = await db.from('room_answers').select('user_id, status').eq('room_id', room.id).eq('idx', room.current_index);
-      const rows = (data ?? []) as { user_id: string; status: string }[];
+      const [{ data }, { count }] = await Promise.all([
+        db.from('room_answers').select('user_id, status').eq('room_id', room.id).eq('idx', room.current_index).eq('status', 'valid'),
+        db.from('room_attempts').select('n', { count: 'exact', head: true }).eq('room_id', room.id).eq('idx', room.current_index).eq('status', 'pending'),
+      ]);
       const playing = players.filter((p) => playsQuestion(p, room.current_index));
-      const answered = new Set(rows.map((r) => r.user_id));
-      pending = rows.some((r) => r.status === 'pending');
+      // „geantwortet“ heißt: eine gültige Antwort – wer noch rät, hält die Frage bis zum Zeitablauf offen
+      const answered = new Set(((data ?? []) as { user_id: string }[]).map((r) => r.user_id));
+      pending = (count ?? 0) > 0;
       allAnswered = playing.length > 0 && playing.every((p) => answered.has(p.user_id)) && !pending;
     }
     const t = nextTransition({
@@ -472,6 +564,7 @@ async function advance(code: string, force = false): Promise<void> {
 /** Aktuelle Frage auswerten und die Auflösung speichern. */
 async function scoreCurrent(room: Room): Promise<void> {
   const idx = room.current_index;
+  await closeAttempts(room.id, idx);
   const [players, answersRes, rqRes] = await Promise.all([
     loadPlayers(room.id),
     db.from('room_answers').select('*').eq('room_id', room.id).eq('idx', idx),
@@ -483,6 +576,39 @@ async function scoreCurrent(room: Room): Promise<void> {
   const after = await loadRoom(room.code);
   await casUpdate(after, { status: 'reveal', phase_ends_at: iso(Date.now() + REVEAL_MS) });
   void reveal;
+}
+
+/**
+ * Frage vorbei: Wer keine gültige Antwort hat, bekommt seinen letzten Versuch als (ungültige)
+ * Antwort eingetragen – so sieht man in der Auflösung, woran es lag, und der Gastgeber kann
+ * sie noch gelten lassen. Gültige Antworten bekommen die Zahl der Versuche.
+ */
+async function closeAttempts(roomId: string, idx: number): Promise<void> {
+  const [{ data: att }, { data: ans }] = await Promise.all([
+    db.from('room_attempts').select('user_id, n, raw, status, reason, ai').eq('room_id', roomId).eq('idx', idx).order('n'),
+    db.from('room_answers').select('user_id').eq('room_id', roomId).eq('idx', idx),
+  ]);
+  const have = new Set(((ans ?? []) as { user_id: string }[]).map((a) => a.user_id));
+  const last = new Map<string, AttemptRow>();
+  for (const a of (att ?? []) as AttemptRow[]) last.set(a.user_id, a);
+  const missing = [...last.values()].filter((a) => !have.has(a.user_id));
+  if (!missing.length) return;
+  await db.from('room_answers').upsert(
+    missing.map((a) => ({
+      room_id: roomId,
+      idx,
+      user_id: a.user_id,
+      raw: a.raw,
+      normalized: normalize(a.raw).slice(0, 100),
+      // laufende oder gescheiterte Prüfung = nicht geprüft
+      status: a.status === 'invalid' ? 'invalid' : 'unchecked',
+      source: a.ai || a.status !== 'invalid' ? 'ai' : 'list',
+      global_tier: 'invalid',
+      global_points: 0,
+      attempts: a.n,
+    })),
+    { onConflict: 'room_id,idx,user_id', ignoreDuplicates: true },
+  );
 }
 
 async function buildReveal(room: Room, idx: number, players: Player[], rows: AnswerRow[], custom: boolean, questionId: string | null) {
@@ -517,17 +643,28 @@ async function buildReveal(room: Room, idx: number, players: Player[], rows: Ans
     const sorted = [...answers].sort((a, b) => b.baseScore - a.baseScore);
     list = { top: sorted[0]?.text ?? null, rarest: sorted.at(-1)?.text ?? null };
   }
+  // Versuche: Anzahl je Spieler immer; die Fehlversuche selbst nur, wenn der Raum es erlaubt
+  const { data: att } = await db.from('room_attempts').select('user_id, n, raw, status, reason, ai').eq('room_id', room.id).eq('idx', idx).order('n');
+  const attempts = ((att ?? []) as AttemptRow[]).filter((a) => participants.includes(a.user_id));
+  const tries: Record<string, number> = {};
+  for (const a of attempts) tries[a.user_id] = Math.max(tries[a.user_id] ?? 0, a.n);
+  // ohne die Antworten, die ohnehin als „ungültig“ in der Auflösung stehen
+  const finals = new Set(rows.map((r) => `${r.user_id}|${compact(r.raw)}`));
+  const funny = room.settings.show_attempts
+    ? pickFunnyAttempts(attempts.filter((a) => a.status === 'invalid' && !finals.has(`${a.user_id}|${compact(a.raw)}`))).map((a) => ({ user_id: a.user_id, text: a.raw }))
+    : null;
   const reveal = {
     idx,
     scoring,
     mode: room.settings.mode,
     groups: score.groups,
     players: Object.fromEntries(
-      Object.entries(score.perPlayer).map(([u, p]) => [u, { ...p, answer: rows.find((r) => r.user_id === u)?.raw ?? null }]),
+      Object.entries(score.perPlayer).map(([u, p]) => [u, { ...p, answer: rows.find((r) => r.user_id === u)?.raw ?? null, attempts: tries[u] ?? 0 }]),
     ),
     missed: score.missed,
     unchecked: rows.filter((r) => r.status === 'unchecked' || r.status === 'pending').map((r) => r.user_id),
     list,
+    funny,
   };
   await db.from('room_questions').update({ reveal }).eq('room_id', room.id).eq('idx', idx);
   return reveal;
@@ -601,8 +738,8 @@ async function handle(req: Request): Promise<Response> {
   try {
     const uid = user.id;
     const action = String(body.action ?? '');
-    // Mitgliedschaft prüfen (außer bei create/join)
-    if (!['create', 'join'].includes(action)) {
+    // Mitgliedschaft prüfen (außer bei create/join; „answer“ prüft sie selbst, das spart zwei Abfragen pro Versuch)
+    if (!['create', 'join', 'answer'].includes(action)) {
       const room = await loadRoom(body.code);
       if (!isMember(await loadPlayers(room.id), uid)) throw new Fail('not_member', 403);
     }

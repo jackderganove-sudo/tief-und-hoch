@@ -82,8 +82,8 @@ export function GameScreen({
           </motion.div>
         )}
 
-        {game.status === 'question' && question && game.deadline && (
-          <QuestionCard key={`q-${game.index}`} question={question} deadline={game.deadline} mode={mode} onSubmit={game.submit} />
+        {game.status === 'question' && question && game.round && (
+          <QuestionCard key={`q-${game.index}`} question={question} round={game.round} mode={mode} onAttempt={game.attempt} onExpire={game.expire} />
         )}
 
         {(game.status === 'reveal' || game.status === 'finished') && game.lastResult && question && (

@@ -10,7 +10,21 @@ Tägliches Wort-/Trivia-Spiel mit zwei Modi:
 Die Stufen sind Medaillen, keine Orte – die Welt (Höhlenzonen, Himmelsschichten) ergibt sich
 allein aus den Metern.
 
-Jeden Tag 7 Fragen pro Modus, 25 Sekunden pro Frage, eine Antwort. 1 Punkt = 10 m.
+Jeden Tag 7 Fragen pro Modus, 25 Sekunden pro Frage. 1 Punkt = 10 m.
+
+**Mehrere Versuche:** Eine falsche Antwort beendet die Frage nicht. Man gibt so oft neu ein, bis
+eine Antwort gilt (die erste gültige zählt) oder die Zeit abläuft (0 Punkte, „Daneben“).
+- Fehlversuch: Feld wackelt, rotes Pixel-Kreuz, „Nicht gültig“ bzw. „Meintest du …?“; Feld wird
+  geleert, Fokus und Tastatur bleiben offen. Schon Versuchtes steht durchgestrichen darunter,
+  doppelte Eingaben werden sofort abgelehnt.
+- Prüfung: erst lokal (Liste, Aliase, Freigaben, Cache). Offensichtlicher Unsinn (zu kurz, nur
+  Zahlen/Sonderzeichen, Wiederholungen) geht nie an die KI. Höchstens 3 KI-Prüfungen pro Frage
+  und Spieler (auch serverseitig begrenzt), danach zählen nur noch Liste und Cache.
+- Während einer KI-Prüfung steht der Timer (höchstens 6 s je Prüfung), die Eingabe ist gesperrt.
+- Gespeichert werden die Zahl der Versuche und die abgelehnten Eingaben (`submissions.attempts`,
+  `invalid_attempts`) – in eigenen Spalten, sie zählen nicht für Häufigkeiten.
+- Logik: `src/domain/attempts.ts`, Ablauf einer Frage: `src/game/questionRound.ts`,
+  Eingabefeld: `src/components/AttemptInput.tsx`.
 Tageswechsel um Mitternacht Europe/Berlin.
 
 ## Pixel-Look
@@ -332,6 +346,17 @@ node scripts/room-scenarios.mjs         # Wertungen (Gruppe/Global, eigene Frage
 node scripts/room-robust.mjs            # Nachzügler, Reload, Gastgeber-Übergabe
 node scripts/room-load.mjs 30           # Lasttest: 30 Bots durch eine komplette Runde
 ```
+
+### Mehrere Versuche im Raum
+
+Der Server prüft jeden Versuch einzeln (`room_attempts`); die erste gültige Antwort zählt und
+steht als einzige in `room_answers`. Nach Ablauf der Fragezeit (Serveruhr, für alle gleich – hier
+pausiert keine KI-Prüfung den Timer) nimmt er nichts mehr an. Das Häkchen „hat geantwortet“ gibt
+es erst bei einer gültigen Antwort; wer noch rät, zeigt nur die Anzahl seiner Versuche (✎ 3×),
+nie den Inhalt. Wer nichts Gültiges findet, bekommt 0 Punkte; sein letzter Versuch steht in der
+Auflösung bei „Ungültig“ (der Gastgeber kann ihn gelten lassen). Die Raum-Einstellung
+„Fehlversuche in der Auflösung“ (Standard aus) blendet zusätzlich ausklappbar Fehlversuche aller
+ein. Tests: `scripts/room-scenarios.mjs` (Szenario 4), Lasttest `scripts/room-load.mjs`.
 
 ## Aufbau
 

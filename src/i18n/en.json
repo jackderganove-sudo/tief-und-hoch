@@ -23,7 +23,7 @@
     "streak_other": "{{count}} day streak",
     "nextIn": "New questions in {{time}}",
     "rules": "How to play",
-    "rulesText": "7 open questions, 25 seconds each, exactly one answer. It has to be a valid answer – otherwise 0 points. 1 point = 10 metres.",
+    "rulesText": "7 open questions, 25 seconds each. If an answer doesn't count, just try again – your first valid answer is scored. If time runs out without a valid one, you get 0 points. 1 point = 10 metres.",
     "loading": "Loading …",
     "credits": "Graphics by Luis Zuno (ansimuz), KnoblePersona (CC-BY 3.0) and many CC0 artists, among others.",
     "creditsLink": "All credits"
@@ -51,7 +51,19 @@
     "unchecked": "Couldn't be checked",
     "uncheckedLimit": "Couldn't be checked (daily AI limit reached)",
     "aiBadge": "AI",
-    "aiBadgeHint": "This answer was not on the list and was checked by an AI."
+    "aiBadgeHint": "This answer was not on the list and was checked by an AI.",
+    "notValid": "Not valid",
+    "alreadyTried": "Already tried",
+    "meantHint": "Did you mean {{answer}}?",
+    "uncheckedRetry": "Couldn't be checked – try again",
+    "listOnly": "Only answers from the list count now",
+    "listOnlyDay": "Daily AI limit reached – only answers from the list count now",
+    "triedLabel": "Already tried",
+    "yourAttempts": "Your attempts",
+    "afterAttempts_one": "after {{count}} attempt",
+    "afterAttempts_other": "after {{count}} attempts",
+    "attemptsMade_one": "{{count}} attempt",
+    "attemptsMade_other": "{{count}} attempts"
   },
   "tiers": {
     "moss": "Bronze",
@@ -266,7 +278,11 @@
       "count_one": "{{count}} question",
       "count_other": "{{count}} questions",
       "time": "Time per question",
-      "lang": "Language"
+      "lang": "Language",
+      "showAttempts": "Failed attempts in the reveal",
+      "showAttemptsHint": "On: the reveal has a fold-out with everyone's funniest failed attempts. Off: everyone only sees their own.",
+      "on": "On",
+      "off": "Off"
     },
     "hostQuestion": "Question from the host",
     "lateJoin": "You joined mid-round – you'll play from the next question.",
@@ -337,7 +353,14 @@
       "no_session": "No connection to the server.",
       "other": "That didn't work. Please try again."
     },
-    "invalidAnswers": "Invalid"
+    "invalidAnswers": "Invalid",
+    "stillTrying_one": "still trying ({{count}} attempt)",
+    "stillTrying_other": "still trying ({{count}} attempts)",
+    "triesShort": "{{count}}×",
+    "tooManyAttempts": "Too many attempts on this question",
+    "noAiLeftCustom": "No AI checks left – the host can still accept your last answer",
+    "funnyAttempts_one": "{{count}} failed attempt this round",
+    "funnyAttempts_other": "{{count}} failed attempts this round"
   },
   "milestone": {
     "hell": {

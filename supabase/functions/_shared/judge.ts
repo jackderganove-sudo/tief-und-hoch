@@ -16,7 +16,7 @@ export interface JudgeQuestion {
   answers: JudgeAnswer[];
 }
 
-export type JudgeStatus = 'valid' | 'invalid' | 'error' | 'limited';
+export type JudgeStatus = 'valid' | 'invalid' | 'error' | 'limited' | 'uncached';
 
 /** Antwort der Edge Function an das Spiel. */
 export interface JudgeResponse {
@@ -29,6 +29,8 @@ export interface JudgeResponse {
   cached: boolean;
   /** Von mir im Admin-Bereich freigegeben → zählt wie eine Listen-Antwort (kein KI-Badge). */
   approved?: boolean;
+  /** Bei 'limited': Kontingent dieser Frage oder Tageslimit. */
+  scope?: 'question' | 'day';
 }
 
 export interface ApprovedRow {

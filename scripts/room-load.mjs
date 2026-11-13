@@ -3,6 +3,10 @@
  * alle mit eigenem Realtime-Kanal. Misst Antwortzeiten der Function und die Zeit
  * bis zur Auflösung; prüft, dass jede Ankündigung bei allen ankommt.
  *
+ * Mehrere Versuche: Die Bots raten erst 0–3-mal falsch (Tippsalat, der nie an die KI geht),
+ * dann richtig; jeder elfte findet gar nichts Gültiges. Geprüft wird, dass nur die erste
+ * gültige Antwort zählt und die Versuche korrekt gezählt werden.
+ *
  *   node scripts/room-load.mjs [30] [--code=ABCDEF   in einen bestehenden Raum (Gastgeber startet)]
  */
 import { assert, bots, call, listAnswers, sleep, state } from './lib/room-bots.mjs';
@@ -50,6 +54,8 @@ else console.log('Warte auf den Start durch den Gastgeber …');
 
 const answerT = [];
 const revealDelay = [];
+let attemptsSent = 0;
+const expected = new Map();
 let lastIdx = -1;
 for (;;) {
   const st = await state(host, code);
@@ -60,13 +66,23 @@ for (;;) {
     const startedAt = Date.now();
     await Promise.all(
       players.map(async (p, i) => {
-        await sleep(500 + Math.random() * 6000);
-        // Verteilung: viele gleiche, einige seltene, ein paar Unsinn
+        await sleep(300 + Math.random() * 3000);
+        // Verteilung: viele gleiche, einige seltene; jeder elfte findet nichts Gültiges
         const text = list.length ? list[[0, 0, 0, 1, 1, 2, 3, 4, list.length - 1][i % 9] % list.length].text : 'Bot-Antwort';
-        const t = Date.now();
-        const r = await call(p, 'answer', { code, idx: st.index, answer: i % 11 === 10 ? 'qwxz' : text });
-        answerT.push(Date.now() - t);
-        assert(r.status === 200 || r.body.error === 'too_late', `answer ${p.name}: ${JSON.stringify(r.body)}`);
+        const hopeless = i % 11 === 10;
+        // erst falsch raten (ohne KI: Wiederholungen, Zahlen, Sonderzeichen), dann die richtige Antwort
+        const wrong = ['zzzz', '12345', 'hahaha', '?!?', 'xyxyxy'].slice(0, hopeless ? 5 : i % 4);
+        for (const w of [...wrong, ...(hopeless ? [] : [text])]) {
+          const t = Date.now();
+          const r = await call(p, 'answer', { code, idx: st.index, answer: w });
+          answerT.push(Date.now() - t);
+          attemptsSent++;
+          assert(r.status === 200 || r.body.error === 'too_late', `answer ${p.name}: ${JSON.stringify(r.body)}`);
+          if (r.status !== 200) break;
+          assert(r.body.accepted === (w === text), `„${w}“ ${r.body.accepted ? 'angenommen' : 'abgelehnt'}: ${JSON.stringify(r.body)}`);
+          await sleep(150 + Math.random() * 500);
+        }
+        expected.set(p.id, { tries: wrong.length + (hopeless ? 0 : 1), valid: !hopeless });
       }),
     );
     const allIn = Date.now();
@@ -79,6 +95,18 @@ for (;;) {
     }
     revealDelay.push(Date.now() - allIn);
     const s = await state(host, code);
+    // nur die erste gültige Antwort zählt; Versuche stimmen; wer nichts Gültiges fand, hat 0 Punkte
+    if (list.length) {
+      for (const p of players) {
+        const e = expected.get(p.id);
+        const got = s.reveal.players[p.id];
+        if (!e || !got) continue;
+        assert(got.attempts === e.tries, `${p.name}: ${got.attempts} Versuche gezählt statt ${e.tries}`);
+        assert(e.valid ? got.points > 0 : got.points === 0, `${p.name}: ${got.points} Punkte bei ${e.valid ? 'gültiger' : 'keiner gültigen'} Antwort`);
+      }
+      assert(s.reveal.groups.filter((g) => g.valid).every((g) => !['zzzz', '12345', 'hahaha', '?!?', 'xyxyxy'].includes(g.text)), 'Fehlversuch als gültige Gruppe');
+    }
+    expected.clear();
     console.log(
       `  Frage ${st.index + 1}/${st.count}: ${((Date.now() - startedAt) / 1000).toFixed(1)} s, Gruppen ${s.reveal.groups
         .slice(0, 4)
@@ -93,6 +121,7 @@ for (;;) {
 const final = await state(host, code);
 assert(final.players.length >= N, `Spieler am Ende: ${final.players.length}`);
 const counts = [...received.values()];
+console.log(`${attemptsSent} Versuche gesendet (richtige und falsche)`);
 console.log(`Antwort-Aufrufe: p50 ${pct(answerT, 50)} ms, p95 ${pct(answerT, 95)} ms, max ${Math.max(...answerT)} ms`);
 console.log(`Alle geantwortet → Auflösung: p50 ${pct(revealDelay, 50)} ms, max ${Math.max(...revealDelay)} ms`);
 console.log(`Realtime-Ankündigungen pro Gerät: min ${Math.min(...counts)}, max ${Math.max(...counts)}, gesamt ${counts.reduce((a, b) => a + b, 0)}`);

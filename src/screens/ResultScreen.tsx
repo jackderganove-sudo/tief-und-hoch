@@ -137,6 +137,7 @@ export function ResultScreen({
                           <AiBadge mode={mode} />
                         )}
                       </p>
+                      {(r.attempts ?? 1) > 1 && <p className="text-xs opacity-65">{t(r.matched ? 'game.afterAttempts' : 'game.attemptsMade', { count: r.attempts })}</p>}
                     </div>
                     <div className="text-right leading-tight">
                       <p className="text-base font-bold" style={{ color: TIER_COLOR[r.tier], textShadow: rare ? '1px 1px 0 #0e0a16' : undefined }}>

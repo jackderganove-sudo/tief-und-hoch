@@ -93,7 +93,12 @@ export function scoreAnswer(params: {
 
 /** Urteil der KI-Prüfung, wie es das Spiel von der Edge Function bekommt. */
 export interface AiVerdict {
-  status: 'valid' | 'invalid' | 'error' | 'limited';
+  /** 'uncached' = nur im Cache nachgesehen (Kontingent der Frage verbraucht), kein Urteil vorhanden. */
+  status: 'valid' | 'invalid' | 'error' | 'limited' | 'uncached';
+  /** Urteil kam aus dem Cache – zählt nicht als KI-Prüfung. */
+  cached?: boolean;
+  /** Bei 'limited': Kontingent dieser Frage (statt Tageslimit) verbraucht. */
+  scope?: 'question' | 'day';
   /** Von mir freigegeben → normale Wertung wie eine Listen-Antwort, kein KI-Badge. */
   approved?: boolean;
   /** Antwort aus der Liste, wenn die Eingabe eine Variante davon ist. */
@@ -125,6 +130,8 @@ export function scoreAiVerdict(params: {
   const invalid: AnswerResult = { ...base, matched: null, frequency: null, tier: 'invalid', points: 0 };
 
   if (verdict.status === 'error' || verdict.status === 'limited') return { ...invalid, unchecked: verdict.status };
+  // nur im Cache nachgesehen und nichts gefunden → schlicht „nicht in der Liste“
+  if (verdict.status === 'uncached') return { ...invalid, source: 'list' };
   if (verdict.status !== 'valid') return invalid;
 
   const listed = verdict.listAnswer ? question.answers.find((a) => a.text === verdict.listAnswer) : undefined;

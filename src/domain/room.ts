@@ -42,6 +42,8 @@ export interface RoomSettings {
   lang: Lang;
   /** Eigene Fragen des Gastgebers (nur bei source custom/mixed) */
   custom_prompts: string[];
+  /** In der Auflösung ausklappbar: lustige Fehlversuche aller Spieler (Standard aus) */
+  show_attempts: boolean;
 }
 
 export const DEFAULT_SETTINGS: RoomSettings = {
@@ -53,6 +55,7 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   seconds: 25,
   lang: 'de',
   custom_prompts: [],
+  show_attempts: false,
 };
 
 export function makeRoomCode(rand: () => number = Math.random): string {
@@ -86,7 +89,8 @@ export function sanitizeSettings(input: unknown, base: RoomSettings = DEFAULT_SE
   const custom_prompts = promptsIn.map(cleanPrompt).filter((p) => p.length >= 3).slice(0, QUESTION_COUNTS.max);
   // Eigene Fragen ohne Antwortliste → Wertung immer „Gruppe“
   const scoring: RoomScoring = source === 'custom' ? 'group' : i.scoring === 'group' || i.scoring === 'global' ? i.scoring : base.scoring;
-  return { mode, scoring, source, topics: source === 'topics' || source === 'mixed' ? topics : [], count, seconds, lang, custom_prompts };
+  const show_attempts = typeof i.show_attempts === 'boolean' ? i.show_attempts : base.show_attempts === true;
+  return { mode, scoring, source, topics: source === 'topics' || source === 'mixed' ? topics : [], count, seconds, lang, custom_prompts, show_attempts };
 }
 
 /** Kann mit diesen Einstellungen gestartet werden? Sonst Grund. */
@@ -134,7 +138,7 @@ export interface PhaseInput {
   count: number;
   endsAt: number | null;
   now: number;
-  /** Alle Mitspieler dieser Frage haben geantwortet und alle Antworten sind geprüft */
+  /** Alle Mitspieler dieser Frage haben eine gültige Antwort und nichts wird mehr geprüft */
   allAnswered: boolean;
   /** Es laufen noch KI-Prüfungen */
   pending: boolean;
@@ -169,7 +173,7 @@ export function nextTransition(p: PhaseInput): Transition {
   }
 }
 
-/** Darf diese Antwort noch angenommen werden? (nur in der Fragephase, bis Ablauf + Netz-Toleranz) */
+/** Darf dieser Versuch noch angenommen werden? (nur in der Fragephase, bis Ablauf + Netz-Toleranz) */
 export function acceptsAnswer(status: RoomStatus, endsAt: number | null, now: number): boolean {
   return status === 'question' && endsAt !== null && now <= endsAt + ANSWER_GRACE_MS;
 }

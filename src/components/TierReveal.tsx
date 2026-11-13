@@ -43,13 +43,17 @@ export function TierReveal({
   // KI-Badge nur bei von der KI akzeptierten Antworten, direkt hinter der Antwort; Erklärung als Tooltip
   const badge = ai && result.matched && !isApprovedResult(question, result) ? <AiBadge mode={mode} /> : null;
 
+  const rejected = result.rejected ?? [];
   let detail: React.ReactNode;
   if (result.matched) detail = <>{t('game.countedAs', { answer: result.matched })}{badge}</>;
-  else if (result.timedOut && !result.input.trim()) detail = t('game.timeUp');
+  // Mehrere Versuche: Zeit um ohne gültige Antwort – die Versuche stehen darunter
+  else if (result.timedOut && (rejected.length > 0 || !result.input.trim())) detail = t('game.timeUp');
   else if (!result.input.trim()) detail = t('game.empty');
   else if (result.unchecked) detail = `„${result.input}“ – ${t(result.unchecked === 'limited' ? 'game.uncheckedLimit' : 'game.unchecked')}`;
   else if (ai) detail = `„${result.input}“ – ${t('game.aiRejected')}`;
   else detail = `„${result.input}“ – ${t('game.invalid')}`;
+  // letzter Versuch konnte nicht geprüft werden (steht nicht bei den abgelehnten)
+  const uncheckedLast = !result.matched && result.unchecked && rejected.length > 0 && result.input.trim() ? result.input : null;
 
 
   return (
@@ -74,6 +78,16 @@ export function TierReveal({
         </div>
         {result.tier === 'tooClever' && <p className="mt-2 text-sm opacity-85">{t('tierHints.tooClever')}</p>}
         <p className="mt-3 text-lg leading-tight">{detail}</p>
+        {result.matched && (result.attempts ?? 1) > 1 && <p className="text-sm opacity-75">{t('game.afterAttempts', { count: result.attempts })}</p>}
+        {uncheckedLast && <p className="text-sm opacity-85">{`„${uncheckedLast}“ – ${t(result.unchecked === 'limited' ? 'game.uncheckedLimit' : 'game.unchecked')}`}</p>}
+        {rejected.length > 0 && (
+          <p className="mt-1 flex flex-wrap justify-center gap-x-2 text-sm leading-snug opacity-75" data-rejected>
+            <span>{t('game.yourAttempts')}:</span>
+            {rejected.map((a) => (
+              <s key={a}>{a}</s>
+            ))}
+          </p>
+        )}
         <div className="mt-1 text-sm leading-snug opacity-75">
           <p>{t('game.topAnswer', { answer: top.text })}</p>
           {rare && rarest && rarest.text !== result.matched && <p>{t('game.rareAnswer', { answer: rarest.text })}</p>}

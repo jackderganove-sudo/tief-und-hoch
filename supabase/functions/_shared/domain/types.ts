@@ -106,4 +106,8 @@ export interface AnswerResult {
   source?: 'list' | 'ai';
   /** KI-Prüfung nicht möglich (Fehler, Zeitüberschreitung, Limit) – gilt als ungültig. */
   unchecked?: 'error' | 'limited';
+  /** Versuche bis zu diesem Ergebnis (1 = auf Anhieb). Fehlt bei alten Spielständen. */
+  attempts?: number;
+  /** Abgelehnte Eingaben davor, in der Reihenfolge der Eingabe. */
+  rejected?: string[];
 }

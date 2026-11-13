@@ -55,11 +55,16 @@ export class CachedJudge implements AnswerJudge {
     }
   }
 
-  async judge(question: Question, input: string): Promise<AiVerdict> {
+  peek(question: Question, input: string): AiVerdict | null {
+    const hit = this.load().entries[`${question.id}|${normalize(input)}`];
+    return hit ? { ...hit, cached: true } : null;
+  }
+
+  async judge(question: Question, input: string, opts?: { cacheOnly?: boolean }): Promise<AiVerdict> {
     const key = `${question.id}|${normalize(input)}`;
     const cached = this.load().entries[key];
-    if (cached) return cached;
-    const verdict = await this.inner.judge(question, input);
+    if (cached) return { ...cached, cached: true };
+    const verdict = await this.inner.judge(question, input, opts);
     if (verdict.status === 'valid' || verdict.status === 'invalid') {
       const store = this.load();
       delete store.entries[key]; // ans Ende (neuester Eintrag)

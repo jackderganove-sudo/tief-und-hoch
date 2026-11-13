@@ -40,7 +40,7 @@ const files: Record<string, string> = {
 
 // Spiel-Logik für die Edge Function "room" (Freunde-Modus): dieselben Regeln wie im Client.
 // Deno braucht Dateiendungen in Importen → './x' wird zu './x.ts'.
-const DOMAIN = ['normalize', 'levenshtein', 'matchAnswer', 'scoring', 'types', 'daily', 'room', 'roomScoring'];
+const DOMAIN = ['normalize', 'levenshtein', 'matchAnswer', 'scoring', 'types', 'daily', 'room', 'roomScoring', 'attempts'];
 for (const name of DOMAIN) {
   const src = readFileSync(join(ROOT, `src/domain/${name}.ts`), 'utf8').replace(/(from\s+'\.\/[A-Za-z]+)'/g, "$1.ts'");
   files[`domain/${name}.ts`] = `// Automatisch kopiert aus src/domain/${name}.ts (npm run function-data) – nicht von Hand ändern.\n${src}`;

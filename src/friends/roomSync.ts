@@ -14,6 +14,8 @@ import type { RoomPreview, RoomState } from './roomApi';
 export interface ChannelHandlers {
   onState: () => void;
   onAnswered: (p: { idx: number; user_id: string }) => void;
+  /** „versucht es noch“ – nur die Anzahl */
+  onTried?: (p: { idx: number; user_id: string; n: number }) => void;
   onStatus: (s: 'SUBSCRIBED' | 'CLOSED' | 'CHANNEL_ERROR' | 'TIMED_OUT') => void;
 }
 
@@ -106,6 +108,12 @@ export class RoomSync {
         const s = this.state;
         if (!s || 'error' in s || s.index !== idx) return;
         this.state = { ...s, players: s.players.map((p) => (p.user_id === user_id ? { ...p, answered: true } : p)) };
+        this.emit();
+      },
+      onTried: ({ idx, user_id, n }) => {
+        const s = this.state;
+        if (!s || 'error' in s || s.index !== idx) return;
+        this.state = { ...s, players: s.players.map((p) => (p.user_id === user_id ? { ...p, attempts: Math.max(p.attempts ?? 0, n) } : p)) };
         this.emit();
       },
       onStatus: (st) => {

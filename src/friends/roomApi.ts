@@ -12,7 +12,10 @@ export interface RoomPlayer {
   color: number;
   from_index: number;
   online: boolean;
+  /** hat eine gültige Antwort (nur die beendet die Frage) */
   answered: boolean;
+  /** Versuche bei der laufenden Frage – nur die Anzahl */
+  attempts: number;
   points: number;
 }
 
@@ -23,6 +26,8 @@ export interface RevealPlayer {
   special?: Special;
   /** Original-Schreibweise */
   answer: string | null;
+  /** Versuche bei dieser Frage */
+  attempts?: number;
 }
 
 export interface Reveal {
@@ -34,6 +39,17 @@ export interface Reveal {
   missed: string[];
   unchecked: string[];
   list: { top: string | null; rarest: string | null } | null;
+  /** Lustige Fehlversuche – nur wenn der Raum es erlaubt (sonst null) */
+  funny?: { user_id: string; text: string }[] | null;
+}
+
+/** Antwort des Servers auf einen Versuch. */
+export interface AttemptReply {
+  accepted: boolean;
+  reason?: 'duplicate' | 'invalid' | 'list_only' | 'limited' | 'unchecked' | 'too_many';
+  hint?: string | null;
+  ai_left: number;
+  attempts: number;
 }
 
 export interface RoomState {
@@ -51,7 +67,12 @@ export interface RoomState {
   me: string;
   players: RoomPlayer[];
   question: { idx: number; prompt: string; topic: string | null; custom: boolean; ends_at: string | null } | null;
+  /** eigene gewertete (gültige) Antwort */
   my_answer: string | null;
+  /** eigene abgelehnte Versuche dieser Frage */
+  my_attempts?: string[];
+  /** KI-Prüfungen, die mir bei dieser Frage bleiben */
+  my_ai_left?: number;
   reveal: Reveal | null;
   reveals: Reveal[] | null;
 }

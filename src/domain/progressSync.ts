@@ -6,6 +6,7 @@
  */
 import { addDays } from './daily';
 import { totalPoints } from './scoring';
+import type { RoundProgress } from './attempts';
 import type { AnswerResult, Lang, Mode, TierId } from './types';
 import { MODES } from './types';
 
@@ -16,6 +17,8 @@ export interface DayRecord {
   questionIds: string[];
   results: AnswerResult[];
   questionStartedAt: number | null;
+  /** Versuche der gerade laufenden Frage (fehlt, solange noch nichts versucht wurde). */
+  round?: RoundProgress;
   finished: boolean;
 }
 

@@ -23,7 +23,7 @@
     "streak_other": "{{count}} Tage in Folge",
     "nextIn": "Neue Fragen in {{time}}",
     "rules": "So geht's",
-    "rulesText": "7 offene Fragen, je 25 Sekunden, genau eine Antwort. Die Antwort muss passen – sonst gibt es 0 Punkte. 1 Punkt = 10 Meter.",
+    "rulesText": "7 offene Fragen, je 25 Sekunden. Passt eine Antwort nicht, gibst du einfach neu ein – die erste gültige zählt. Läuft die Zeit ohne gültige Antwort ab, gibt es 0 Punkte. 1 Punkt = 10 Meter.",
     "loading": "Lade …",
     "credits": "Grafiken u. a. von Luis Zuno (ansimuz), KnoblePersona (CC-BY 3.0) und vielen CC0-Künstlern.",
     "creditsLink": "Alle Credits"
@@ -51,7 +51,19 @@
     "unchecked": "Konnte nicht geprüft werden",
     "uncheckedLimit": "Konnte nicht geprüft werden (KI-Tageslimit erreicht)",
     "aiBadge": "KI",
-    "aiBadgeHint": "Diese Antwort stand nicht in der Liste und wurde von einer KI geprüft."
+    "aiBadgeHint": "Diese Antwort stand nicht in der Liste und wurde von einer KI geprüft.",
+    "notValid": "Nicht gültig",
+    "alreadyTried": "Schon versucht",
+    "meantHint": "Meintest du {{answer}}?",
+    "uncheckedRetry": "Konnte nicht geprüft werden – versuch es nochmal",
+    "listOnly": "Nur noch Antworten aus der Liste möglich",
+    "listOnlyDay": "KI-Tageslimit erreicht – nur noch Antworten aus der Liste möglich",
+    "triedLabel": "Schon versucht",
+    "yourAttempts": "Deine Versuche",
+    "afterAttempts_one": "nach {{count}} Versuch",
+    "afterAttempts_other": "nach {{count}} Versuchen",
+    "attemptsMade_one": "{{count}} Versuch",
+    "attemptsMade_other": "{{count}} Versuche"
   },
   "tiers": {
     "moss": "Bronze",
@@ -266,7 +278,11 @@
       "count_one": "{{count}} Frage",
       "count_other": "{{count}} Fragen",
       "time": "Zeit pro Frage",
-      "lang": "Sprache"
+      "lang": "Sprache",
+      "showAttempts": "Fehlversuche in der Auflösung",
+      "showAttemptsHint": "An: In der Auflösung lassen sich die lustigsten Fehlversuche aller ausklappen. Aus: Jeder sieht nur seine eigenen.",
+      "on": "An",
+      "off": "Aus"
     },
     "hostQuestion": "Frage vom Gastgeber",
     "lateJoin": "Du bist mitten in der Runde dazugekommen – ab der nächsten Frage spielst du mit.",
@@ -337,7 +353,14 @@
       "no_session": "Keine Verbindung zum Server.",
       "other": "Das hat nicht geklappt. Bitte nochmal versuchen."
     },
-    "invalidAnswers": "Ungültig"
+    "invalidAnswers": "Ungültig",
+    "stillTrying_one": "versucht es noch ({{count}} Versuch)",
+    "stillTrying_other": "versucht es noch ({{count}} Versuche)",
+    "triesShort": "{{count}}×",
+    "tooManyAttempts": "Zu viele Versuche bei dieser Frage",
+    "noAiLeftCustom": "Keine KI-Prüfung mehr – der Gastgeber kann deine letzte Antwort noch gelten lassen",
+    "funnyAttempts_one": "{{count}} Fehlversuch der Runde",
+    "funnyAttempts_other": "{{count}} Fehlversuche der Runde"
   },
   "milestone": {
     "hell": {

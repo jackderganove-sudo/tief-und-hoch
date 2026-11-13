@@ -22,6 +22,10 @@ export function RevealPhase({ s, isHost, endsAt }: { s: RoomState; isHost: boole
   const maxCount = Math.max(1, ...r.groups.map((g) => g.count));
   const last = s.index + 1 >= s.count;
 
+  // eigene abgelehnte Versuche, ohne die Antwort, die ohnehin oben steht
+  const myFinal = r.players[s.me]?.answer;
+  const mine = (s.my_attempts ?? []).filter((a) => a !== myFinal);
+
   const ranking = standings(Object.fromEntries(s.players.map((p) => [p.user_id, p.points])));
 
   return (
@@ -80,6 +84,7 @@ export function RevealPhase({ s, isHost, endsAt }: { s: RoomState; isHost: boole
                         <Avatar player={p} scale={2} />
                         <span className="max-w-[7rem] truncate">{p.user_id === s.me ? t('friends.you') : p.name}</span>
                         {open === key && raw && <span className="italic opacity-80">„{raw}“</span>}
+                        {(r.players[p.user_id]?.attempts ?? 1) > 1 && <span className="text-xs opacity-65">{t('friends.triesShort', { count: r.players[p.user_id]?.attempts })}</span>}
                       </button>
                     );
                   })}
@@ -125,6 +130,28 @@ export function RevealPhase({ s, isHost, endsAt }: { s: RoomState; isHost: boole
           </p>
         )}
         {r.unchecked.length > 0 && <p className="mt-1 text-sm opacity-75">{t('friends.unchecked', { count: r.unchecked.length })}</p>}
+        {/* eigene Fehlversuche – sieht nur man selbst */}
+        {mine.length > 0 && (
+          <p className="mt-2 flex flex-wrap gap-x-2 text-sm leading-snug opacity-75" data-rejected>
+            <span>{t('game.yourAttempts')}:</span>
+            {mine.map((a) => (
+              <s key={a}>{a}</s>
+            ))}
+          </p>
+        )}
+        {/* Fehlversuche aller – nur wenn der Raum es in den Einstellungen erlaubt */}
+        {r.funny && r.funny.length > 0 && (
+          <details className="mt-2 text-sm" data-funny>
+            <summary className="cursor-pointer underline decoration-dotted underline-offset-4">😄 {t('friends.funnyAttempts', { count: r.funny.length })}</summary>
+            <ul className="mt-1 grid gap-0.5">
+              {r.funny.map((f, i) => (
+                <li key={i}>
+                  <s>{f.text}</s> <span className="opacity-70">– {f.user_id === s.me ? t('friends.you') : byId.get(f.user_id)?.name ?? '?'}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </Panel>
 
       <Panel tone={theme.panel} className="px-1">

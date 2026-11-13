@@ -234,6 +234,13 @@ function Settings({ s, editable }: { s: RoomState; editable: boolean }) {
       </div>
       <Row label={t('friends.set.time')} value={v.seconds} onChange={(seconds) => update({ seconds })} options={QUESTION_SECONDS.map((x) => [x, `${x} s`] as [typeof x, string])} />
       <Row label={t('friends.set.lang')} value={v.lang} onChange={(lang) => update({ lang })} options={[['de', 'Deutsch'], ['en', 'English']]} />
+      <Row
+        label={t('friends.set.showAttempts')}
+        value={v.show_attempts === true ? 'on' : 'off'}
+        onChange={(x) => update({ show_attempts: x === 'on' })}
+        options={[['off', t('friends.set.off')], ['on', t('friends.set.on')]]}
+      />
+      <p className="mt-1 text-sm leading-snug opacity-80">{t('friends.set.showAttemptsHint')}</p>
     </Panel>
   );
 }

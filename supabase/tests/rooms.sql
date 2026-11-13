@@ -19,6 +19,12 @@ insert into public.room_questions (room_id, idx, question_id, prompt, lang, reve
 values ('00000000-0000-4000-8000-0000000000d1', 0, 'zz-test-001', 'Nenne ein Testgemüse', 'de', '{"groups":[{"text":"Geheimantwort"}]}');
 insert into public.room_answers (room_id, idx, user_id, raw, normalized, status, points)
 values ('00000000-0000-4000-8000-0000000000d1', 0, '00000000-0000-4000-8000-0000000000f1', 'Antwort der Gastgeberin', 'antwort der gastgeberin', 'valid', 100);
+-- Mehrere Versuche: Gastgeberin hatte vorher einen Fehlversuch, der Gast rät noch (2 Fehlversuche, 1 davon mit KI)
+insert into public.room_attempts (room_id, idx, user_id, n, raw, normalized, status, reason, ai) values
+  ('00000000-0000-4000-8000-0000000000d1', 0, '00000000-0000-4000-8000-0000000000f1', 1, 'Fehlversuch der Gastgeberin', 'fehlversuch der gastgeberin', 'invalid', 'ai', true),
+  ('00000000-0000-4000-8000-0000000000d1', 0, '00000000-0000-4000-8000-0000000000f1', 2, 'Antwort der Gastgeberin', 'antwort der gastgeberin', 'valid', null, false),
+  ('00000000-0000-4000-8000-0000000000d1', 0, '00000000-0000-4000-8000-0000000000f2', 1, 'Mein erster Fehlversuch', 'mein erster fehlversuch', 'invalid', 'ai', true),
+  ('00000000-0000-4000-8000-0000000000d1', 0, '00000000-0000-4000-8000-0000000000f2', 2, 'aaaa', 'aaaa', 'invalid', 'nonsense', false);
 
 -- ================================================================ Gast während der Frage
 set local role authenticated;
@@ -30,6 +36,11 @@ begin
   begin perform 1 from public.questions; raise exception 'FAIL: Spieler liest questions (Antwortlisten)'; exception when insufficient_privilege then null; end;
   begin perform 1 from public.room_answers; raise exception 'FAIL: Spieler liest room_answers'; exception when insufficient_privilege then null; end;
   begin perform 1 from public.room_questions; raise exception 'FAIL: Spieler liest room_questions'; exception when insufficient_privilege then null; end;
+  begin perform 1 from public.room_attempts; raise exception 'FAIL: Spieler liest room_attempts (Versuche anderer)'; exception when insufficient_privilege then null; end;
+  begin
+    insert into public.room_attempts (room_id, idx, user_id, n, raw, normalized, status) values ('00000000-0000-4000-8000-0000000000d1', 0, '00000000-0000-4000-8000-0000000000f2', 3, 'x', 'x', 'valid');
+    raise exception 'FAIL: Spieler schreibt Versuch an der Funktion vorbei';
+  exception when insufficient_privilege then null; end;
   begin perform 1 from public.rooms; raise exception 'FAIL: Spieler liest rooms direkt'; exception when insufficient_privilege then null; end;
   begin
     insert into public.room_answers (room_id, idx, user_id, raw, normalized) values ('00000000-0000-4000-8000-0000000000d1', 0, '00000000-0000-4000-8000-0000000000f2', 'x', 'x');
@@ -49,6 +60,18 @@ begin
   if not (select (p ->> 'answered')::boolean from jsonb_array_elements(s -> 'players') p where p ->> 'name' = 'Gastgeberin') then
     raise exception 'FAIL: „hat geantwortet“ fehlt';
   end if;
+  -- Mehrere Versuche: Häkchen erst bei gültiger Antwort; von anderen nur die Anzahl, nie der Inhalt
+  if (select (p ->> 'answered')::boolean from jsonb_array_elements(s -> 'players') p where p ->> 'name' = 'Gast Eins') then
+    raise exception 'FAIL: Häkchen trotz nur ungültiger Versuche';
+  end if;
+  if (select (p ->> 'attempts')::int from jsonb_array_elements(s -> 'players') p where p ->> 'name' = 'Gastgeberin') <> 2
+     or (select (p ->> 'attempts')::int from jsonb_array_elements(s -> 'players') p where p ->> 'name' = 'Gast Eins') <> 2 then
+    raise exception 'FAIL: Anzahl der Versuche falsch %', s -> 'players';
+  end if;
+  if s::text like '%Fehlversuch der Gastgeberin%' then raise exception 'FAIL: fremder Fehlversuch sichtbar'; end if;
+  if s -> 'my_attempts' <> '["Mein erster Fehlversuch", "aaaa"]'::jsonb then raise exception 'FAIL: eigene Versuche fehlen %', s -> 'my_attempts'; end if;
+  if (s ->> 'my_ai_left')::int <> 2 then raise exception 'FAIL: KI-Kontingent % statt 2', s ->> 'my_ai_left'; end if;
+  if s -> 'my_answer' <> 'null'::jsonb then raise exception 'FAIL: my_answer ohne gültige Antwort gesetzt'; end if;
 end $$;
 reset role;
 
@@ -120,6 +143,7 @@ do $$ begin
   perform public.cleanup_rooms();
   if exists (select 1 from public.rooms where id = '00000000-0000-4000-8000-0000000000d1') then raise exception 'FAIL: abgelaufener Raum nicht aufgeräumt'; end if;
   if exists (select 1 from public.room_answers where room_id = '00000000-0000-4000-8000-0000000000d1') then raise exception 'FAIL: Antworten des Raums übrig'; end if;
+  if exists (select 1 from public.room_attempts where room_id = '00000000-0000-4000-8000-0000000000d1') then raise exception 'FAIL: Versuche des Raums übrig'; end if;
 end $$;
 
 select 'Raum-Tests bestanden' as result;

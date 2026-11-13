@@ -47,6 +47,9 @@ const BLOCK_503_MS = 2 * 60_000;
 const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? '';
 /** KI-Anfragen (ohne Cache-Treffer) pro Spieler in 24 Stunden. */
 const USER_LIMIT = Number(Deno.env.get('AI_USER_DAILY_LIMIT') ?? 100);
+/** KI-Anfragen pro Spieler und Frage (mehrere Versuche pro Frage) innerhalb von QUESTION_WINDOW_MS. */
+const QUESTION_LIMIT = Number(Deno.env.get('AI_QUESTION_LIMIT') ?? 3);
+const QUESTION_WINDOW_MS = 5 * 60_000;
 /** Schutz des Gratis-Kontingents: KI-Anfragen aller Spieler in 24 Stunden. */
 const GLOBAL_LIMIT = Number(Deno.env.get('AI_GLOBAL_DAILY_LIMIT') ?? 1000);
 
@@ -357,7 +360,7 @@ async function handle(req: Request): Promise<Response> {
   const reqStart = Date.now();
   if (req.method !== 'POST') return json({ error: 'method not allowed' }, 405);
 
-  let body: { question_id?: unknown; answer?: unknown; recheck?: unknown; mode?: unknown; limit?: unknown; room_code?: unknown; room_idx?: unknown };
+  let body: { question_id?: unknown; answer?: unknown; recheck?: unknown; mode?: unknown; limit?: unknown; room_code?: unknown; room_idx?: unknown; cache_only?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -407,12 +410,12 @@ async function handle(req: Request): Promise<Response> {
   const listed = findListAnswer(question, answer);
   if (listed) {
     log(user.id, questionId, { kind: 'list' });
-    return json(verdict({ status: 'valid', list_answer: listed, canonical_text: listed }));
+    return json(verdict({ status: 'valid', list_answer: listed, canonical_text: listed, cached: true }));
   }
 
   // Freigaben, Cache und Limits gleichzeitig abfragen (spart Zeit vor der KI)
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const [approvedRes, hitRes, mine, all] = await Promise.all([
+  const [approvedRes, hitRes, mine, all, here] = await Promise.all([
     admin.from('approved_answers').select('text, aliases, base_score, merged_into').eq('question_id', questionId),
     isAdmin
       ? Promise.resolve({ data: null })
@@ -426,6 +429,16 @@ async function handle(req: Request): Promise<Response> {
     // Nur echte KI-Anfragen zählen (kind 'model'); Cache-Treffer und Freigaben nie
     isAdminUser ? Promise.resolve({ count: 0 }) : admin.from('ai_judge_log').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('kind', 'model').gte('created_at', since),
     isAdminUser ? Promise.resolve({ count: 0 }) : admin.from('ai_judge_log').select('id', { count: 'exact', head: true }).eq('kind', 'model').gte('created_at', since),
+    // KI-Prüfungen dieses Spielers für diese Frage in den letzten Minuten (auch gescheiterte)
+    isAdminUser
+      ? Promise.resolve({ count: 0 })
+      : admin
+          .from('ai_judge_log')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('question_id', questionId)
+          .in('kind', ['model', 'error'])
+          .gte('created_at', new Date(Date.now() - QUESTION_WINDOW_MS).toISOString()),
   ]);
 
   // Von mir freigegeben (auch Schreibweisen/Aliase) → wie eine Listen-Antwort
@@ -440,6 +453,7 @@ async function handle(req: Request): Promise<Response> {
         list_answer: merged,
         canonical_text: merged ?? approved.text,
         estimated_base_score: approved.base_score,
+        cached: true,
       }),
     );
   }
@@ -460,11 +474,20 @@ async function handle(req: Request): Promise<Response> {
     );
   }
 
+  // Nur nachsehen (Kontingent der Frage im Spiel verbraucht): kein Urteil bekannt, KI wird nicht gefragt
+  if (body.cache_only === true) return json(verdict({ status: 'uncached' }));
+
+  // Höchstens QUESTION_LIMIT KI-Prüfungen pro Spieler und Frage (mehrere Versuche pro Frage)
+  if (!isAdmin && (here.count ?? 0) >= QUESTION_LIMIT) {
+    log(user.id, questionId, { kind: 'limited', detail: 'pro Frage' });
+    return json(verdict({ status: 'limited', scope: 'question' }));
+  }
+
   // Rate-Limit: pro Spieler und insgesamt, jeweils über die letzten 24 Stunden
   if (!isAdminUser && ((mine.count ?? 0) >= USER_LIMIT || (all.count ?? 0) >= GLOBAL_LIMIT)) {
     log(user.id, questionId, { kind: 'limited' });
     storeUnchecked(questionId, key, 'limited');
-    return json(verdict({ status: 'limited' }));
+    return json(verdict({ status: 'limited', scope: 'day' }));
   }
 
   // Admin-Nachprüfung: länger warten (kein Spieler-Timer)

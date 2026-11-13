@@ -226,8 +226,8 @@ function PracticeSession({
           </motion.div>
         )}
 
-        {game.status === 'question' && game.question && game.deadline && (
-          <QuestionCard key={`q-${n}`} question={game.question} deadline={game.deadline} mode={mode} onSubmit={game.submit} />
+        {game.status === 'question' && game.question && game.round && (
+          <QuestionCard key={`q-${n}`} question={game.question} round={game.round} mode={mode} onAttempt={game.attempt} onExpire={game.expire} />
         )}
 
         {game.status === 'reveal' && game.lastResult && game.question && (
