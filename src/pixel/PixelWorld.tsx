@@ -63,6 +63,11 @@ const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 
  * Figur dorthin; je weiter der Weg, desto länger die Fahrt. Bei der Ankunft
  * wird `fx` ausgelöst (Partikel, Jubel bei 100 Punkten, Zucken bei 0).
  */
+/** Was als UI-Fläche gilt (Vordergrund-Effekte weichen aus). */
+const UI_SELECTOR = '.px-wood, .px-stone, .px-btn, .px-field, input, textarea, [data-world-avoid]';
+/** Worauf Antippen nicht in die Welt geht. */
+const NO_TAP_SELECTOR = 'button, a, input, textarea, select, label, [role="button"], [role="dialog"], .px-wood, .px-stone, .px-btn, .px-field, [data-no-world-tap]';
+
 export function PixelWorld({ view, meters = 0, fx = null, crew }: { view: WorldView; meters?: number; fx?: WorldFx | null; crew?: CrewInput[] }) {
   const wrap = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -116,6 +121,46 @@ export function PixelWorld({ view, meters = 0, fx = null, crew }: { view: WorldV
     let moodUntil = 0;
     let last = performance.now();
     let lastTheme = 0;
+    let lastUi = 0;
+
+    /** UI-Flächen (Panels, Knöpfe, Felder) in Canvas-Koordinaten – dort keine Vordergrund-Effekte. */
+    const measureUi = () => {
+      if (!world) return;
+      const base = el.getBoundingClientRect();
+      const rects: { x: number; y: number; w: number; h: number }[] = [];
+      for (const n of document.querySelectorAll<HTMLElement>(UI_SELECTOR)) {
+        const r = n.getBoundingClientRect();
+        if (r.width < 2 || r.height < 2 || r.bottom < base.top || r.top > base.bottom) continue;
+        rects.push({ x: (r.left - base.left) / scale, y: (r.top - base.top) / scale, w: r.width / scale, h: r.height / scale });
+        if (rects.length >= 24) break;
+      }
+      // Frage/Eingabe zu sehen → ruhiger
+      world.setUi(rects, !!document.querySelector('input:not([type=hidden]), textarea, [data-world-quiet]'));
+    };
+
+    /**
+     * Antippen der Szene: nur auf freier Fläche (nicht auf Knöpfen, Panels, Feldern), nie während
+     * ein Eingabefeld den Fokus hat (Tastatur bleibt offen), kein preventDefault – stört nichts.
+     */
+    let down: { x: number; y: number; t: number } | null = null;
+    const onDown = (e: PointerEvent) => {
+      down = e.isPrimary ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
+    };
+    const onUp = (e: PointerEvent) => {
+      const d = down;
+      down = null;
+      if (!d || !world || !e.isPrimary) return;
+      if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 10 || performance.now() - d.t > 450) return; // Wischen/Halten
+      const a = document.activeElement;
+      if (a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement || (a instanceof HTMLElement && a.isContentEditable)) return;
+      const tgt = e.target instanceof Element ? e.target : null;
+      if (tgt?.closest(NO_TAP_SELECTOR)) return;
+      const base = el.getBoundingClientRect();
+      if (e.clientX < base.left || e.clientX > base.right || e.clientY < base.top || e.clientY > base.bottom) return;
+      world.tap(Math.floor((e.clientX - base.left) / scale), Math.floor((e.clientY - base.top) / scale));
+    };
+    document.addEventListener('pointerdown', onDown, { passive: true });
+    document.addEventListener('pointerup', onUp, { passive: true });
 
     const fire = (f: WorldFx, now: number) => {
       if (!world) return;
@@ -211,6 +256,10 @@ export function PixelWorld({ view, meters = 0, fx = null, crew }: { view: WorldV
           el.style.transform = `translate(${x * scale}px, ${y * scale}px) translate(-50%, -100%)`;
         }
       }
+      if (now - lastUi > 250) {
+        lastUi = now;
+        measureUi();
+      }
       world.draw(ctx, W, H, state, dt);
       // Systemleisten: feste Farbe je Ort (Himmel nach Höhe, Höhle nach Zone)
       if (now - lastTheme > 300) {
@@ -240,6 +289,8 @@ export function PixelWorld({ view, meters = 0, fx = null, crew }: { view: WorldV
       cancelAnimationFrame(raf);
       ro.disconnect();
       document.removeEventListener('visibilitychange', onVis);
+      document.removeEventListener('pointerdown', onDown);
+      document.removeEventListener('pointerup', onUp);
     };
   }, [view]);
 

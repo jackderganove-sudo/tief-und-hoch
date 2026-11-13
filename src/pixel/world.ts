@@ -11,6 +11,9 @@ import { caveZoneAt, HELL_M, LAVAFALL, type CaveZone } from './zones';
 import { HELL_DARK, HellRenderer } from './hell';
 import { DEEP_DARK } from './deep';
 import { HeavenRenderer, MidSkyRenderer, type SkyFrame } from './heaven';
+import { Interact, Rig, type FxFrame, type Rect } from './interact';
+import { CaveFx } from './caveFx';
+import { SkyFx } from './skyFx';
 import { cobweb, crystalCluster, fossil, pebbles, roots, rng, shroomPatch, vine, worm } from './decor';
 import {
   balloonSprite,
@@ -40,6 +43,17 @@ const HW = 48; // halbe Schachtbreite in px (3 Kacheln je Seite)
 export const BALLOON_X = 104; // Startplatz des Ballons rechts neben dem Höhleneingang
 /** Ab dieser Kachelzeile öffnet sich der Schacht in die Hölle (Riesenhöhle, eigene Zeichnung). */
 const HELL_ROW = Math.round((HELL_M * PPM) / T);
+/** Ballon-Neigung: Zeilenbereiche des Sprites und wie stark sie mitgehen. */
+const BALLOON_SHEAR: [number, number, number][] = [
+  [0, 12, 1],
+  [12, 24, 0.8],
+  [24, 36, 0.6],
+  [36, 49, 0.4],
+  [49, 56, 0.15],
+  [56, 62, -0.05],
+  [62, 74, -0.3],
+];
+
 /** Schacht-Zwischenspeicher: Zeilen je Abschnitt und mitgezeichnete Nachbarzeilen (Überhang). */
 const CHUNK_ROWS = 16;
 const CHUNK_MARGIN = 5;
@@ -240,6 +254,10 @@ export class World {
   private darkCtx: CanvasRenderingContext2D;
   private particles: Particle[] = [];
   private lights: Light[] = [];
+  /** Wechselwirkung Welt ↔ Figur (siehe interact.ts). */
+  readonly ix = new Interact();
+  private caveFx: CaveFx;
+  private skyFx: SkyFx;
   private chunks = new Map<string, Chunk>();
   /** Vorberechnete Leucht-Bilder der Abschnitte für dieses Bild: [Bild, y]. */
   private glowLayers: [Sprite, number][] = [];
@@ -342,6 +360,8 @@ export class World {
     [this.dark, this.darkCtx] = canvas(8, 8);
     this.hell = new HellRenderer(images);
     this.heaven = new HeavenRenderer(images);
+    this.caveFx = new CaveFx(images);
+    this.skyFx = new SkyFx(images);
   }
 
   // ---------------------------------------------------------------- Effekte
@@ -449,6 +469,17 @@ export class World {
 
   // ---------------------------------------------------------------- Zeichnen
 
+  /** Antippen der Szene (Canvas-Koordinaten); wird im nächsten Bild beantwortet. */
+  tap(x: number, y: number) {
+    if (this.ix.taps.length < 4) this.ix.taps.push({ x, y, used: false });
+  }
+
+  /** UI-Flächen (Canvas-Koordinaten) und ob gerade eine Frage/Eingabe zu sehen ist. */
+  setUi(avoid: Rect[], quiet: boolean) {
+    this.ix.avoid = avoid;
+    this.ix.quiet = quiet;
+  }
+
   draw(ctx: CanvasRenderingContext2D, W: number, H: number, v: ViewState, dt: number) {
     ctx.imageSmoothingEnabled = false;
     const ox = Math.round(W / 2 - v.camX); // Welt-x → Bildschirm
@@ -457,8 +488,12 @@ export class World {
     this.lights.length = 0;
     this.glowLayers.length = 0;
     this.maskLayers.length = 0;
+    const fx = this.beginInteract(ctx, W, H, v, ox, oy, dt);
 
-    if (groundY > 0) this.drawSky(ctx, W, H, v, ox, groundY);
+    if (groundY > 0) {
+      this.drawSky(ctx, W, H, v, ox, groundY);
+      if (v.show.balloon) this.skyFx.back(fx);
+    }
     if (groundY < H) {
       if (v.show.cave) {
         this.drawCave(ctx, W, H, v, ox, oy);
@@ -473,12 +508,14 @@ export class World {
           lights: this.lights,
           sign: (t) => this.sign(t),
         });
+        this.caveFx.back(fx);
       } else this.drawGround(ctx, W, H, ox, oy);
     }
     if (groundY > -60 && groundY < H + 200) this.drawSurface(ctx, W, ox, groundY, v.show.cave);
 
     if (v.crew) for (const c of v.crew) v.show.cave ? this.drawCrewExplorer(ctx, v, c, ox, oy, groundY) : this.drawCrewBalloon(ctx, v, c, ox, groundY);
     if (v.show.explorer) this.drawExplorer(ctx, v, ox, oy, groundY);
+    if (v.show.cave) this.caveFx.front(fx);
     if (v.show.balloon) this.drawBalloon(ctx, v, ox, groundY);
 
     // Wolken vor dem Ballon
@@ -487,6 +524,7 @@ export class World {
       const sky = this.skyFrame(ctx, W, H, v, ox, groundY);
       this.midSky.front(sky);
       this.heaven.front(sky);
+      this.skyFx.front(fx);
     }
 
     this.ambient(v, W, H, dt);
@@ -506,18 +544,110 @@ export class World {
       ctx.fillStyle = p.color;
       ctx.fillRect(Math.round(p.x) + ox, Math.round(p.y) + oy, p.size, p.size);
     }
+    if (v.show.cave && groundY < H) this.caveFx.glow(fx);
+    this.ix.end(dt, W);
   }
+
+  /**
+   * Anfang jedes Bilds: Anker von Figur und Ballon setzen, Antippen der Figur und Böen am
+   * Ballon beantworten, ruhiges Eigenleben (Seil pendelt nach). Gibt den Rahmen für skyFx/caveFx.
+   */
+  private beginInteract(ctx: CanvasRenderingContext2D, W: number, H: number, v: ViewState, ox: number, oy: number, dt: number): FxFrame {
+    const ix = this.ix;
+    ix.calm = v.calm;
+    ix.time = v.time;
+    const ex = v.show.explorer ? ox + Math.round(ix.explorer.swing) : 0;
+    const ey = Math.round(v.depth * PPM) + oy;
+    ix.explorerAnchor = v.show.explorer ? { x: ex, y: ey, head: { x: ex - 4, y: ey - 9, w: 9, h: 5 }, lamp: { x: ex + 5, y: ey - 5, r: 72 } } : null;
+    const bx = ox + v.balloonX;
+    const by = oy - Math.round(v.altitude * PPM);
+    ix.balloonAnchor = v.show.balloon ? { x: bx, y: by - 6, envelope: { x: bx - 22, y: by - 74, w: 45, h: 48 }, basket: { x: bx - 6, y: by - 12, w: 13, h: 12 } } : null;
+    const crew = v.crew ?? [];
+    while (ix.crew.length < crew.length) ix.crew.push(new Rig(14, 2.6, 4));
+    ix.crewAnchors = crew.map((c, i) =>
+      v.show.cave
+        ? { x: ox + Math.round(c.x + ix.crew[i].swing), y: Math.round(c.meters * PPM) + oy }
+        : { x: bx + Math.round(c.x), y: oy - Math.round(c.meters * PPM) - 15 },
+    );
+
+    // Antippen der Figur: Forscher winkt, Ballon-Brenner faucht
+    const e = ix.explorerAnchor;
+    if (e && ix.takeTap({ x: e.x - 9, y: e.y - 13, w: 19, h: 22 })) {
+      ix.explorer.react('wave', 1.2, 1);
+      ix.explorer.push(8);
+    }
+    const b = ix.balloonAnchor;
+    if (b && ix.takeTap({ x: b.envelope.x - 4, y: b.envelope.y - 4, w: b.envelope.w + 8, h: 78 })) {
+      ix.balloon.burner = 0.9;
+      ix.balloon.react('wave', 1.2, 1);
+    }
+
+    // Böen: einmal je Ballon stoßen, Passagier hält sich fest
+    if (b)
+      for (const g of ix.wind.at(b.x, b.y - 36, 26)) {
+        g.hit ??= new Set();
+        if (g.hit.has(-1)) continue;
+        g.hit.add(-1);
+        const dir = g.vx >= 0 ? 1 : -1;
+        ix.balloon.push(dir * (18 + 34 * g.strength));
+        if (g.strength > 0.3) ix.balloon.react('hold', 0.6 + g.strength * 0.8, dir);
+      }
+    if (v.show.balloon)
+      ix.crewAnchors.forEach((a, i) => {
+        for (const g of ix.wind.at(a.x, a.y, 20)) {
+          g.hit ??= new Set();
+          if (g.hit.has(i)) continue;
+          g.hit.add(i);
+          ix.crew[i].push((g.vx >= 0 ? 1 : -1) * (14 + 26 * g.strength));
+        }
+      });
+
+    // Seil pendelt leise nach; beim Losfahren/Anhalten kleiner Ruck
+    if (v.show.explorer && !v.calm) {
+      if (v.explorerMoving !== this.wasMoving) ix.explorer.push((Math.random() < 0.5 ? -1 : 1) * 7);
+      else if (Math.random() < dt * 0.25) ix.explorer.push((Math.random() - 0.5) * 6);
+    }
+    this.wasMoving = v.explorerMoving;
+
+    return {
+      ctx,
+      W,
+      H,
+      ox,
+      oy,
+      camY: v.camY,
+      anchorY: v.anchorY,
+      time: v.time,
+      dt,
+      calm: v.calm,
+      depth: v.depth,
+      altitude: v.altitude,
+      show: v.show,
+      lights: this.lights,
+      ix,
+    };
+  }
+  private wasMoving = false;
 
   /** Seil vom Holzgerüst und der Forscher mit Stirnlampe. */
   private drawExplorer(ctx: CanvasRenderingContext2D, v: ViewState, ox: number, oy: number, groundY: number) {
     const ey = Math.round(v.depth * PPM) + oy;
     const beamY = groundY - 34;
+    const rig = this.ix.explorer;
+    const swing = Math.round(rig.swing);
     ctx.fillStyle = '#d8b27a';
     const ropeTop = Math.max(-2, beamY);
+    // unteres Seilstück biegt sich mit dem Pendeln (oben bleibt das Seil gerade)
+    const bendLen = Math.min(56, Math.max(0, ey - 9 - ropeTop));
+    const bendTop = ey - 9 - bendLen;
     if (ey - 9 > ropeTop) {
-      ctx.fillRect(ox, ropeTop, 1, ey - 9 - ropeTop);
+      ctx.fillRect(ox, ropeTop, 1, bendTop - ropeTop);
+      for (let y = bendTop; y < ey - 9; y++) {
+        const t = (y - bendTop) / Math.max(1, bendLen);
+        ctx.fillRect(ox + Math.round(rig.swing * t * t), y, 1, 1);
+      }
       ctx.fillStyle = '#a8824e';
-      for (let y = ropeTop + ((oy % 4) + 4) % 4; y < ey - 9; y += 4) ctx.fillRect(ox, y, 1, 1);
+      for (let y = ropeTop + ((oy % 4) + 4) % 4; y < bendTop; y += 4) ctx.fillRect(ox, y, 1, 1);
       // im Lavafall glüht das Seil kurz auf
       const g0 = Math.max(ropeTop, Math.round(LAVAFALL[0] * PPM) + oy);
       const g1 = Math.min(ey - 9, Math.round((LAVAFALL[1] + 60) * PPM) + oy);
@@ -529,9 +659,17 @@ export class World {
         this.lights.push([ox, Math.round((g0 + g1) / 2), 18, '#ff8a2b']);
       }
     }
-    const sway = v.calm || v.explorerMoving ? 0 : Math.round(Math.sin(v.time * 1.6) * 1);
-    const frame =
-      v.explorerMood === 'cheer'
+    const sway = swing + (v.calm || v.explorerMoving ? 0 : Math.round(Math.sin(v.time * 1.6) * 1));
+    const pose = v.explorerMood === 'idle' ? rig.pose : null;
+    const frame = pose
+      ? pose === 'flinch' || pose === 'duck'
+        ? this.explorer.flinch
+        : pose === 'wave'
+          ? Math.floor(v.time * 6) % 2
+            ? this.explorer.cheer
+            : this.explorer.hangB
+          : this.explorer.hangB
+      : v.explorerMood === 'cheer'
         ? Math.floor(v.time * 6) % 2
           ? this.explorer.cheer
           : this.explorer.hangB
@@ -542,14 +680,15 @@ export class World {
             : Math.floor(v.time * 1.2) % 2 && !v.calm
               ? this.explorer.hangB
               : this.explorer.hangA;
-    const shake = v.explorerMood === 'flinch' ? Math.round(Math.sin(v.time * 40) * 1) : 0;
-    ctx.drawImage(frame, ox - 7 + sway + shake, ey - 9);
+    const shake = v.explorerMood === 'flinch' || rig.jolt > 0 ? Math.round(Math.sin(v.time * 40) * 1) : 0;
+    ctx.drawImage(frame, ox - 7 + sway + shake, ey - 9 + (pose === 'duck' ? 2 : 0));
     this.lights.push([ox + 5 + sway, ey - 5, 72, '#ffe9a8']);
   }
 
   /** Mitspieler im Abstieg: eigenes Seil, kleine Figur mit Hemd in Spielerfarbe. */
   private drawCrewExplorer(ctx: CanvasRenderingContext2D, v: ViewState, c: CrewMember, ox: number, oy: number, groundY: number) {
-    const x = ox + Math.round(c.x);
+    const i = v.crew?.indexOf(c) ?? -1;
+    const x = ox + Math.round(c.x) + (i >= 0 && this.ix.crew[i] ? Math.round(this.ix.crew[i].swing) : 0);
     const ey = Math.round(c.meters * PPM) + oy;
     const ropeTop = Math.max(-2, groundY - 34);
     ctx.fillStyle = '#b8935e';
@@ -587,18 +726,31 @@ export class World {
     const bob = v.calm ? 0 : Math.round(Math.sin(v.time * 1.3 + c.x * 0.1) * 1.5);
     const shake = c.mood === 'flinch' ? Math.round(Math.sin(v.time * 36) * 1) : 0;
     const jump = c.mood === 'cheer' && Math.floor(v.time * 5) % 2 ? -2 : 0;
-    ctx.drawImage(s, ox + v.balloonX + Math.round(c.x) - 8 + shake, by - 30 + bob + jump);
+    const i = v.crew?.indexOf(c) ?? -1;
+    const tilt = i >= 0 && this.ix.crew[i] ? Math.round(this.ix.crew[i].swing * 0.7) : 0;
+    ctx.drawImage(s, ox + v.balloonX + Math.round(c.x) - 8 + shake + tilt, by - 30 + bob + jump);
   }
 
   private drawBalloon(ctx: CanvasRenderingContext2D, v: ViewState, ox: number, groundY: number) {
     const by = groundY - Math.round(v.altitude * PPM);
     const bob = v.calm || v.altitude < 4 ? 0 : Math.round(Math.sin(v.time * 1.3) * 1.5);
-    const flame = v.balloonRising ? 1 + (Math.floor(v.time * 12) % 3) : !v.calm && v.altitude > 4 && Math.floor(v.time * 0.6) % 4 === 0 ? 1 + (Math.floor(v.time * 12) % 3) : 0;
-    const key = `${flame}-${v.balloonMood}`;
+    const rig = this.ix.balloon;
+    const burn = v.balloonRising || rig.burner > 0 || (!v.calm && v.altitude > 4 && Math.floor(v.time * 0.6) % 4 === 0);
+    const flame = burn ? 1 + (Math.floor(v.time * 12) % 3) : 0;
+    // Pose des Passagiers: festhalten bei Böen (wie Zucken), winken beim Antippen (wie Jubel)
+    const mood = v.balloonMood !== 'idle' ? v.balloonMood : rig.pose === 'hold' ? 'flinch' : rig.pose === 'wave' ? 'cheer' : 'idle';
+    const key = `${flame}-${mood}`;
     let bs = this.balloons.get(key);
-    if (!bs) this.balloons.set(key, (bs = balloonSprite(flame, v.balloonMood)));
+    if (!bs) this.balloons.set(key, (bs = balloonSprite(flame, mood)));
     const bShake = v.balloonMood === 'flinch' ? Math.round(Math.sin(v.time * 36) * 1) : 0;
-    ctx.drawImage(bs, ox + v.balloonX - 23 + bShake, by - 74 + bob);
+    const x0 = ox + v.balloonX - 23 + bShake;
+    const y0 = by - 74 + bob;
+    const t = rig.swing;
+    if (Math.abs(t) < 0.5) ctx.drawImage(bs, x0, y0);
+    else
+      // Neigen als Scherung in Streifen (pixelgenau, keine weichgezeichnete Drehung):
+      // Hülle oben weht am weitesten, der Korb pendelt leicht dagegen
+      for (const [r0, r1, k] of BALLOON_SHEAR) ctx.drawImage(bs, 0, r0, bs.width, r1 - r0, x0 + Math.round(t * k), y0 + r0, bs.width, r1 - r0);
   }
 
   /** Aufstieg: fester Boden ohne Höhleneingang (Erde, nach unten dunkler). */
