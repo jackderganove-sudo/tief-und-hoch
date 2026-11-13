@@ -417,13 +417,14 @@ export class HeavenRenderer {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     for (const [color, ph] of bands) {
-      for (let x = 0; x < W; x += 2) {
+      ctx.fillStyle = color;
+      // 3-px-Säulen in 4 Helligkeitsstufen (wenige große Rechtecke statt vieler Pixel – schnell auf Handys)
+      for (let x = 0; x < W; x += 3) {
         const base = bottom * (0.25 + ph * 0.06) + Math.sin(x * 0.03 + (calm ? 0 : time * 0.4) + ph) * 14 + Math.sin(x * 0.011 + ph) * 20;
         const len = 26 + Math.round(Math.sin(x * 0.05 + ph * 2 + (calm ? 0 : time * 0.7)) * 12);
-        for (let k = 0; k < len; k += 2) {
-          ctx.globalAlpha = s * 0.18 * (1 - k / len);
-          ctx.fillStyle = color;
-          ctx.fillRect(x, Math.round(base + k), 2, 2);
+        for (let q = 0; q < 4; q++) {
+          ctx.globalAlpha = s * 0.18 * (1 - q / 4);
+          ctx.fillRect(x, Math.round(base + (q * len) / 4), 3, Math.ceil(len / 4));
         }
       }
     }
