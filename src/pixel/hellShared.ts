@@ -88,3 +88,20 @@ export interface HellFrame {
   lights: Light[];
   sign: (text: string) => Sprite;
 }
+
+/**
+ * Antippbare Dinge der Höllen-Renderer in diesem Bild (Bildschirm-Koordinaten): hell.ts trägt sie
+ * beim Zeichnen ein, caveFx.ts prüft die Taps dagegen und vermerkt Stupser (wirken im nächsten Bild).
+ */
+export interface HellTarget {
+  kind: 'imp' | 'lake';
+  /** stabil über Bilder hinweg (aus Säule/Sims-Index) */
+  id: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** Lava-Farbe (für das Blubbern) */
+  color?: string;
+}
+export const hellTargets: { list: HellTarget[]; poked: Map<number, number> } = { list: [], poked: new Map() };

@@ -4,7 +4,7 @@ import { scoreAnswer, tierFor } from '../domain/scoring';
 import { MODES, type AnswerResult, type Lang, type Mode, type Question, type TierId } from '../domain/types';
 import { currentLang } from '../i18n';
 import { services } from '../services';
-import { PixelWorld, type WorldView } from '../pixel/PixelWorld';
+import { PixelWorld, previewCrew, type WorldView } from '../pixel/PixelWorld';
 import { PracticeScreen } from '../screens/PracticeScreen';
 import { TierReveal } from '../components/TierReveal';
 import { PxButton } from '../components/px';
@@ -40,9 +40,11 @@ export default function DebugRoutes({ dateKey }: { dateKey: string }) {
   if (p.has('reveal')) return <RevealPreview tier={p.get('reveal') as TierId} mode={mode} lang={lang} />;
 
   const view = (p.get('world') || 'home') as WorldView;
+  const crewN = Number(p.get('crew') ?? 0);
+  const m = Number(p.get('m') ?? 0);
   return (
     <div className="relative h-dvh w-full">
-      <PixelWorld view={view} meters={Number(p.get('m') ?? 0)} />
+      <PixelWorld view={view} meters={m} crew={crewN > 0 && view !== 'home' ? previewCrew(crewN, m) : undefined} />
       <BackButton />
     </div>
   );

@@ -16,7 +16,7 @@
 import type { Images } from './assets';
 import { canvas, flipX, lerpColor, rampMap, recolor, type Sprite } from './sprites';
 import { DEEP_PAL, DEEP_SHARED, DeepRenderer } from './deep';
-import { hash, HELL_BG, HW, levelAt, levelBlend, LEVELS, mod, PPM, type Darkness, type HellFrame, type Level, type Palette, type SharedParts } from './hellShared';
+import { hash, HELL_BG, hellTargets, HW, levelAt, levelBlend, LEVELS, mod, PPM, type Darkness, type HellFrame, type Level, type Palette, type SharedParts } from './hellShared';
 import { GATE_M, HELL_M } from './zones';
 
 export type { Light } from './hellShared';
@@ -600,11 +600,14 @@ export class HellRenderer {
     });
   }
 
-  /** Sims-Platte (ohne See) mit dunklem Unterbau. */
-  private ledge(l: Level, sw: number): Sprite {
-    return this.cached(`ledge-${l}-${sw}`, () => {
+  /**
+   * Sims-Platte (ohne See) mit dunklem Unterbau und Kragstein zur Säule hin (wall: Seite der
+   * Säule, -1 links / 1 rechts) – der Sims ruht sichtbar auf einer Konsole statt in der Luft.
+   */
+  private ledge(l: Level, sw: number, wall: -1 | 1): Sprite {
+    return this.cached(`ledge-${l}-${sw}-${wall}`, () => {
       const p = PAL[l];
-      const [c, x] = canvas(sw, 9);
+      const [c, x] = canvas(sw, 17);
       x.fillStyle = p.col[1];
       x.fillRect(0, 0, sw, 5);
       x.fillStyle = p.col[2];
@@ -612,8 +615,42 @@ export class HellRenderer {
       x.fillStyle = p.col[0];
       x.fillRect(2, 5, sw - 4, 2);
       x.fillRect(6, 7, sw - 12, 2);
+      for (let r = 0; r < 12; r++) {
+        const cw = Math.max(1, Math.round(17 * (1 - r / 12)));
+        const x0 = wall > 0 ? sw - cw : 0;
+        x.fillStyle = r === 0 ? p.col[0] : p.col[1];
+        x.fillRect(x0, 5 + r, cw, 1);
+        // schräge Unterkante dunkel, Fuge zur Säule hell
+        x.fillStyle = p.col[0];
+        x.fillRect(wall > 0 ? x0 : x0 + cw - 1, 5 + r, 1, 1);
+        if (r > 1 && r < 10) {
+          x.fillStyle = p.col[2];
+          x.fillRect(wall > 0 ? sw - 1 : 0, 5 + r, 1, 1);
+        }
+      }
       return c;
     });
+  }
+
+  /** Lavastrom-Säule (nur Hölle): dunkler als die Obsidiansäulen, trägt Speier und Becken. */
+  private fallColumn(w: number, rimLeft: boolean): Sprite {
+    return this.cached(`fallcol-${w}-${rimLeft}`, () => {
+      const src = this.column('hell', w, rimLeft);
+      const [c, x] = canvas(w, 240);
+      x.drawImage(src, 0, 0);
+      x.globalCompositeOperation = 'source-atop';
+      x.fillStyle = 'rgba(12,2,10,0.45)';
+      x.fillRect(0, 0, w, 240);
+      return c;
+    });
+  }
+
+  /** Kette senkrecht von y0 bis y1 (Bildschirm), Glieder an der Welt ausgerichtet. */
+  private chainDown(d: HellFrame, x: number, y0: number, y1: number) {
+    for (let cy = y0; cy < y1; cy += CHAIN_LEN) {
+      const h = Math.min(CHAIN_LEN, y1 - cy);
+      d.ctx.drawImage(this.chainStrip, 0, mod(cy - y1, 27), 6, h, x, cy, 6, h);
+    }
   }
 
   /** Warmer Schein über einem Feuersee: färbt Säulenwand und Luft von unten an. */
@@ -697,6 +734,8 @@ export class HellRenderer {
   draw(d: HellFrame) {
     const { ctx, W, H, oy } = d;
     const top = Math.round(HELL_M * PPM + oy);
+    hellTargets.list.length = 0;
+    for (const [id, t] of hellTargets.poked) if (d.time - t > 3 || d.time < t) hellTargets.poked.delete(id);
     if (top >= H) return;
     const clipTop = Math.max(0, top);
     this.hellRows(d, clipTop);
@@ -715,13 +754,14 @@ export class HellRenderer {
       this.lavaFalls(d, clipTop);
       this.runeGates(d);
     }
+    this.signs(d, true);
     this.midLayer(d, clipTop);
     if (hell) this.cages(d, clipTop);
     this.gate(d);
     if (hell) this.flyingImps(d, clipTop);
     this.spirits(d, clipTop);
     if (hell) this.swathLayer(d, 1, 1);
-    this.signs(d);
+    this.signs(d, false);
     if (hell) this.foreground(d);
     this.deep.front(d, clipTop);
     ctx.restore();
@@ -903,19 +943,28 @@ export class HellRenderer {
     ctx.globalAlpha = 1;
   }
 
-  /** Große Lavafälle aus Felsnasen, die in glühende Becken stürzen (nur Hölle). */
+  /**
+   * Große Lavafälle aus Felsnasen, die in glühende Becken stürzen (nur Hölle). Speier und Becken
+   * hängen an zwei durchgehenden Felssäulen (je Seite eine Bahn) – nichts schwebt frei.
+   */
   private lavaFalls(d: HellFrame, clipTop: number) {
     const { ctx, W, H, time, calm } = d;
     const f = 0.5;
     const L = this.layer(d, f);
     const STEP = 270;
     const p = PAL.hell;
+    const lanes = [-1, 1].map((side) => {
+      const lx = side * (side < 0 ? 104 : 118);
+      const x = L.sx(lx) - 6;
+      if (x > -30 && x < W + 30) this.columnRuns(d, clipTop, x - 6, L.sy(0), 48, 5, 'farColumns', () => this.fallColumn(24, side > 0), 1);
+      return x;
+    });
     for (let j = Math.floor(L.ly(clipTop - 400) / STEP); j <= Math.ceil(L.ly(H) / STEP); j++) {
       if (hash(j, 130) > 0.5) continue;
       const ly = j * STEP + hash(j, 131) * 80;
       if (ly < HELL_M * PPM + 20) continue;
       const side = hash(j, 132) < 0.5 ? -1 : 1;
-      const x = L.sx(side * (60 + hash(j, 133) * 70)) - 6;
+      const x = lanes[side < 0 ? 0 : 1];
       const y0 = L.sy(ly);
       const len = 80 + Math.floor(hash(j, 134) * 110);
       const y1 = y0 + len;
@@ -930,6 +979,7 @@ export class HellRenderer {
       if (e > a) ctx.drawImage(this.fallTex, 0, 32 - off + ((a - y0) % 32), 12, e - a, x, a, 12, e - a);
       ctx.drawImage(this.spout(), x - 6, y0 - 6);
       ctx.drawImage(this.basin(), x - 14, y1 - 4);
+      hellTargets.list.push({ kind: 'lake', id: 900000 + j, x: x - 8, y: y1 - 4, w: 28, h: 7, color: p.lake[3] });
       if (!calm) {
         ctx.fillStyle = p.lake[4];
         const sp = Math.floor(time * 6 + j);
@@ -953,6 +1003,20 @@ export class HellRenderer {
       if (y > H || y + 70 < 0) continue;
       const al = hellW((y + 33 - d.oy) / PPM);
       if (al <= 0) continue;
+      // das Tor steht auf einem Felspfeiler, der nach unten in die Tiefe weiterläuft
+      if (y + 64 < H) {
+        const pc = this.fallColumn(38, side < 0);
+        ctx.globalAlpha = al;
+        for (let py = y + 64; py < H; py += 240) {
+          const ph = Math.min(240, H - py);
+          ctx.drawImage(pc, 0, 0, 38, ph, x + 5, py, 38, ph);
+        }
+        // breiter Sockel unter dem Tor
+        ctx.fillStyle = PAL.hell.col[0];
+        ctx.fillRect(x + 1, y + 64, 46, 3);
+        ctx.fillStyle = PAL.hell.col[2];
+        ctx.fillRect(x + 2, y + 64, 44, 1);
+      }
       ctx.globalAlpha = al * (calm ? 0.85 : 0.6 + 0.4 * Math.sin(time * 1.7 + m));
       ctx.drawImage(this.portal, x, y);
       ctx.globalAlpha = al;
@@ -998,6 +1062,8 @@ export class HellRenderer {
         const x1 = b.x;
         if (x1 - x0 < 8 || y < clipTop - 30 || y > H + 30) continue;
         if (hash(a.k * 3 + j, 23) >= sharedW(mOf(y), 'chains')) continue;
+        // ohne sichtbare Säulen (Kristall-Hölle, Abgrund) hinge die Kette in der Luft
+        if (sharedW(mOf(y), 'midColumns') < 0.3) continue;
         ctx.drawImage(this.sagChain(levelAt(ly / PPM), x1 - x0), x0, y);
       }
     }
@@ -1044,7 +1110,12 @@ export class HellRenderer {
           ctx.drawImage(this.uplight(lvl, uw), Math.round(sx + sw / 2 - uw / 2), y - 42);
           ctx.globalAlpha = 1;
         }
-        ctx.drawImage(this.ledge(lvl, sw), sx, y);
+        ctx.drawImage(this.ledge(lvl, sw, left ? 1 : -1), sx, y);
+        // Tiefen ohne Säulen: der Sims hängt an zwei Ketten von oben
+        if (sharedW(m, 'midColumns') < 0.5) {
+          this.chainDown(d, sx + 2, clipTop, y + 1);
+          this.chainDown(d, sx + sw - 8, clipTop, y + 1);
+        }
         // Feuersee in der Mulde (animiert)
         const frame = calm ? 0 : Math.floor(time * 10 + k) % 45;
         const lw = sw - 10;
@@ -1053,6 +1124,7 @@ export class HellRenderer {
         ctx.fillStyle = p.lake[4];
         if (!calm && hash(k * 9 + j, Math.floor(time * 2)) < 0.3) ctx.fillRect(sx + 5 + Math.floor(hash(j, Math.floor(time * 2)) * lw), y - 2, 1, 1);
         d.lights.push([sx + sw / 2, y - 2, 16 + Math.floor(sw / 3), p.lake[3]]);
+        hellTargets.list.push({ kind: 'lake', id: (k + 512) * 8192 + mod(j, 4096) * 2 + 1, x: sx + 5, y: y - 3, w: lw, h: 5, color: p.lake[3] });
         // Lava läuft über die Kante und rinnt als dünner Strom hinab (nur Hölle)
         if (hw > 0 && hash(k * 6 + j, 49) < 0.45) {
           const fx = left ? sx + 1 : sx + sw - 3;
@@ -1081,9 +1153,12 @@ export class HellRenderer {
           ctx.drawImage(this.torch.get(lvl)!, tf * 16, 0, 16, 16, tx, y - 16, 16, 16);
           d.lights.push([tx + 8, y - 10, 14, p.flame[1]]);
         }
-        // Teufelchen läuft auf dem Sims hin und her – winkt, wenn die Figur vorbeikommt
+        // Teufelchen läuft auf dem Sims hin und her. Kommt die Figur vorbei, hüpft es ans seilferne
+        // Ende und versteckt sich hinter dem Rand des Feuersees (lugt ab und zu hervor, winkt);
+        // angetippt (caveFx.ts → hellTargets) macht es einen Satz.
         if (hash(k * 2 + j, 46) < 0.62 * sharedW(m, 'imps')) {
-          const near = Math.abs(y - d.explorerY) < 70;
+          const id = (k + 512) * 8192 + mod(j, 4096) * 2;
+          const dist = Math.abs(y - d.explorerY);
           let a0 = sx + 2;
           let a1 = sx + sw - 20;
           if (torch) {
@@ -1092,14 +1167,48 @@ export class HellRenderer {
           }
           const span = Math.max(0, a1 - a0);
           const u = calm ? 0.25 : (time * 7) / Math.max(8, span * 2) + hash(k, j + 3);
-          const ix = Math.round(a0 + tri(u) * span);
-          const goingLeft = u - Math.floor(u) >= 0.5;
-          const wave = !calm && near && Math.floor(time * 4 + k) % 2 === 1;
-          const faceLeft = near ? sx + sw / 2 > W / 2 : goingLeft;
-          const bob = calm || near || span < 2 ? 0 : -(Math.floor(time * 8 + k) % 2);
+          const walkX = a0 + tri(u) * span;
+          const towardRope = sx + sw / 2 > W / 2; // Blick zum Seil
+          const away = towardRope ? a1 : a0;
+          const shy = calm ? 0 : clamp01((74 - dist) / 30);
+          const poke = hellTargets.poked.get(id);
+          const pt = poke === undefined ? 9 : time - poke;
           const [imp, impL] = this.imp.get(lvl)!;
-          // gespiegeltes Blatt: Frame 0 liegt rechts
-          ctx.drawImage(faceLeft ? impL : imp, faceLeft ? (wave ? 0 : 18) : wave ? 18 : 0, 0, 18, 20, ix, y - 19 + bob, 18, 20);
+          const frameX = (faceLeft: boolean, wave: boolean) => (faceLeft ? (wave ? 0 : 18) : wave ? 18 : 0);
+          if (shy >= 1 && pt > 0.7) {
+            // versteckt: nur der Kopf schaut über den Rand, ab und zu höher und winkend
+            const ix = Math.round(away);
+            const peek = Math.floor(time * 0.9 + k * 3 + j) % 3 === 0;
+            const hh = peek ? 14 : 10;
+            const wave = peek && Math.floor(time * 4) % 2 === 1;
+            ctx.drawImage(towardRope ? impL : imp, frameX(towardRope, wave), 0, 18, hh, ix, y - hh - 1, 18, hh);
+            ctx.fillStyle = p.lake[3];
+            ctx.fillRect(ix + 3, y - 2, 12, 1);
+            hellTargets.list.push({ kind: 'imp', id, x: ix, y: y - hh - 1, w: 18, h: hh + 2 });
+          } else {
+            let ix = walkX;
+            let bob: number;
+            let faceLeft: boolean;
+            if (pt < 0.7) {
+              // Satz nach dem Antippen
+              bob = -Math.round(Math.sin((Math.PI * pt) / 0.7) * 10);
+              faceLeft = hash(id, Math.floor(poke! * 10)) < 0.5;
+              ix = walkX + (faceLeft ? -1 : 1) * Math.round(pt * 6);
+            } else if (shy > 0) {
+              // hüpft davon
+              ix = walkX + (away - walkX) * shy;
+              bob = -Math.round(Math.abs(Math.sin(time * 11 + k)) * 4);
+              faceLeft = away < walkX || (away === walkX && !towardRope);
+            } else {
+              const goingLeft = u - Math.floor(u) >= 0.5;
+              faceLeft = goingLeft;
+              bob = calm || span < 2 ? 0 : -(Math.floor(time * 8 + k) % 2);
+            }
+            ix = Math.round(ix);
+            // gespiegeltes Blatt: Frame 0 liegt rechts
+            ctx.drawImage(faceLeft ? impL : imp, frameX(faceLeft, false), 0, 18, 20, ix, y - 19 + bob, 18, 20);
+            hellTargets.list.push({ kind: 'imp', id, x: ix, y: y - 19 + bob, w: 18, h: 20 });
+          }
         }
         // Kette hängt vom Sims herab
         if (hash(k * 4 + j, 47) < 0.3 * sharedW(m, 'chains')) {
@@ -1127,7 +1236,8 @@ export class HellRenderer {
       if (y < clipTop - 30 || y > H + 2 || x < -24 || x > W + 4) continue;
       const al = hellW((y - d.oy) / PPM);
       if (al <= 0) continue;
-      const chainTop = Math.max(clipTop, L.sy(Math.max(HELL_M * PPM, ly - 140 - hash(j, 144) * 200)));
+      // Kette reicht bis zur Höhlendecke (bzw. über den Bildrand) – kein loses Ende in der Luft
+      const chainTop = clipTop;
       ctx.globalAlpha = al;
       const kind = hash(j, 145);
       const cw = kind < 0.6 ? 22 : 9;
@@ -1261,17 +1371,28 @@ export class HellRenderer {
   }
 
   /** Tiefenschilder an Ketten (in der offenen Höhle gibt es keine Wand). */
-  private signs(d: HellFrame) {
+  private signs(d: HellFrame, chains: boolean) {
     const { ctx, H, ox, oy } = d;
+    // alle Schilder hängen an einer durchgehenden Kette von der Decke (bzw. vom Schild darüber)
+    let prev = Math.max(0, Math.round(HELL_M * PPM + oy));
     for (let m = HELL_M + 400; m < GATE_M + 40000; m += m < GATE_M ? 500 : 1000) {
-      if (m === GATE_M) continue;
+      if (m === GATE_M) {
+        prev = Math.round(GATE_M * PPM + oy) + 28; // unter dem Tor neu ansetzen
+        continue;
+      }
       const y = Math.round(m * PPM) + oy;
-      if (y < -40) continue;
+      if (y < -40) {
+        prev = Math.max(0, y);
+        continue;
+      }
       if (y > H + 20) break;
       const s = d.sign(`-${m} m`);
       const x = ox + HW - s.width - 6;
-      ctx.drawImage(this.chain, x + Math.floor(s.width / 2) - 3, y - 33);
-      ctx.drawImage(s, x, y - 6);
+      const top = Math.max(0, prev);
+      // Kette hinter Säulen und Simsen (eigener Durchgang), Schild davor
+      if (chains && y - 6 > top) this.chainDown(d, x + Math.floor(s.width / 2) - 3, top, y - 5);
+      if (!chains) ctx.drawImage(s, x, y - 6);
+      prev = y + 6;
     }
   }
 

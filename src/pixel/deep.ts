@@ -312,9 +312,11 @@ function iceFar(): Tile {
   const body = C('#0d203b');
   const streak = C('#132a4c');
   const edge = C('#2a5a90');
+  const edgeL = (y: number) => cx - 100 + 24 * pnoise(y, h, 1) + 7 * pnoise(y, h / 3, 2);
+  const edgeR = (y: number) => cx + 100 - 24 * pnoise(y, h, 3) - 7 * pnoise(y, h / 3, 4);
   for (let y = 0; y < h; y++) {
-    const eL = cx - 100 + 24 * pnoise(y, h, 1) + 7 * pnoise(y, h / 3, 2);
-    const eR = cx + 100 - 24 * pnoise(y, h, 3) - 7 * pnoise(y, h / 3, 4);
+    const eL = edgeL(y);
+    const eR = edgeR(y);
     for (let x = 0; x < w; x++) {
       const dl = eL - x;
       const dr = x - eR;
@@ -329,8 +331,21 @@ function iceFar(): Tile {
     [cx + 58, 6, 0, h],
     [cx - 84, 5, 40, 150],
     [cx + 82, 5, 170, 120],
-    [cx - 30, 4, 200, 70],
+    [cx - 76, 4, 214, 56],
   ];
+  // Teil-Fälle entspringen einem fernen Eissims an der Wand und landen auf einem zweiten
+  const farShelf = (fx: number, fw: number, y: number) => {
+    const left = fx < cx;
+    const e = Math.round(left ? edgeL(y) : edgeR(y));
+    const a = left ? e - 2 : fx - 4;
+    const z = left ? fx + fw + 4 : e + 2;
+    for (let x = a; x <= z; x++) {
+      const taper = Math.min(x - a, z - x);
+      const rows = Math.min(4, 2 + taper);
+      for (let r = 0; r < rows; r++) b.set(x, y + r, r === 0 ? C('#5a90c8') : r === 1 ? C('#2a5a90') : C('#16304f'));
+      if (hash(x, 11) < 0.35) b.set(x, y + rows, C('#2a5a90'), 0.8);
+    }
+  };
   for (const [fx, fw, y0, len] of falls)
     for (let yy = 0; yy < len; yy++) {
       const spread = len < h && yy > len - 8 ? Math.round((yy - (len - 8)) * 0.5) : 0;
@@ -340,6 +355,11 @@ function iceFar(): Tile {
         if (mod(y0 + yy + Math.floor(hash(fx + x, 3) * 3), 9) === 0) c = C('#5a90c8');
         b.set(fx + x, y0 + yy, c);
       }
+    }
+  for (const [fx, fw, y0, len] of falls)
+    if (len < h) {
+      farShelf(fx, fw, y0 - 2);
+      farShelf(fx, fw, y0 + len - 1);
     }
   // ferne blaue Feuer
   for (let i = 0; i < 7; i++) {
@@ -416,6 +436,14 @@ function iceMid(): Tile {
         const len = 90 + Math.floor(R() * 90);
         const fw = 8 + Math.floor(R() * 5);
         frozenFall(b, fx, y + 7, len, fw, j * 11 + s);
+        // Auffang-Sims: der gefrorene Haufen liegt auf Eis, das aus der Wand wächst
+        const yb = y + 7 + len - 1;
+        const eb = E(s, yb);
+        for (let row = 0; row < 6; row++) {
+          const reach = Math.abs(fx - cx) - fw / 2 - 5 + row * 2;
+          for (let dist = Math.floor(reach); dist <= eb + 3; dist++) b.set(cx + s * dist, yb + row, row === 0 ? ICE.i4 : row < 3 ? ICE.i2 : ICE.i1);
+        }
+        for (let dist = Math.floor(Math.abs(fx - cx) - fw / 2 - 3); dist <= eb; dist++) if (R() < 0.4) icicle(b, cx + s * dist, yb + 6, 2 + Math.floor(R() * R() * 8));
         out.glints.push({ x: fx - 1, w: 1, y0: y + 9, y1: y + len - 8 });
       }
     }
@@ -535,12 +563,14 @@ interface PrismCols {
 }
 
 /** Sechseckige Kristallsäule von der Seite: helle, mittlere (spiegelnde) und dunkle Fläche. */
-function prism(b: Buf, cxp: number, w: number, y0: number, len: number, pc: PrismCols, tips: boolean, seed: number) {
+function prism(b: Buf, cxp: number, w: number, y0: number, len: number, pc: PrismCols, tips: boolean | 'top' | 'bottom', seed: number) {
   const T = Math.round(w * 0.9);
+  const tipTop = tips === true || tips === 'top';
+  const tipBot = tips === true || tips === 'bottom';
   for (let yy = 0; yy < len; yy++) {
     let hw = w / 2;
-    if (tips && yy < T) hw *= (yy + 1) / T;
-    if (tips && yy > len - T) hw *= (len - yy) / T;
+    if (tipTop && yy < T) hw *= (yy + 1) / T;
+    if (tipBot && yy > len - T) hw *= (len - yy) / T;
     const l = Math.round(cxp - hw);
     const r = Math.round(cxp + hw);
     const vein = Math.round(cxp + w * 0.1 + Math.sin(yy * 0.05 + seed) * w * 0.08);
@@ -555,6 +585,16 @@ function prism(b: Buf, cxp: number, w: number, y0: number, len: number, pc: Pris
       if (x === vein && rel > 0.3 && rel < 0.72) c = mix(c, pc.vein, 0.6);
       b.set(x, y0 + yy, c);
     }
+  }
+}
+
+/** Drusen-Sims: dunkles Muttergestein von x0 bis x1, aus dem Kristalle nach oben und unten wachsen. */
+function druse(b: Buf, x0: number, x1: number, y: number, hgt: number, cols: [RGB, RGB, RGB], seed: number) {
+  for (let x = Math.round(x0); x <= Math.round(x1); x++) {
+    const taper = Math.min(x - x0, x1 - x);
+    const top = Math.max(0, 3 - taper) + (hash(x, seed) < 0.3 ? 1 : 0);
+    const bot = hgt - Math.max(0, 4 - taper) - (hash(x, seed + 1) < 0.4 ? 1 : 0);
+    for (let r = top; r < bot; r++) b.set(x, y + r, r === top ? cols[2] : r === bot - 1 ? cols[0] : (x + r) % 5 === 0 ? cols[0] : cols[1]);
   }
 }
 
@@ -576,12 +616,20 @@ function crystalFar(): Tile {
     [cx - 96, 26, 0, h],
     [cx + 92, 22, 0, h],
     [cx - 60, 14, 30, 170],
-    [cx + 50, 16, 180, 200],
-    [cx - 18, 9, 120, 70],
+    [cx + 50, 16, 180, 120],
     [cx + 128, 18, 90, 160],
-    [cx - 136, 16, 230, 150],
+    [cx - 136, 16, 230, 70],
   ];
-  spires.forEach(([x, sw, y0, len], i) => prism(b, x, sw, y0, len, pc, len < h, i * 3));
+  // Teil-Spitzen hängen an einem fernen Drusen-Sims, der an der durchgehenden Säule sitzt
+  const rock: [RGB, RGB, RGB] = [C('#0e0618'), C('#1a0c2c'), C('#3c1a66')];
+  spires.forEach(([x, sw, y0, len], i) => {
+    if (len >= h) return prism(b, x, sw, y0, len, pc, false, i * 3);
+    const hang = i % 2 === 0; // hängt vom Sims herab bzw. wächst darauf
+    const full = x < cx ? cx - 96 : cx + 92;
+    const shelfY = hang ? y0 - 4 : y0 + len - 2;
+    prism(b, x, sw, y0, len, pc, hang ? 'bottom' : 'top', i * 3);
+    druse(b, Math.min(full, x - sw / 2 - 3), Math.max(full, x + sw / 2 + 3), shelfY, 7, rock, 40 + i);
+  });
   for (let i = 0; i < 26; i++) b.set(R() * w, R() * h, R() < 0.3 ? CRY.white : CRY.light, 0.7);
   for (const fy of [80, 240]) for (let y = -12; y < 12; y++) for (let x = 0; x < w; x++) if (bayer(x, y) < 0.3 * (1 - Math.abs(y) / 12)) b.set(x, fy + y, C('#8a50c8'), 0.12);
   return tile(b, cx);
@@ -615,9 +663,10 @@ function crystalMid(): Tile {
     w: number;
     y0: number;
     len: number;
-    tips: boolean;
+    tips: boolean | 'top' | 'bottom';
     near: boolean;
   }[] = [];
+  const shelves: { s: number; x: number; w: number; y: number }[] = [];
   for (const s of [-1, 1]) {
     // ferne Säulen ganz durch
     segs.push({
@@ -628,40 +677,40 @@ function crystalMid(): Tile {
       tips: false,
       near: false,
     });
-    // nahe, riesige Säulen in zwei Stücken mit Spitzen
-    let y = Math.floor(R() * 80) + (s > 0 ? 250 : 0);
+    // nahe, riesige Kristalle: je Seite zwei Drusen-Simse, die von der fernen Säule herüberragen;
+    // von jedem Sims hängt ein Kristall herab, auf dem nächsten wächst einer hinauf (Spitzen frei)
+    const y00 = Math.floor(R() * 80) + (s > 0 ? 288 : 0);
     for (let k = 0; k < 2; k++) {
-      const len = 200 + Math.floor(R() * 60);
-      segs.push({
-        x: cx + s * (64 + R() * 8),
-        w: 30 + Math.floor(R() * 8),
-        y0: y,
-        len,
-        tips: true,
-        near: true,
-      });
-      y += len + 20 + Math.floor(R() * 30);
+      const sy = y00 + k * 288;
+      const x = cx + s * (64 + R() * 8);
+      const w = 30 + Math.floor(R() * 8);
+      const down = 110 + Math.floor(R() * 60);
+      const gap = 26 + Math.floor(R() * 34);
+      shelves.push({ s, x, w, y: sy });
+      segs.push({ x, w, y0: sy + 6, len: down, tips: 'bottom', near: true });
+      const up = 288 - 8 - down - gap;
+      segs.push({ x: x + s * 2, w: w - 2, y0: sy + 288 - up + 2, len: up, tips: 'top', near: true });
+      // kleine Begleiter: Splitter wachsen neben den großen aus dem Sims
+      segs.push({ x: x - s * (w / 2 + 3), w: 6 + Math.floor(R() * 3), y0: sy - 14 - Math.floor(R() * 12), len: 0, tips: 'top', near: false });
+      segs.push({ x: x - s * (w / 2 + 2), w: 6 + Math.floor(R() * 3), y0: sy + 7, len: 16 + Math.floor(R() * 14), tips: 'bottom', near: false });
     }
   }
-  // schwebende Splitter hinter dem Seil
-  for (let k = 0; k < 4; k++)
-    segs.push({
-      x: cx + (k % 2 ? 1 : -1) * (22 + R() * 16),
-      w: 6 + Math.floor(R() * 3),
-      y0: Math.floor(k * 144 + R() * 80),
-      len: 18 + Math.floor(R() * 24),
-      tips: true,
-      near: false,
-    });
+  // Begleiter oben: Länge bis zur Simsoberkante
+  for (const sg of segs) if (sg.len === 0) sg.len = shelves.reduce((best, sh) => (Math.abs(sh.y - sg.y0) < Math.abs(best - sg.y0) ? sh.y : best), sg.y0 + 20) - sg.y0 + 2;
   for (const sg of segs.filter((s) => !s.near)) prism(b, sg.x, sg.w, sg.y0, sg.len, sg.w < 12 ? pc : pcFar, sg.tips, sg.x);
-  for (const sg of segs.filter((s) => s.near)) prism(b, sg.x, sg.w, sg.y0, sg.len, pc, true, sg.x);
+  for (const sg of segs.filter((s) => s.near)) prism(b, sg.x, sg.w, sg.y0, sg.len, pc, sg.tips, sg.x);
+  const rock: [RGB, RGB, RGB] = [CRY.deep, C('#1e0c38'), C('#4a2380')];
+  for (const sh of shelves) {
+    const far = cx + sh.s * 104;
+    druse(b, Math.min(far, sh.x - sh.w / 2 - 8), Math.max(far, sh.x + sh.w / 2 + 8), sh.y - 1, 9, rock, Math.floor(sh.x));
+  }
   // Spiegelung: die mittlere Fläche zeigt (getönt, leicht versetzt) die Säule gegenüber
   const snap = new Buf(w, h);
   snap.px.set(b.px);
   for (const sg of segs.filter((s) => s.near)) {
     const T = Math.round(sg.w * 0.9);
     const l = sg.x - sg.w / 2;
-    for (let yy = T; yy < sg.len - T; yy++) {
+    for (let yy = sg.tips === 'bottom' ? 2 : T; yy < sg.len - (sg.tips === 'top' ? 2 : T); yy++) {
       const y = sg.y0 + yy;
       for (let x = Math.ceil(l + sg.w * 0.3); x < l + sg.w * 0.72; x++) {
         const src = snap.get(2 * cx - x, y + 23);
@@ -670,7 +719,7 @@ function crystalMid(): Tile {
     }
     // Leuchtknoten in der Säule
     for (let n = 0; n < 2; n++) {
-      const ny = Math.round(sg.y0 + T + 20 + R() * (sg.len - 2 * T - 40));
+      const ny = Math.round(sg.y0 + T + 10 + R() * Math.max(1, sg.len - 2 * T - 20));
       const nx = Math.round(sg.x + sg.w * 0.05);
       b.halo(nx, ny, 9, CRY.bright, 0.45);
       for (let dy = -2; dy <= 2; dy++)
@@ -683,8 +732,7 @@ function crystalMid(): Tile {
       y0: sg.y0 + T,
       y1: sg.y0 + sg.len - T,
     });
-    out.sparks.push({ x: Math.round(sg.x), y: sg.y0 });
-    out.sparks.push({ x: Math.round(sg.x), y: sg.y0 + sg.len - 1 });
+    out.sparks.push({ x: Math.round(sg.x), y: sg.tips === 'top' ? sg.y0 : sg.y0 + sg.len - 1 });
   }
   out.img = b.toCanvas();
   const ctx = out.img.getContext('2d')!;
@@ -692,7 +740,7 @@ function crystalMid(): Tile {
   for (const sg of segs.filter((s) => s.near))
     for (let k = 0; k < 2; k++) {
       const cr = crystalCluster(Math.floor(sg.x) + k * 9, R() < 0.5 ? 0 : 1, 1);
-      const y = sg.y0 + 40 + R() * (sg.len - 80);
+      const y = sg.y0 + 20 + R() * Math.max(1, sg.len - 50);
       const inner = sg.x < cx ? sg.x + sg.w / 2 - 3 : sg.x - sg.w / 2 - cr.width + 3;
       blitWrap(ctx, cr, inner, y, w, h);
     }

@@ -361,7 +361,7 @@ export class World {
     this.hell = new HellRenderer(images);
     this.heaven = new HeavenRenderer(images);
     this.caveFx = new CaveFx(images);
-    this.skyFx = new SkyFx(images);
+    this.skyFx = new SkyFx(images, this.heaven);
   }
 
   // ---------------------------------------------------------------- Effekte
@@ -589,7 +589,8 @@ export class World {
         if (g.hit.has(-1)) continue;
         g.hit.add(-1);
         const dir = g.vx >= 0 ? 1 : -1;
-        ix.balloon.push(dir * (18 + 34 * g.strength));
+        // schwache Böe schaukelt nur, starke legt den Ballon deutlich schief
+        ix.balloon.push(dir * (6 + 24 * g.strength));
         if (g.strength > 0.3) ix.balloon.react('hold', 0.6 + g.strength * 0.8, dir);
       }
     if (v.show.balloon)
@@ -695,9 +696,11 @@ export class World {
     if (ey - 6 > ropeTop) ctx.fillRect(x, ropeTop, 1, ey - 6 - ropeTop);
     const bob = v.calm ? 0 : Math.round(Math.sin(v.time * 1.6 + c.x) * 1);
     const jump = c.mood === 'cheer' && Math.floor(v.time * 6) % 2 ? -2 : 0;
-    const shake = c.mood === 'flinch' ? Math.round(Math.sin(v.time * 40) * 1) : 0;
+    // Posen der Mitspieler aus ihrem Rig (Tropfen → zucken, Fledermäuse → ducken)
+    const pose = i >= 0 ? this.ix.crew[i]?.pose : null;
+    const shake = c.mood === 'flinch' || pose === 'flinch' ? Math.round(Math.sin(v.time * 40) * 1) : 0;
     const fx = x - 3 + bob + shake;
-    const fy = ey - 6 + jump;
+    const fy = ey - 6 + jump + (pose === 'duck' ? 2 : 0);
     const r = (dx: number, dy: number, w: number, h: number, col: string) => {
       ctx.fillStyle = col;
       ctx.fillRect(fx + dx, fy + dy, w, h);
@@ -742,7 +745,7 @@ export class World {
     const key = `${flame}-${mood}`;
     let bs = this.balloons.get(key);
     if (!bs) this.balloons.set(key, (bs = balloonSprite(flame, mood)));
-    const bShake = v.balloonMood === 'flinch' ? Math.round(Math.sin(v.time * 36) * 1) : 0;
+    const bShake = v.balloonMood === 'flinch' || rig.jolt > 0 ? Math.round(Math.sin(v.time * 36) * 1) : 0;
     const x0 = ox + v.balloonX - 23 + bShake;
     const y0 = by - 74 + bob;
     const t = rig.swing;
@@ -1150,7 +1153,8 @@ export class World {
     // --- Leuchtendes im Fels neben dem Schacht: die Zone ist auch außerhalb der Lampe erkennbar
     if (r >= 2) {
       if (zone === 'lava') {
-        if (A) this.lavaRock(ctx, r, ox, y, W, v);
+        // Feststehendes (Ströme, Risse, Glutnester, Lichter) im Zwischenspeicher, nur Funkeln bewegt
+        this.lavaRock(ctx, r, ox, y, W, v, A);
       } else if (S) this.sideEmitters(ctx, zone, r, ox, y, W);
     }
 
@@ -1462,11 +1466,12 @@ export class World {
         this.embedLip(ctx, Math.round(x - s.width / 2), y + 15, s.width, 'crystal', seed);
         this.lights.push([x, y + 9, 11, CRYSTAL_COLORS[k][1]]);
       } else {
-        // Pilzgruppe auf Moospolster – sitzt auf einem Felssims, der aus dem Gestein ragt
-        // (vorher schwebten die Polster als kleine Inseln im Dunkeln)
+        // Pilzgruppe auf Moospolster – wächst in einer Felsmulde, deren Boden als Sims hervorsteht
+        // (nur ein Sims im massiven Fels las sich noch wie eine schwebende Insel)
         const k = Math.floor(h * 97) % 3;
         const s = shroomPatch(seed * 5 + 2, k);
         const px0 = Math.round(x - s.width / 2);
+        this.niche(ctx, x, y + 17, s.width + 6, 'shroom', seed);
         this.rockShelf(ctx, px0 - 3, y + 17, s.width + 6, 'shroom', seed);
         ctx.drawImage(s, px0, y + 18 - s.height);
         this.embedLip(ctx, px0, y + 17, s.width, 'shroom', seed);
@@ -1693,7 +1698,9 @@ export class World {
    * mehrere Zeilen, verzweigte Risse und kleine Glutnester, mit unterschiedlicher Größe
    * und Helligkeit (kein gleichmäßiges Raster aus Lichtkreisen).
    */
-  private lavaRock(ctx: CanvasRenderingContext2D, r: number, ox: number, y: number, W: number, v: ViewState) {
+  private lavaRock(ctx: CanvasRenderingContext2D, r: number, ox: number, y: number, W: number, v: ViewState, anim: boolean) {
+    // anim: nur Bewegtes (Brocken im Strom, Flackern); sonst alles Feste samt Lichtern (Zwischenspeicher)
+    const S = !anim;
     const span = Math.max(8, W / 2 - HW - 16);
     const glow = ['#ff7a2b', '#ffb347', '#e2541e', '#ff9a3c'];
     for (const side of [-1, 1]) {
@@ -1704,17 +1711,18 @@ export class World {
       if (hash(block * 2 + s, 91) < 0.38 && inBlock >= 1 && inBlock <= 3) {
         const x = ox + side * (HW + 12 + Math.floor(hash(block, 92 + s) * span));
         const wob = (yy: number) => Math.round(Math.sin((r * T + yy) * 0.18 + block) * 2);
-        for (let yy = 0; yy < T; yy++) {
-          const xx = x + wob(yy);
-          ctx.fillStyle = '#7a2416';
-          ctx.fillRect(xx - 2, y + yy, 5, 1);
-          ctx.fillStyle = '#e2541e';
-          ctx.fillRect(xx - 1, y + yy, 3, 1);
-          ctx.fillStyle = '#ffb347';
-          ctx.fillRect(xx, y + yy, 1, 1);
-        }
+        if (S)
+          for (let yy = 0; yy < T; yy++) {
+            const xx = x + wob(yy);
+            ctx.fillStyle = '#7a2416';
+            ctx.fillRect(xx - 2, y + yy, 5, 1);
+            ctx.fillStyle = '#e2541e';
+            ctx.fillRect(xx - 1, y + yy, 3, 1);
+            ctx.fillStyle = '#ffb347';
+            ctx.fillRect(xx, y + yy, 1, 1);
+          }
         // helle Brocken, die den Strom hinunterfließen
-        if (!v.calm) {
+        if (anim && !v.calm) {
           const t = mod(v.time * 14 + hash(block, 93) * 40, T * 3);
           const yy = Math.floor(t) - (inBlock - 1) * T;
           if (yy >= 0 && yy < T) {
@@ -1722,8 +1730,8 @@ export class World {
             ctx.fillRect(x + wob(yy), y + yy, 1, 2);
           }
         }
-        if (inBlock === 2) this.lights.push([x, y + 8, 14 + Math.floor(hash(block, 94 + s) * 10), glow[block % 4]]);
-        if (inBlock === 3) {
+        if (S && inBlock === 2) this.lights.push([x, y + 8, 14 + Math.floor(hash(block, 94 + s) * 10), glow[block % 4]]);
+        if (S && inBlock === 3) {
           // kleine Lache am Ende
           ctx.fillStyle = '#e2541e';
           ctx.fillRect(x - 4, y + T - 3, 9, 2);
@@ -1737,6 +1745,7 @@ export class World {
       const x = ox + side * (HW + 10 + Math.floor(hash(r, 96 + s) * span));
       const yy = y + Math.floor(hash(r, 98 + s) * (T - 6));
       if (h < 0.12) {
+        if (anim) continue;
         // 2) verzweigter Riss, unterschiedlich lang
         const len = 4 + Math.floor(hash(r, 99) * 6);
         ctx.fillStyle = '#c9541e';
@@ -1751,10 +1760,16 @@ export class World {
         if (hash(r, 101) < 0.6) this.lights.push([x, yy + 3, 7 + Math.floor(hash(r, 102) * 6), glow[r % 4]]);
       } else {
         // 3) Glutnest: kleiner, heller Fleck, flackert leicht
-        const flick = v.calm ? 0 : Math.floor(v.time * 3 + r) % 3 === 0 ? 1 : 0;
+        if (anim) {
+          if (!v.calm && Math.floor(v.time * 3 + r) % 3 === 0) {
+            ctx.fillStyle = '#fff1b0';
+            ctx.fillRect(x, yy, 1, 1);
+          }
+          continue;
+        }
         ctx.fillStyle = '#e2541e';
         ctx.fillRect(x - 1, yy, 3, 2);
-        ctx.fillStyle = flick ? '#fff1b0' : '#ffb347';
+        ctx.fillStyle = '#ffb347';
         ctx.fillRect(x, yy, 1, 1);
         this.lights.push([x, yy + 1, 5 + Math.floor(hash(r, 103) * 5), glow[(r + 1) % 4]]);
       }
@@ -1765,7 +1780,18 @@ export class World {
    * Oberkante des Schachts: Grasnarbe hängt unregelmäßig über die Kante, darunter
    * wellige Schichten (Humus → Erde → Kies) und Wurzeln, Schatten unter dem Überhang.
    */
+  private lipImg: Sprite | null = null;
   private shaftLip(ctx: CanvasRenderingContext2D, ox: number, oy: number) {
+    // einmal vorzeichnen (≈ 700 Einzelaufrufe), dann nur noch ein Blit pro Bild
+    if (!this.lipImg) {
+      const [c, lc] = canvas(HW * 2 + 16, 48);
+      this.shaftLipDraw(lc, HW + 8, 2);
+      this.lipImg = c;
+    }
+    ctx.drawImage(this.lipImg, ox - HW - 8, oy - 2);
+  }
+
+  private shaftLipDraw(ctx: CanvasRenderingContext2D, ox: number, oy: number) {
     const x0 = ox - HW;
     for (let i = 0; i < HW * 2; i++) {
       const x = x0 + i;

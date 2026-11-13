@@ -15,6 +15,14 @@ export interface WorldFx {
 }
 
 /** Freunde-Modus: ein Spieler in der Szene (die eigene Figur hat me = true). */
+/** Vorschau/Debug: `n` erfundene Mitspieler rund um `meters` (Freunde-Modus testen ohne Raum). */
+export function previewCrew(n: number, meters: number): CrewInput[] {
+  const colors = ['#e2533a', '#3a8ee2', '#4ac26a', '#e2b83a', '#a85ae2', '#e25aa8', '#3ac2c2', '#8a8a8a'];
+  const out: CrewInput[] = [{ id: 'me', name: 'Ich', color: '#f2d03a', meters, me: true }];
+  for (let i = 0; i < n; i++) out.push({ id: `p${i}`, name: `Spieler ${i + 1}`, color: colors[i % colors.length], meters: Math.max(0, meters + (((i * 37) % 9) - 4) * 40) });
+  return out;
+}
+
 export interface CrewInput {
   id: string;
   name: string;

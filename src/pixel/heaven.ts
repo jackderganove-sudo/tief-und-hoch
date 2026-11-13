@@ -57,6 +57,19 @@ function fadeBottom(src: Sprite, keep: number): Sprite {
   return c;
 }
 
+/** Säulen in heaven/columns: [x, Breite] – jede steht mit Sockel auf der Unterkante (y 96). */
+const COLUMN_CROPS: [number, number][] = [
+  [93, 16],
+  [109, 16],
+  [141, 16],
+  [173, 16],
+  [189, 16],
+  [125, 16],
+];
+
+/** Farben der abbröckelnden Splitter (aus den Kristallpaletten). */
+const CRUMB = ['#9ad8ff', '#f0b0ff', '#9af0e0', '#c8c0ff'];
+
 const GOLD = ['#7a5a2a', '#c89a4a', '#f0d08a', '#fff2c8', '#ffffff'];
 const CRYSTAL = ['#4a5a9a', '#7a9ad8', '#b8d4ff', '#e6f2ff', '#ffffff'];
 
@@ -69,6 +82,8 @@ export class HeavenRenderer {
   private temple: Sprite;
   private columns: Sprite;
   private angel: Sprite;
+  private angelWave: Sprite[];
+  private angelWaveL: Sprite[];
   private space: Record<string, HTMLImageElement>;
   private spaceFlip: Sprite;
   private starsFlip: Sprite;
@@ -79,6 +94,8 @@ export class HeavenRenderer {
   private islesFar: Sprite[];
   private nacre: Sprite[];
   private fan: Sprite;
+  /** Wolkenpolster, auf dem der Kristall im Lichtfächer wächst. */
+  private pad: Sprite;
   private halo: Sprite;
 
   constructor(img: Images) {
@@ -92,6 +109,8 @@ export class HeavenRenderer {
     this.temple = recolor(img['heaven/temple'], rampMap(['#6a5030', '#b89058', '#ead2a0', '#fff6dc', '#ffffff']));
     this.columns = recolor(img['heaven/columns'], rampMap(['#7a6a50', '#c8b898', '#f0e6d0', '#fffaf0', '#ffffff']));
     this.angel = img['heaven/angel'] as unknown as Sprite;
+    this.angelWave = [0, 1].map((t) => angelWaveSprite(img['heaven/angel'], t));
+    this.angelWaveL = this.angelWave.map((s) => flipX(s));
     this.space = {
       background: img['space/background'],
       stars: img['space/stars'],
@@ -117,6 +136,7 @@ export class HeavenRenderer {
       }),
     );
     this.fan = prismFanSprite();
+    this.pad = cloudPad(77, 26);
     this.halo = haloSprite(48);
   }
 
@@ -131,6 +151,7 @@ export class HeavenRenderer {
     this.islands(f);
     this.gate(f);
     this.signs(f);
+    this.angels(f, false);
   }
 
   /** Vor dem Ballon: Wolkendecke zum Durchfliegen, Engelchen. */
@@ -226,8 +247,10 @@ export class HeavenRenderer {
           const th = Math.round(this.temple.height / 2);
           ctx.drawImage(this.temple, x + Math.round(isl.width / 2 - tw / 2), y - th + 6 + bob, tw, th);
         } else if (big) {
-          const c = Math.floor(hash(j, li) * 6);
-          ctx.drawImage(this.columns, c * 32, 0, 32, 96, x + 20, y - 92 + bob, 32, 96);
+          // ganze Säulen (eigene Ausschnitte, kein 32-px-Raster – sonst halbe Säulen ohne Sockel)
+          const [cx0, cw] = COLUMN_CROPS[Math.floor(hash(j, li) * COLUMN_CROPS.length)];
+          ctx.drawImage(this.columns, cx0, 0, cw, 96, x + 24 + (16 - cw) / 2, y - 92 + bob, cw, 96);
+          if (cw <= 16) ctx.drawImage(this.columns, cx0, 0, cw, 96, x + 52, y - 91 + bob, cw, 96);
         }
         ctx.drawImage(isl, x, y + bob);
         // Regenbogenbrücke zur nächsten Insel derselben Ebene
@@ -360,18 +383,66 @@ export class HeavenRenderer {
     }
   }
 
-  /** Engelchen begleiten den Ballon im Himmel. */
-  private angels(f: SkyFrame) {
-    const vis = clamp((f.camM - HEAVEN_M) / 200) * clamp((GATE_M + 600 - f.camM) / 300);
+  /** Sichtbarkeit der Engelchen (nur im Himmel bis knapp über das Tor). */
+  angelVis(camM: number) {
+    return clamp((camM - HEAVEN_M) / 200) * clamp((GATE_M + 600 - camM) / 300);
+  }
+
+  /**
+   * Ruheplatz bzw. Flugbahn eines Engelchens: [x, y (oben links), hinter dem Ballon?, winkt?].
+   * Ausflug (angelFx, gesetzt von skyFx): eine Runde um den Ballon – oben hinter der Hülle,
+   * unten davor –, danach neben dem Korb winken und zurück an den Platz.
+   */
+  angelPos(f: SkyFrame, i: number): [number, number, boolean, boolean] {
+    const { time, calm } = f;
+    const side = i ? 1 : -1;
+    const rx = Math.round(f.balloonX + side * (42 + (calm ? 0 : Math.sin(time * 0.7 + i) * 8)) - 17);
+    const ry = Math.round(f.balloonY - 70 + i * 26 + (calm ? 0 : Math.sin(time * 1.4 + i * 2) * 5));
+    const a = this.angelFx[i];
+    if (!a) return [rx, ry, false, false];
+    const u = (time - a.t0) / a.dur;
+    if (u < 0 || u >= 1) {
+      this.angelFx[i] = null;
+      return [rx, ry, false, false];
+    }
+    if (a.kind === 'wave') return [rx, ry + (calm ? 0 : Math.round(Math.sin(u * Math.PI * 4))), false, true];
+    // Runde: Ellipse um die Ballonmitte, Start und Ende am Ruheplatz
+    const cx = f.balloonX - 17;
+    const cy = f.balloonY - 28;
+    const th0 = Math.atan2((ry - cy) / 20, (rx - cx) / 52);
+    const e = (t: number) => t * t * (3 - 2 * t);
+    const loop = u < 0.12 ? 0 : u > 0.72 ? 1 : (u - 0.12) / 0.6;
+    const th = th0 - side * e(loop) * Math.PI * 2;
+    let x = cx + Math.cos(th) * 52;
+    let y = cy + Math.sin(th) * 20;
+    // weich vom Platz auf die Bahn und zurück
+    const k = u < 0.12 ? e(u / 0.12) : u > 0.72 ? 1 - e(Math.min(1, (u - 0.72) / 0.12)) : 1;
+    x = rx + (x - rx) * k;
+    y = ry + (y - ry) * k;
+    const waving = u > 0.84;
+    return [Math.round(x), Math.round(y), k > 0.5 && Math.sin(th) < 0, waving];
+  }
+
+  /** Ausflüge der beiden Engelchen (von skyFx gesetzt): Runde um den Ballon oder winken. */
+  angelFx: ({ kind: 'loop' | 'wave'; t0: number; dur: number } | null)[] = [null, null];
+
+  /** Engelchen begleiten den Ballon im Himmel (front: davor, sonst die Teile der Runde hinter der Hülle). */
+  private angels(f: SkyFrame, front = true) {
+    const vis = this.angelVis(f.camM);
     if (vis <= 0) return;
     const { ctx, time, calm } = f;
     ctx.globalAlpha = vis;
     for (let i = 0; i < 2; i++) {
-      const side = i ? 1 : -1;
-      const fr = calm ? 0 : Math.floor(time * 6 + i * 2) % 4;
-      const x = Math.round(f.balloonX + side * (42 + (calm ? 0 : Math.sin(time * 0.7 + i) * 8)) - 17);
-      const y = Math.round(f.balloonY - 70 + i * 26 + (calm ? 0 : Math.sin(time * 1.4 + i * 2) * 5));
-      ctx.drawImage(this.angel, fr * 34, 0, 34, 43, x, y, 34, 43);
+      const [x, y, behind, waving] = this.angelPos(f, i);
+      if (behind === front) continue;
+      if (waving) {
+        // winkt mit dem Arm, der zum Ballon zeigt
+        const k = calm ? 0 : Math.floor(time * 5) % 2;
+        ctx.drawImage(i ? this.angelWaveL[k] : this.angelWave[k], x, y);
+      } else {
+        const fr = calm ? 0 : Math.floor(time * (this.angelFx[i] ? 10 : 6) + i * 2) % 4;
+        ctx.drawImage(this.angel, fr * 34, 0, 34, 43, x, y, 34, 43);
+      }
     }
     ctx.globalAlpha = 1;
   }
@@ -393,15 +464,27 @@ export class HeavenRenderer {
         ctx.fillRect(x - 1, y, 4, 1);
         ctx.fillRect(x, y - 1, 1, 4);
       }
-      if (f.camM > GATE_M) ctx.drawImage(this.shards[i % 3], x - 6, y + 10);
     }
+  }
+
+  /** Kristallinseln dieses Bilds (Bildschirm-Rechteck des Kerns, Index) – für Antippen in skyFx. */
+  crystalHits: { x: number; y: number; w: number; h: number; j: number }[] = [];
+  /** Angetippte Inseln: Index → Zeitpunkt (klingen, Splitter rieseln). */
+  private chimes = new Map<number, number>();
+
+  /** Insel j zum Klingen bringen (Antippen). */
+  chime(j: number, time: number) {
+    this.chimes.set(j, time);
   }
 
   /**
    * Kristallwolken (7.000–9.000 m): Halo mit Nebensonnen, schillernde Perlmuttwolken,
-   * schwebende Kristallinseln mit Spektralfächern, großer Lichtfächer, funkelnde Splitter.
+   * schwebende Kristallinseln mit Spektralfächern, großer Lichtfächer an einem Kristall auf
+   * einem Wolkenpolster. Nichts schwebt frei: Splitter bröckeln sichtbar von den Unterseiten
+   * der Inseln ab und fallen funkelnd in die Tiefe.
    */
   private crystals(f: SkyFrame) {
+    this.crystalHits.length = 0;
     if (f.camM < GATE_M - 300 || f.camM > GATE_M + 2600) return;
     const { ctx, W, time, calm, bottom } = f;
     // über dem Tor einblenden, vor dem Polarlicht ausblenden
@@ -424,15 +507,20 @@ export class HeavenRenderer {
       const off = mod(Math.round(-f.camX * par * 0.5 + (calm ? 0 : time * (1.5 + i))), s.width);
       for (let x = off - s.width; x < W; x += s.width) ctx.drawImage(s, x, y);
     }
-    // Lichtfächer: Strahl bricht sich an einem Kristall (zwei Stück, pulsieren leicht)
+    // Lichtfächer: Strahl bricht sich an einem Kristall, der auf einem kleinen Wolkenpolster wächst
     for (let i = 0; i < 2; i++) {
       const y = f.at(GATE_M + 500 + i * 800, 0.7);
-      if (y > bottom || y + this.fan.height < 0) continue;
+      if (y > bottom || y + this.fan.height + 20 < 0) continue;
       const x = i ? Math.round(f.balloonX + 10) : Math.round(f.balloonX - 150);
+      const bob = calm ? 0 : Math.round(Math.sin(time * 0.5 + i * 3) * 1);
       ctx.globalAlpha = vis * (calm ? 0.8 : 0.65 + 0.3 * Math.sin(time * 0.7 + i * 2));
       ctx.drawImage(this.fan, x, y);
       ctx.globalAlpha = vis;
-      ctx.drawImage(this.shards[i], x + 38, y + 24);
+      const sh = this.shards[i];
+      ctx.drawImage(sh, x + 44 - Math.round(sh.width / 2), y + 24 + bob);
+      ctx.drawImage(this.pad, x + 44 - Math.round(this.pad.width / 2), y + 24 + sh.height - 3 + bob);
+      this.crystalHits.push({ x: x + 30, y: y + 18, w: 28, h: sh.height + this.pad.height + 6, j: 100 + i });
+      this.crumbs(f, x + 44, y + 24 + sh.height + 3 + bob, 6, 100 + i, 0.7);
     }
     // schwebende Kristallinseln in zwei Ebenen, links/rechts vom Ballon
     for (let j = 0; j < 9; j++) {
@@ -442,30 +530,88 @@ export class HeavenRenderer {
       const isl = (li ? this.isles : this.islesFar)[j % this.isles.length];
       const bob = calm ? 0 : Math.round(Math.sin(time * 0.5 + j) * 2);
       const y = f.at(m, par) + bob;
-      if (y > bottom || y + isl.height < 0) continue;
+      if (y > bottom || y + isl.height + 40 < 0) continue;
       const side = (j >> 1) % 2 ? 1 : -1;
       const gap = 30 + Math.round(hash(j, 132) * 40);
       const x = Math.round(side > 0 ? f.balloonX + gap : f.balloonX - gap - (isl.width - 34)) + (calm ? 0 : Math.round(Math.sin(time * 0.12 + j) * 5));
       ctx.drawImage(isl, x, y);
+      const w = isl.width - 34;
+      const h = Math.round(w * 0.88);
+      const y0 = Math.round(h * 0.46);
+      this.crystalHits.push({ x, y, w, h: h + 4, j });
       if (!calm && Math.sin(time * 2.6 + j * 1.7) > 0.7) {
         // Funkeln auf einer Kristallspitze
-        const sx = x + Math.round(isl.width * (0.25 + hash(j, 133) * 0.35));
-        const sy = y + Math.round(isl.height * 0.2);
+        const sx = x + Math.round(w * (0.25 + hash(j, 133) * 0.35));
+        const sy = y + Math.round(h * 0.2);
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(sx, sy - 2, 1, 5);
         ctx.fillRect(sx - 2, sy, 5, 1);
       }
-    }
-    // kleine Splitter dazwischen
-    for (let i = 0; i < 10; i++) {
-      const m = GATE_M + 150 + i * 190 + hash(i, 121) * 80;
-      const par = i % 3 === 0 ? 0.6 : 0.9;
-      const y = f.at(m, par) + (calm ? 0 : Math.round(Math.sin(time * 0.8 + i) * 3));
-      if (y < -30 || y > bottom) continue;
-      const x = Math.round(mod(hash(i, 122) * W + (calm ? 0 : time * (3 + (i % 4))), W + 20) - 10);
-      ctx.drawImage(this.shards[i % 3], x, y);
+      // Splitter bröckeln von der Unterseite (Kegel) ab
+      this.crumbs(f, x + Math.round(w / 2), y + y0 + 2, h - y0, j, li ? 1 : 0.6, w / 2 - 3);
+      const c = this.chimes.get(j);
+      if (c !== undefined) this.chimeFx(f, x, y, w, y0, h, j, time - c);
     }
     ctx.globalAlpha = 1;
+  }
+
+  /**
+   * Abbröckelnde Splitter unter einer Insel: in Abständen lösen sich 2–3 Splitter vom Kegel
+   * (Mitte cx, Oberkante top, Höhe cone, halbe Breite oben half), fallen beschleunigt und funkeln.
+   */
+  private crumbs(f: SkyFrame, cx: number, top: number, cone: number, j: number, a: number, half = 3) {
+    if (f.calm) return;
+    const { ctx, time } = f;
+    const P = 5 + hash(j, 141) * 5;
+    const tt = time + hash(j, 142) * P;
+    const cyc = Math.floor(tt / P);
+    const ph = tt - cyc * P;
+    for (let k = 0; k < 3; k++) {
+      const t = ph - k * 0.4;
+      if (t < 0 || t > 1.9) continue;
+      if (k === 2 && hash(j + cyc, 143) < 0.5) continue;
+      // Ablösepunkt auf der Kegelfläche (unten schmaler)
+      const u = 0.35 + 0.6 * hash(j * 7 + k, cyc * 13 + 1);
+      const hw = half * (1 - u ** 1.15);
+      const sx = cx + Math.round((hash(j * 5 + k, cyc * 7 + 2) - 0.5) * 1.6 * hw);
+      const sy = top + Math.round(u * cone);
+      // kurz hängen, dann fallen
+      const fall = t < 0.25 ? 0 : 0.5 * 38 * (t - 0.25) ** 2;
+      const y = sy + Math.round(fall);
+      if (y > f.bottom) continue;
+      if (t > 1.4 && Math.floor(time * 20) % 2) continue; // flackert aus
+      const glint = (Math.floor(time * 12) + k + j) % 3 === 0;
+      ctx.globalAlpha = a;
+      ctx.fillStyle = glint ? '#ffffff' : CRUMB[(j + k) % CRUMB.length];
+      ctx.fillRect(sx + Math.round(Math.sin(t * 3 + k) * (t * 2)), y, 1, k === 0 && a > 0.8 ? 2 : 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Angetippte Insel klingt: Funkeln auf den Spitzen, ein Schauer Splitter rieselt ab. */
+  private chimeFx(f: SkyFrame, x: number, y: number, w: number, y0: number, h: number, j: number, t: number) {
+    if (t > 1.6 || t < 0) {
+      this.chimes.delete(j);
+      return;
+    }
+    const { ctx, calm } = f;
+    ctx.fillStyle = '#ffffff';
+    for (let k = 0; k < 3; k++) {
+      if (!calm && (Math.floor(t * 10) + k) % 2) continue;
+      const sx = x + Math.round(w * (0.22 + k * 0.28));
+      const sy = y + Math.round(y0 * (0.35 + hash(j, k + 150) * 0.4));
+      const r = t < 0.3 ? 3 : 2;
+      ctx.fillRect(sx, sy - r, 1, r * 2 + 1);
+      ctx.fillRect(sx - r, sy, r * 2 + 1, 1);
+    }
+    if (calm) return;
+    for (let k = 0; k < 6; k++) {
+      const u = 0.3 + 0.6 * hash(j, k + 160);
+      const sx = x + w / 2 + (hash(j, k + 170) - 0.5) * w * (1 - u) * 0.9;
+      const sy = y + y0 + 2 + u * (h - y0) + 0.5 * 40 * t * t;
+      ctx.fillStyle = (Math.floor(t * 14) + k) % 2 ? '#ffffff' : CRUMB[k % CRUMB.length];
+      ctx.fillRect(Math.round(sx + (hash(j, k + 180) - 0.5) * 10 * t), Math.round(sy), 1, 1);
+    }
   }
 
   /** Polarlicht (9.000–11.000 m): wehende Bänder in Grün, Türkis und Rosa, dazu Sterne. */
@@ -545,6 +691,30 @@ export class HeavenRenderer {
 
 // ================================================================ Pixel-Generatoren (nur beim Laden)
 
+/** Engelchen (erstes Bild) mit erhobenem rechtem Arm zum Winken; tilt 0/1 = Arm steil/schräg. */
+function angelWaveSprite(sheet: CanvasImageSource, tilt: number): Sprite {
+  const [c, x] = canvas(34, 43);
+  x.drawImage(sheet, 0, 0, 34, 43, 0, 0, 34, 43);
+  const r = (px: number, py: number, w: number, h: number, col: string) => {
+    x.fillStyle = col;
+    x.fillRect(px, py, w, h);
+  };
+  // herabhängende Hand übermalen (Gewand)
+  r(25, 31, 2, 3, '#a3acbe');
+  r(27, 31, 1, 4, '#67708b');
+  // Ärmel von der Schulter nach oben, Hand oben
+  const pts = tilt ? [[24, 21], [25, 19], [26, 17], [27, 15], [28, 13]] : [[24, 21], [25, 19], [25, 17], [26, 15], [26, 13]];
+  for (const [px, py] of pts) {
+    r(px - 1, py, 4, 2, '#67708b');
+    r(px, py, 2, 2, '#a3acbe');
+  }
+  const [hx, hy] = pts[pts.length - 1];
+  r(hx - 1, hy - 4, 4, 4, '#945542');
+  r(hx, hy - 4, 2, 3, '#e5ae78');
+  r(hx, hy - 1, 2, 1, '#c58158');
+  return c;
+}
+
 type RGBA = [number, number, number, number];
 const rgbaCache = new Map<string, RGBA>();
 function rgba(h: string): RGBA {
@@ -556,17 +726,17 @@ function rgba(h: string): RGBA {
   return c;
 }
 /** Zwei Hex-Farben mischen → Hex. */
-function mix(a: string, b: string, t: number): string {
+export function mix(a: string, b: string, t: number): string {
   const x = rgba(a);
   const y = rgba(b);
   return '#' + [0, 1, 2].map((i) => Math.round(x[i] + (y[i] - x[i]) * t).toString(16).padStart(2, '0')).join('');
 }
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
-const bayer = (x: number, y: number) => BAYER[(y & 3) * 4 + (x & 3)];
+export const bayer = (x: number, y: number) => BAYER[(y & 3) * 4 + (x & 3)];
 const SPECTRUM = ['#ff6a6a', '#ffb347', '#ffe28a', '#7ec850', '#5ab8ff', '#a87aff'];
 
 /** Kleiner Pixelpuffer: Pixel setzen (mit Deckkraft), am Ende ein Sprite – keine fillRect-Flut beim Laden. */
-class Px {
+export class Px {
   d: Uint8ClampedArray;
   constructor(
     public w: number,
@@ -603,7 +773,7 @@ class Px {
  * Falten zwischen den Ballen, flache schattige Unterseite, Bayer-Dithering an den Tonstufen.
  * pal: [Glanz, hell, mittel, Schatten, Unterseite]
  */
-function cumulus(seed: number, w: number, pal: string[], tower = 0.5): Sprite {
+export function cumulus(seed: number, w: number, pal: string[], tower = 0.5): Sprite {
   const r = rng(seed);
   const h = Math.round(w * (0.42 + tower * 0.3));
   const blobs: [number, number, number][] = [];
@@ -802,7 +972,7 @@ function swarmSprite(seed: number, frame: number, color: string): Sprite {
 }
 
 /** Kondensstreifen: zwei Triebwerkslinien am Flugzeug, nach hinten breiter und blasser. */
-function contrailSprite(len: number, thick: number): Sprite {
+export function contrailSprite(len: number, thick: number): Sprite {
   const h = thick + 4;
   const px = new Px(len, h);
   const mid = Math.floor(h / 2);
@@ -952,6 +1122,35 @@ function crystalIsland(seed: number, w: number, haze?: string): Sprite {
       d[i + 1] += (hg - d[i + 1]) * 0.45;
       d[i + 2] += (hb - d[i + 2]) * 0.45;
     }
+  }
+  return px.sprite();
+}
+
+/** Kleines Wolkenpolster (Unterseite mit hängenden Kristallzapfen), Breite w. */
+function cloudPad(seed: number, w: number): Sprite {
+  const r = rng(seed);
+  const h = 13;
+  const px = new Px(w, h);
+  // hängende Zapfen zuerst (Polster verdeckt ihren Ansatz)
+  for (let i = 0; i < 3; i++) {
+    const cx = Math.round(w * (0.3 + i * 0.2) + (r() - 0.5) * 2);
+    const len = 3 + Math.round(r() * 4);
+    const p = CRY_PALS[(seed + i) % 4];
+    for (let y = 0; y < len; y++) {
+      const half = y < len - 1 ? 1 : 0;
+      for (let x = -half; x <= half; x++) px.set(cx + x, 5 + y, x < 0 ? p[2] : x > 0 ? p[0] : p[1]);
+    }
+  }
+  const bumps = 3;
+  for (let i = 0; i < bumps; i++) {
+    const cx = 3 + ((w - 6) * (i + 0.5)) / bumps;
+    const rad = 3 + r() * 2;
+    for (let y = -rad; y <= 2; y++)
+      for (let x = -rad; x <= rad; x++) {
+        if (x * x + y * y > rad * rad && y < 0) continue;
+        const l = -(x / rad) * 0.5 - (y / rad) * 0.8 + (bayer(x + 64, y + 64) - 0.5) * 0.2;
+        px.set(cx + x, 5 + y, l > 0.55 ? '#ffffff' : l > 0.05 ? '#eef0ff' : l > -0.4 ? '#d4d6fa' : '#b4b6ea');
+      }
   }
   return px.sprite();
 }

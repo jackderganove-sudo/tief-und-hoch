@@ -170,7 +170,7 @@ export class Interact {
   /** Forscher am Seil (Abstieg). */
   explorer = new Rig(9, 1.6, 6);
   /** Eigener Ballon (Aufstieg). */
-  balloon = new Rig(14, 2.6, 4);
+  balloon = new Rig(14, 2.6, 6);
   /** Ballons/Figuren der Mitspieler (Freunde-Modus), nach Index. */
   crew: Rig[] = [];
   wind = new Wind();
