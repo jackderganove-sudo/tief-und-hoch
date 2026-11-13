@@ -97,7 +97,7 @@ const hash = (a: number, b = 0) => {
 };
 const mod = (n: number, m: number) => ((n % m) + m) % m;
 
-export type Light = [number, number, number, string?];
+export type Light = [number, number, number, string?, boolean?];
 
 interface Drawn {
   ctx: CanvasRenderingContext2D;

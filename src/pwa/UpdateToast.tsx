@@ -15,8 +15,14 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
       listeners.forEach((l) => l());
     },
     onRegisteredSW(_url, reg) {
-      // stündlich nach einer neuen Version sehen
-      if (reg) setInterval(() => void reg.update().catch(() => {}), 60 * 60 * 1000);
+      if (!reg) return;
+      // stündlich nach einer neuen Version sehen – und immer, wenn die App wieder in den
+      // Vordergrund kommt (sonst bleibt ein Handy, auf dem die App nur pausiert, ewig auf dem alten Stand)
+      const check = () => void reg.update().catch(() => {});
+      setInterval(check, 60 * 60 * 1000);
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') check();
+      });
     },
   });
 }
