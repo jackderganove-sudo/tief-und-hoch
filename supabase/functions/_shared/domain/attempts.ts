@@ -22,8 +22,13 @@ export const ROOM_MAX_ATTEMPTS = 30;
 
 /** Was von einer laufenden Frage gespeichert wird (Reload setzt weder Versuche noch KI-Kontingent zurück). */
 export interface RoundProgress {
-  /** Abgelehnte Eingaben in Reihenfolge. */
+  /** Eingaben, die nicht noch einmal versucht werden können (abgelehnt oder ohne KI nicht prüfbar), in Reihenfolge. */
   tried: string[];
+  /**
+   * Eingaben, die NICHT geprüft werden konnten (KI nicht erreichbar, Limit, Kontingent der Frage
+   * verbraucht). Sie gelten nicht als falsch – nur als nicht gewertet. Fehlt bei alten Spielständen.
+   */
+  unchecked?: string[];
   /** Alle gewerteten Versuche (ohne doppelte und leere). */
   count: number;
   aiChecks: number;
