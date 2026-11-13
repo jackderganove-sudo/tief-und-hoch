@@ -44,16 +44,15 @@ export function TierReveal({
   const badge = ai && result.matched && !isApprovedResult(question, result) ? <AiBadge mode={mode} /> : null;
 
   const rejected = result.rejected ?? [];
+  const uncheckedTries = result.uncheckedTries ?? [];
   let detail: React.ReactNode;
   if (result.matched) detail = <>{t('game.countedAs', { answer: result.matched })}{badge}</>;
   // Mehrere Versuche: Zeit um ohne gültige Antwort – die Versuche stehen darunter
-  else if (result.timedOut && (rejected.length > 0 || !result.input.trim())) detail = t('game.timeUp');
+  else if (result.timedOut && (rejected.length + uncheckedTries.length > 0 || !result.input.trim())) detail = t('game.timeUp');
   else if (!result.input.trim()) detail = t('game.empty');
   else if (result.unchecked) detail = `„${result.input}“ – ${t(result.unchecked === 'limited' ? 'game.uncheckedLimit' : 'game.unchecked')}`;
   else if (ai) detail = `„${result.input}“ – ${t('game.aiRejected')}`;
   else detail = `„${result.input}“ – ${t('game.invalid')}`;
-  // letzter Versuch konnte nicht geprüft werden (steht nicht bei den abgelehnten)
-  const uncheckedLast = !result.matched && result.unchecked && rejected.length > 0 && result.input.trim() ? result.input : null;
 
 
   return (
@@ -79,7 +78,14 @@ export function TierReveal({
         {result.tier === 'tooClever' && <p className="mt-2 text-sm opacity-85">{t('tierHints.tooClever')}</p>}
         <p className="mt-3 text-lg leading-tight">{detail}</p>
         {result.matched && (result.attempts ?? 1) > 1 && <p className="text-sm opacity-75">{t('game.afterAttempts', { count: result.attempts })}</p>}
-        {uncheckedLast && <p className="text-sm opacity-85">{`„${uncheckedLast}“ – ${t(result.unchecked === 'limited' ? 'game.uncheckedLimit' : 'game.unchecked')}`}</p>}
+        {uncheckedTries.length > 0 && (
+          <p className="mt-1 flex flex-wrap justify-center gap-x-2 text-sm leading-snug opacity-85" data-unchecked>
+            <span>{t('game.notCheckedShort')}:</span>
+            {uncheckedTries.map((a) => (
+              <span key={a}>„{a}“</span>
+            ))}
+          </p>
+        )}
         {rejected.length > 0 && (
           <p className="mt-1 flex flex-wrap justify-center gap-x-2 text-sm leading-snug opacity-75" data-rejected>
             <span>{t('game.yourAttempts')}:</span>

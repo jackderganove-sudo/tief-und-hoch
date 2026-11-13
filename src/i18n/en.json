@@ -55,7 +55,7 @@
     "notValid": "Not valid",
     "alreadyTried": "Already tried",
     "meantHint": "Did you mean {{answer}}?",
-    "uncheckedRetry": "Couldn't be checked – try again",
+    "uncheckedRetry": "Couldn't be checked – send again or try something else",
     "listOnly": "Only answers from the list count now",
     "listOnlyDay": "Daily AI limit reached – only answers from the list count now",
     "triedLabel": "Already tried",
@@ -63,7 +63,9 @@
     "afterAttempts_one": "after {{count}} attempt",
     "afterAttempts_other": "after {{count}} attempts",
     "attemptsMade_one": "{{count}} attempt",
-    "attemptsMade_other": "{{count}} attempts"
+    "attemptsMade_other": "{{count}} attempts",
+    "notChecked": "Not checked – doesn't count as wrong",
+    "notCheckedShort": "Not checked"
   },
   "tiers": {
     "moss": "Bronze",

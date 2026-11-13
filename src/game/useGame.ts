@@ -69,7 +69,7 @@ export function useGame(mode: Mode, dateKey: string, lang: Lang) {
         let record = s.record;
         if (!rs.checking) {
           // Versuche, KI-Kontingent und die (durch KI-Pausen verschobene) Startzeit merken
-          record = { ...record, questionStartedAt: rs.deadline - QUESTION_MS, round: { tried: rs.tried, count: rs.count, aiChecks: rs.aiChecks, listOnly: rs.listOnly } };
+          record = { ...record, questionStartedAt: rs.deadline - QUESTION_MS, round: { tried: rs.tried, unchecked: rs.unchecked, count: rs.count, aiChecks: rs.aiChecks, listOnly: rs.listOnly } };
           services.progress.saveDay(record);
         }
         setState({ ...s, record, round: rs });

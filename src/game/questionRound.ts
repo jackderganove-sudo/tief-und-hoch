@@ -16,9 +16,9 @@ import type { ScoreService } from '../services/ScoreService';
 export type FeedbackKind =
   | 'invalid' // nicht gültig
   | 'duplicate' // schon versucht
-  | 'unchecked' // KI nicht erreichbar – nochmal versuchen erlaubt
-  | 'listOnly' // KI-Kontingent der Frage verbraucht
-  | 'limited'; // KI-Tageslimit
+  | 'unchecked' // KI nicht erreichbar – nicht geprüft, nochmal versuchen erlaubt
+  | 'listOnly' // nicht geprüft: KI-Kontingent der Frage verbraucht
+  | 'limited'; // nicht geprüft: KI-Tageslimit
 
 export interface Feedback {
   /** Zählt hoch – so spielt die Wackel-Animation bei jedem Fehlversuch neu. */
@@ -38,12 +38,12 @@ export interface RoundState extends RoundProgress {
   result: AnswerResult | null;
 }
 
-export const emptyProgress = (): RoundProgress => ({ tried: [], count: 0, aiChecks: 0, listOnly: null });
+export const emptyProgress = (): RoundProgress => ({ tried: [], unchecked: [], count: 0, aiChecks: 0, listOnly: null });
 
 export class QuestionRound {
   state: RoundState;
   private feedbackId = 0;
-  private lastReject: Feedback['kind'] | 'ai' | null = null;
+  private lastReject: FeedbackKind | 'ai' | null = null;
 
   constructor(
     private readonly question: Question,
@@ -53,7 +53,7 @@ export class QuestionRound {
     private readonly onChange: (s: RoundState) => void = () => {},
     private readonly now: () => number = () => Date.now(),
   ) {
-    this.state = { ...emptyProgress(), ...init, tried: [...(init.tried ?? [])], checking: false, feedback: null, result: null };
+    this.state = { ...emptyProgress(), ...init, tried: [...(init.tried ?? [])], unchecked: [...(init.unchecked ?? [])], checking: false, feedback: null, result: null };
   }
 
   private set(patch: Partial<RoundState>) {
@@ -105,44 +105,61 @@ export class QuestionRound {
     const aiChecks = this.state.aiChecks + (outcome.aiUsed ? 1 : 0);
     const deadline = remote ? resumeDeadline(this.state.deadline, pausedAt, this.now()) : this.state.deadline;
 
+    const without = (list: readonly string[]) => list.filter((x) => !isDuplicate([text], x));
     if (outcome.ok) {
-      this.set({ checking: false, deadline, aiChecks, feedback: null, result: { ...outcome.result, attempts: count, rejected: [...this.state.tried] } });
+      // (eine vorher „nicht geprüfte“ Eingabe kann beim zweiten Versuch doch gelten)
+      const unchecked = without(this.state.unchecked ?? []);
+      this.set({ checking: false, deadline, aiChecks, feedback: null, unchecked, result: this.finish(outcome.result, count, this.state.tried, unchecked) });
       return;
     }
 
-    // „Nicht geprüft“ darf noch einmal versucht werden – alles andere gilt als versucht
+    // Prüfung fehlgeschlagen (KI nicht erreichbar, Limit, Kontingent): Die Eingabe ist NICHT falsch,
+    // nur nicht geprüft. Die Frage läuft weiter – nur der Zeitablauf beendet sie.
+    const notChecked = outcome.reason === 'unchecked' || outcome.reason === 'limited' || outcome.reason === 'listOnly';
+    const unchecked = notChecked ? rememberRejected(this.state.unchecked ?? [], text) : without(this.state.unchecked ?? []);
+    // „KI nicht erreichbar“ darf noch einmal versucht werden; ohne KI-Kontingent bringt ein zweiter Versuch nichts
     const tried = outcome.reason === 'unchecked' ? this.state.tried : rememberRejected(this.state.tried, text);
     const listOnly: RoundState['listOnly'] =
       outcome.reason === 'limited' ? 'day' : this.state.listOnly ?? (outcome.reason === 'listOnly' || aiChecks >= MAX_AI_CHECKS ? 'question' : null);
     const kind: FeedbackKind = outcome.reason === 'ai' ? 'invalid' : outcome.reason;
     this.lastReject = outcome.reason;
-    this.state = { ...this.state, checking: false, deadline, aiChecks, tried, listOnly };
+    this.state = { ...this.state, checking: false, deadline, aiChecks, tried, unchecked, listOnly };
     if (final) this.timeUp(text);
     else this.set({ feedback: this.feedback(kind, text, outcome.hint) });
+  }
+
+  /** Ergebnis mit den Versuchen davor: abgelehnte und nicht geprüfte getrennt. */
+  private finish(result: AnswerResult, count: number, tried: readonly string[], unchecked: readonly string[]): AnswerResult {
+    const rejected = tried.filter((t) => !isDuplicate(unchecked, t));
+    return { ...result, attempts: count, rejected, ...(unchecked.length ? { uncheckedTries: [...unchecked] } : {}) };
   }
 
   /** Zeit um ohne gültige Antwort: 0 Punkte („Daneben“), die Versuche bleiben sichtbar. */
   private timeUp(lastInput: string) {
     const s = this.state;
     const last = this.lastReject;
-    const wasLast = lastInput !== '' && (s.tried.at(-1) === lastInput || last === 'unchecked');
+    const unchecked = s.unchecked ?? [];
+    const wasLast = lastInput !== '' && (s.tried.at(-1) === lastInput || unchecked.at(-1) === lastInput);
     this.set({
       checking: false,
       feedback: null,
-      result: {
-        questionId: this.question.id,
-        input: lastInput,
-        matched: null,
-        fuzzy: false,
-        frequency: null,
-        tier: 'invalid',
-        points: 0,
-        timedOut: true,
-        source: wasLast && last === 'ai' ? 'ai' : 'list',
-        ...(wasLast && (last === 'unchecked' || last === 'limited') ? { unchecked: last === 'limited' ? ('limited' as const) : ('error' as const) } : {}),
-        attempts: s.count,
-        rejected: [...s.tried],
-      },
+      result: this.finish(
+        {
+          questionId: this.question.id,
+          input: lastInput,
+          matched: null,
+          fuzzy: false,
+          frequency: null,
+          tier: 'invalid',
+          points: 0,
+          timedOut: true,
+          source: wasLast && last === 'ai' ? 'ai' : 'list',
+          ...(wasLast && last !== 'ai' && last !== 'invalid' && last !== null && isDuplicate(unchecked, lastInput) ? { unchecked: last === 'limited' ? ('limited' as const) : ('error' as const) } : {}),
+        },
+        s.count,
+        s.tried,
+        unchecked,
+      ),
     });
   }
 }

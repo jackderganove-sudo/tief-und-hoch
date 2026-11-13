@@ -50,6 +50,7 @@ export function QuestionCard({
           checking={round.checking}
           feedback={round.feedback}
           tried={round.tried}
+          unchecked={round.unchecked}
           note={note}
           valueRef={typed}
           onSubmit={onAttempt}

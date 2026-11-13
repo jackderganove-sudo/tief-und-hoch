@@ -28,6 +28,7 @@ export function QuestionPhase({ s, endsAt }: { s: RoomState; endsAt: number | nu
   const [checking, setChecking] = useState(false);
   const [feedback, setFeedback] = useState<AttemptFeedback | null>(null);
   const [tried, setTried] = useState<string[]>(s.my_attempts ?? []);
+  const [unchecked, setUnchecked] = useState<string[]>(s.my_unchecked ?? []);
   const [aiLeft, setAiLeft] = useState<number | null>(s.my_ai_left ?? null);
   const [tooMany, setTooMany] = useState(false);
   const typed = useRef('');
@@ -41,6 +42,7 @@ export function QuestionPhase({ s, endsAt }: { s: RoomState; endsAt: number | nu
     setChecking(false);
     setFeedback(null);
     setTried(s.my_attempts ?? []);
+    setUnchecked(s.my_unchecked ?? []);
     setAiLeft(s.my_ai_left ?? null);
     setTooMany(false);
     busy.current = false;
@@ -70,6 +72,8 @@ export function QuestionPhase({ s, endsAt }: { s: RoomState; endsAt: number | nu
       setAiLeft(r.ai_left);
       if (r.accepted) return setSent(text);
       if (r.reason !== 'unchecked' && r.reason !== 'too_many') setTried((cur) => rememberRejected(cur, text));
+      // Prüfung nicht möglich (KI nicht erreichbar, Limit, Kontingent): nicht falsch, nur nicht geprüft – weiter raten
+      if (r.reason === 'unchecked' || r.reason === 'list_only' || r.reason === 'limited') setUnchecked((cur) => rememberRejected(cur, text));
       if (r.reason === 'too_many') setTooMany(true);
       reject(r.reason === 'duplicate' ? 'duplicate' : r.reason === 'unchecked' ? 'unchecked' : r.reason === 'list_only' ? 'listOnly' : r.reason === 'limited' ? 'limited' : 'invalid', text, r.hint ?? null);
     } catch (e) {
@@ -107,7 +111,7 @@ export function QuestionPhase({ s, endsAt }: { s: RoomState; endsAt: number | nu
         {late ? (
           <p className="mt-4 text-lg">{t('friends.lateJoin')}</p>
         ) : sent === null && s.status === 'question' ? (
-          <AttemptInput mode={s.settings.mode} checking={checking} feedback={feedback} tried={tried} note={note} valueRef={typed} onSubmit={(text) => void send(text)} />
+          <AttemptInput mode={s.settings.mode} checking={checking} feedback={feedback} tried={tried} unchecked={unchecked} note={note} valueRef={typed} onSubmit={(text) => void send(text)} />
         ) : (
           <>
             <p className="mt-4 text-lg">

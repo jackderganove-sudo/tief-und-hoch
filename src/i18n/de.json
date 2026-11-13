@@ -55,7 +55,7 @@
     "notValid": "Nicht gültig",
     "alreadyTried": "Schon versucht",
     "meantHint": "Meintest du {{answer}}?",
-    "uncheckedRetry": "Konnte nicht geprüft werden – versuch es nochmal",
+    "uncheckedRetry": "Konnte nicht geprüft werden – nochmal senden oder etwas anderes versuchen",
     "listOnly": "Nur noch Antworten aus der Liste möglich",
     "listOnlyDay": "KI-Tageslimit erreicht – nur noch Antworten aus der Liste möglich",
     "triedLabel": "Schon versucht",
@@ -63,7 +63,9 @@
     "afterAttempts_one": "nach {{count}} Versuch",
     "afterAttempts_other": "nach {{count}} Versuchen",
     "attemptsMade_one": "{{count}} Versuch",
-    "attemptsMade_other": "{{count}} Versuche"
+    "attemptsMade_other": "{{count}} Versuche",
+    "notChecked": "Nicht geprüft – zählt nicht als falsch",
+    "notCheckedShort": "Nicht geprüft"
   },
   "tiers": {
     "moss": "Bronze",

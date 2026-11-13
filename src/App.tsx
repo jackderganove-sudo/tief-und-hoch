@@ -126,7 +126,8 @@ export default function App() {
         />
       )}
       {/* Update-Hinweis nie während einer Runde (Tagesspiel oder Übung) */}
-      <UpdateToast hidden={screen.name === 'game' || screen.name === 'practice'} />
+      {/* … auf der Startseite wird eine neue Version sofort von selbst übernommen */}
+      <UpdateToast hidden={screen.name === 'game' || screen.name === 'practice'} auto={screen.name === 'home'} />
       {screen.name !== 'game' && screen.name !== 'friends' && <AccountNotice />}
       {debug && !DebugPanel && <DebugBadge />}
       {DebugPanel && debug && (

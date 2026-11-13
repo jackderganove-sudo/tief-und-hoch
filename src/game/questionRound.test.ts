@@ -187,6 +187,76 @@ describe('KI-Prüfung bei mehreren Versuchen', () => {
   });
 });
 
+describe('Prüffehler beenden die Frage nicht (Regression „Couldn\'t be checked“ → sofort „Daneben“)', () => {
+  it('KI nicht erreichbar: Hinweis, Eingabe wieder frei, Frage läuft weiter', async () => {
+    const { round } = setup({ 'Grilled hamfish': { status: 'error' } });
+    await round.attempt('Grilled hamfish');
+    expect(round.state.result).toBeNull();
+    expect(round.state.checking).toBe(false);
+    expect(round.state.feedback).toMatchObject({ kind: 'unchecked', input: 'Grilled hamfish' });
+    // als „nicht geprüft“ gemerkt – nicht als abgelehnt
+    expect(round.state.unchecked).toEqual(['Grilled hamfish']);
+    expect(round.state.tried).toEqual([]);
+    // weiter tippen, bis etwas gilt
+    await round.attempt('Karotte');
+    expect(round.state.result).toMatchObject({ matched: 'Karotte', timedOut: false, attempts: 2, rejected: [], uncheckedTries: ['Grilled hamfish'] });
+  });
+
+  it('nur der Zeitablauf ergibt „Daneben“ – die nicht geprüfte Eingabe bleibt als solche stehen', async () => {
+    const { round } = setup({ Mangold: { status: 'error' } });
+    await round.attempt('Mangold');
+    expect(round.state.result).toBeNull();
+    await round.expire('');
+    expect(round.state.result).toMatchObject({ tier: 'invalid', points: 0, timedOut: true, rejected: [], uncheckedTries: ['Mangold'] });
+  });
+
+  it('nicht geprüft und beim zweiten Senden doch gültig: kein Eintrag mehr unter „nicht geprüft“', async () => {
+    const clock = { t: 0 };
+    let n = 0;
+    const judge: AnswerJudge = {
+      async judge() {
+        clock.t += 1000;
+        return n++ === 0 ? { status: 'error' } : { status: 'valid', canonicalText: 'Mangold', estimatedBaseScore: 8 };
+      },
+    };
+    const round = new QuestionRound(question, 'rare', new LocalScoreService(judge), { deadline: 25_000 }, () => {}, () => clock.t);
+    await round.attempt('Mangold');
+    expect(round.state.unchecked).toEqual(['Mangold']);
+    await round.attempt('Mangold');
+    expect(round.state.result).toMatchObject({ matched: 'Mangold', attempts: 2 });
+    expect(round.state.result?.uncheckedTries).toBeUndefined();
+  });
+
+  it('KI-Tageslimit: nicht geprüft statt falsch, Frage läuft weiter, die Liste zählt', async () => {
+    const { round } = setup({ Mangold: { status: 'limited', scope: 'day' } });
+    await round.attempt('Mangold');
+    expect(round.state.result).toBeNull();
+    expect(round.state.feedback).toMatchObject({ kind: 'limited' });
+    expect(round.state.unchecked).toEqual(['Mangold']);
+    // dieselbe Eingabe nochmal bringt ohne KI nichts → als „schon versucht“ abgefangen
+    await round.attempt('mangold');
+    expect(round.state.feedback).toMatchObject({ kind: 'duplicate' });
+    await round.attempt('Pastinake');
+    expect(round.state.result).toMatchObject({ matched: 'Pastinake', rejected: [], uncheckedTries: ['Mangold'] });
+  });
+
+  it('Kontingent der Frage verbraucht: weitere unbekannte Antworten sind „nicht geprüft“, nicht „falsch“', async () => {
+    const { round } = setup();
+    for (const w of ['Stein', 'Holz', 'Beton']) await round.attempt(w);
+    await round.attempt('Mangold');
+    expect(round.state.feedback).toMatchObject({ kind: 'listOnly' });
+    expect(round.state.unchecked).toEqual(['Mangold']);
+    await round.expire('');
+    expect(round.state.result).toMatchObject({ rejected: ['Stein', 'Holz', 'Beton'], uncheckedTries: ['Mangold'], attempts: 4 });
+  });
+
+  it('Zeitablauf mit nicht prüfbarer letzter Eingabe: „Daneben“ mit Vermerk „nicht geprüft“', async () => {
+    const { round } = setup({ Mangold: { status: 'error' } });
+    await round.expire('Mangold');
+    expect(round.state.result).toMatchObject({ points: 0, timedOut: true, input: 'Mangold', unchecked: 'error', uncheckedTries: ['Mangold'], rejected: [] });
+  });
+});
+
 describe('Timer-Pause während der KI-Prüfung', () => {
   it('der Timer steht während der Prüfung und läuft bei Ablehnung weiter', async () => {
     const { round, states } = setup({}, 2000);
@@ -235,6 +305,7 @@ describe('Fortsetzen nach einem Reload', () => {
     await round.attempt('Mangold');
     expect(calls).toEqual([{ input: 'Mangold', cacheOnly: true }]);
     await round.expire('');
-    expect(round.state.result).toMatchObject({ attempts: 4, rejected: ['Stein', 'Holz', 'Beton', 'Mangold'] });
+    // „Mangold“ wurde nicht mehr geprüft (Kontingent verbraucht) – nicht als falsch gewertet
+    expect(round.state.result).toMatchObject({ attempts: 4, rejected: ['Stein', 'Holz', 'Beton'], uncheckedTries: ['Mangold'] });
   });
 });

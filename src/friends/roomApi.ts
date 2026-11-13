@@ -71,6 +71,8 @@ export interface RoomState {
   my_answer: string | null;
   /** eigene abgelehnte Versuche dieser Frage */
   my_attempts?: string[];
+  /** eigene nicht geprüfte Versuche (KI nicht erreichbar/Limit) – nicht falsch */
+  my_unchecked?: string[];
   /** KI-Prüfungen, die mir bei dieser Frage bleiben */
   my_ai_left?: number;
   reveal: Reveal | null;

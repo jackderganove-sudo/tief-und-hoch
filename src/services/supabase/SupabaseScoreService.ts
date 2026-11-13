@@ -37,6 +37,8 @@ export class SupabaseScoreService extends LocalScoreService {
         // nirgends als Antworten für die Seltenheit mitzählen
         attempts: Math.max(0, Math.min(500, result.attempts ?? 1)),
         invalid_attempts: (result.rejected ?? []).slice(-20).map((a) => a.slice(0, 60)),
+        // nicht geprüfte Eingaben (KI nicht erreichbar/Limit) – nicht falsch, nur nicht gewertet
+        unchecked_attempts: (result.uncheckedTries ?? []).slice(-20).map((a) => a.slice(0, 60)),
         is_practice: practice,
         // Admin-Debug: zählt nirgends (die Datenbank lässt das nur Admins zu)
         is_debug: isDebug(),

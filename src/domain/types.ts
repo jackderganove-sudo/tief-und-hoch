@@ -109,4 +109,6 @@ export interface AnswerResult {
   attempts?: number;
   /** Abgelehnte Eingaben davor, in der Reihenfolge der Eingabe. */
   rejected?: string[];
+  /** Eingaben, die nicht geprüft werden konnten (KI nicht erreichbar/Limit) – nicht als falsch gewertet. */
+  uncheckedTries?: string[];
 }

@@ -21,6 +21,7 @@ import {
   type JudgeQuestion,
   type JudgeResponse,
 } from '../_shared/judge.ts';
+import { hedged, type HedgeError } from '../_shared/hedge.ts';
 
 declare const EdgeRuntime: { waitUntil(p: Promise<unknown>): void } | undefined;
 
@@ -43,6 +44,12 @@ const FALLBACK_HEDGE_MS = 1800;
 /** Breaker: so lange wird das Hauptmodell nach 429 (Kontingent) bzw. 503 (Überlastung) übersprungen. */
 const BLOCK_429_MS = 15 * 60_000;
 const BLOCK_503_MS = 2 * 60_000;
+/** … und nachdem es gehangen hat (kein Fehler, nur zu langsam). Im Log als Status 408. */
+const BLOCK_SLOW_MS = 5 * 60_000;
+const SLOW_STATUS = 408;
+/** So lange (ab Start) hat das Hauptmodell Vorrang vor einer schon vorliegenden Antwort des Ersatzmodells. */
+const PREFER_PRIMARY_MS = 3600;
+const blockFor = (status: number) => (status === 429 ? BLOCK_429_MS : status === SLOW_STATUS ? BLOCK_SLOW_MS : BLOCK_503_MS);
 /** Geheimnis für den nächtlichen Nachprüf-Job (Supabase Cron). Leer = Job deaktiviert. */
 const CRON_SECRET = Deno.env.get('CRON_SECRET') ?? '';
 /** KI-Anfragen (ohne Cache-Treffer) pro Spieler in 24 Stunden. */
@@ -209,61 +216,63 @@ async function primaryBlocked(): Promise<boolean> {
   const { data } = await admin
     .from('ai_judge_log')
     .select('created_at, primary_status')
-    .in('primary_status', [429, 503])
+    .in('primary_status', [429, 503, SLOW_STATUS])
     .gte('created_at', new Date(now - BLOCK_429_MS).toISOString())
     .order('created_at', { ascending: false })
     .limit(1);
   const last = data?.[0];
-  const until = last ? Date.parse(last.created_at) + (last.primary_status === 429 ? BLOCK_429_MS : BLOCK_503_MS) : 0;
+  const until = last ? Date.parse(last.created_at) + blockFor(last.primary_status) : 0;
   breakerCache = { until, checkedAt: now };
   return now < until;
 }
 
 function notePrimaryFailure(status: number) {
-  if (status === 429 || status === 503) {
-    breakerCache = { until: Date.now() + (status === 429 ? BLOCK_429_MS : BLOCK_503_MS), checkedAt: Date.now() };
+  if (status === 429 || status === 503 || status === SLOW_STATUS) {
+    breakerCache = { until: Date.now() + blockFor(status), checkedAt: Date.now() };
   }
 }
 
 /**
- * Hauptmodell zuerst (genauer). Bei 429/503 sofort, sonst nach HEDGE_AFTER_MS läuft das
- * Ersatzmodell parallel; das Hauptmodell gewinnt, wenn es bis zur Deadline antwortet.
+ * Hauptmodell zuerst (genauer). Scheitert es (429/503), sofort, sonst nach HEDGE_AFTER_MS läuft
+ * das Ersatzmodell parallel. Das Hauptmodell gewinnt nur, wenn es innerhalb von
+ * `preferPrimaryMs` antwortet – danach zählt die erste Antwort (siehe _shared/hedge.ts).
+ * Ein hängendes Hauptmodell öffnet den Breaker, damit die nächsten Spieler nicht warten.
  * Ist der Breaker offen, urteilt direkt das Ersatzmodell mit voller Zeit.
  */
-async function askGemini(question: JudgeQuestion, answer: string, budgetMs: number): Promise<Judged> {
+async function askGemini(question: JudgeQuestion, answer: string, budgetMs: number, preferPrimaryMs = PREFER_PRIMARY_MS): Promise<Judged> {
   const t0 = Date.now();
   const deadline = t0 + budgetMs;
   if (FALLBACK_MODEL && (await primaryBlocked())) {
     const r = await askFallback(question, answer, deadline);
     return { ...r, model: FALLBACK_MODEL, primaryStatus: null, note: `${MODEL} pausiert (Breaker)` };
   }
-  const primary = askGeminiOnce(MODEL, THINKING, question, answer, deadline - Date.now());
-  primary.catch(() => {});
-  if (!FALLBACK_MODEL) return { ...(await primary), model: MODEL, primaryStatus: 200 };
+  if (!FALLBACK_MODEL) return { ...(await askGeminiOnce(MODEL, THINKING, question, answer, budgetMs)), model: MODEL, primaryStatus: 200 };
 
-  let primaryErr: GeminiError | null = null;
-  const settled = primary.then(
-    () => true,
-    (e) => ((primaryErr = e as GeminiError), false),
-  );
-  await Promise.race([settled, new Promise((r) => setTimeout(r, HEDGE_AFTER_MS))]);
-  if (!primaryErr && (await Promise.race([settled, Promise.resolve(null)])) === true) {
-    return { ...(await primary), model: MODEL, primaryStatus: 200 };
-  }
-  const fallback = askFallback(question, answer, deadline);
-  fallback.catch(() => {});
   try {
-    return { ...(await primary), model: MODEL, primaryStatus: 200 };
+    const r = await hedged({
+      primary: () => askGeminiOnce(MODEL, THINKING, question, answer, deadline - Date.now()),
+      fallback: () => askFallback(question, answer, deadline),
+      hedgeAfterMs: HEDGE_AFTER_MS,
+      preferPrimaryMs: Math.max(HEDGE_AFTER_MS + 300, Math.min(preferPrimaryMs, budgetMs - 500)),
+    });
+    const err = r.primaryError as GeminiError | undefined;
+    if (err) notePrimaryFailure(err.status);
+    else if (r.primarySlow) notePrimaryFailure(SLOW_STATUS);
+    if (r.from === 'primary') return { ...r.value, model: MODEL, primaryStatus: 200, note: r.primarySlow ? `${MODEL} langsam (${Date.now() - t0} ms)` : undefined };
+    return {
+      ...r.value,
+      model: FALLBACK_MODEL,
+      // 408 = Hauptmodell hing; steht im Log, damit der Breaker für alle Instanzen gilt
+      primaryStatus: err ? err.status || null : SLOW_STATUS,
+      note: err ? err.message : `${MODEL} zu langsam (> ${preferPrimaryMs} ms)`,
+    };
   } catch (e) {
-    const err = e as GeminiError;
-    notePrimaryFailure(err.status);
-    try {
-      return { ...(await fallback), model: FALLBACK_MODEL, primaryStatus: err.status || null, note: err.message };
-    } catch (e2) {
-      const err2 = new GeminiError(FALLBACK_MODEL, (e2 as GeminiError).status ?? 0, `${err.message.slice(0, 180)} | ${String((e2 as Error).message).slice(0, 180)}`);
-      (err2 as GeminiError & { primaryStatus?: number }).primaryStatus = err.status;
-      throw err2;
-    }
+    const h = e as HedgeError;
+    const pe = h.primaryError as GeminiError | undefined;
+    if (pe) notePrimaryFailure(pe.status);
+    const err2 = new GeminiError(FALLBACK_MODEL, (h.fallbackError as GeminiError)?.status ?? 0, h.message);
+    (err2 as GeminiError & { primaryStatus?: number }).primaryStatus = pe?.status;
+    throw err2;
   }
 }
 
@@ -290,9 +299,10 @@ async function judgeAndStore(
   // Die eigentliche Prüfung darf länger dauern als der Spieler wartet (Hintergrund).
   const work = (async (): Promise<JudgeResponse> => {
     try {
-      const { model, primaryStatus, note, ...result } = await askGemini(question, answer, BACKGROUND_TIMEOUT_MS);
+      // Das Hauptmodell hat nur Vorrang, solange der Spieler noch wartet (mit Puffer fürs Antworten)
+      const { model, primaryStatus, note, ...result } = await askGemini(question, answer, BACKGROUND_TIMEOUT_MS, Math.min(15_000, waitMs - 1200));
       const ms = Date.now() - t0;
-      log(userId, questionId, { kind: 'model', ms, model, primaryStatus, detail: [note && `Ersatzmodell ${model} – ${note}`, ms > waitMs && 'im Hintergrund fertig'].filter(Boolean).join(' · ') || undefined });
+      log(userId, questionId, { kind: 'model', ms, model, primaryStatus, detail: [note && (model === MODEL ? note : `Ersatzmodell ${model} – ${note}`), ms > waitMs && 'im Hintergrund fertig'].filter(Boolean).join(' · ') || undefined });
       const { error } = await admin.from('ai_verdicts').upsert(
         {
           question_id: questionId,
@@ -520,7 +530,7 @@ async function judgeRoomCustom(userId: string, code: string, idx: number, rawAns
   const question: JudgeQuestion = { lang: rq.lang === 'en' ? 'en' : 'de', prompt: rq.custom_prompt, answers: [] };
   const t0 = Date.now();
   try {
-    const { model, primaryStatus, ...result } = await askGemini(question, answer, 8000);
+    const { model, primaryStatus, ...result } = await askGemini(question, answer, 8000, PREFER_PRIMARY_MS);
     log(userId, logId, { kind: 'model', ms: Date.now() - t0, model, primaryStatus });
     return json(verdict(result));
   } catch (e) {

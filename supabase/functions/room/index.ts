@@ -600,8 +600,8 @@ async function closeAttempts(roomId: string, idx: number): Promise<void> {
       user_id: a.user_id,
       raw: a.raw,
       normalized: normalize(a.raw).slice(0, 100),
-      // laufende oder gescheiterte Prüfung = nicht geprüft
-      status: a.status === 'invalid' ? 'invalid' : 'unchecked',
+      // laufende/gescheiterte Prüfung oder gar nicht mehr geprüft (KI-Kontingent, Limit) = nicht geprüft, nicht „falsch“
+      status: a.status === 'invalid' && a.reason !== 'list_only' && a.reason !== 'limited' ? 'invalid' : 'unchecked',
       source: a.ai || a.status !== 'invalid' ? 'ai' : 'list',
       global_tier: 'invalid',
       global_points: 0,
